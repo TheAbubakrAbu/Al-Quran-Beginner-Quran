@@ -79,6 +79,8 @@
 /* Begin PBXFileReference section */
 		720296862D419CFE009BA21E /* Arabic.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Arabic.swift; sourceTree = "<group>"; };
 		720296892D419D13009BA21E /* ArabicLetterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArabicLetterView.swift; sourceTree = "<group>"; };
+		7202968D2D419F1B009BA21E /* Apple Watch.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Apple Watch.plist"; sourceTree = "<group>"; };
+		7202968F2D419F28009BA21E /* iPhone.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = iPhone.plist; sourceTree = "<group>"; };
 		720D00882C1AABB000D00D7E /* CopyAyah.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CopyAyah.swift; sourceTree = "<group>"; };
 		720D008B2C1AABB600D00D7E /* QuranPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuranPlayer.swift; sourceTree = "<group>"; };
 		720DEC692D24581D006EA342 /* CreditsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreditsView.swift; sourceTree = "<group>"; };
@@ -99,13 +101,11 @@
 		72F479C62B36A83C00FCF22C /* ToolsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolsView.swift; sourceTree = "<group>"; };
 		72F479C82B36A9A600FCF22C /* 99_Names_Of_Allah.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = 99_Names_Of_Allah.json; sourceTree = "<group>"; };
 		72F479CA2B36ACAD00FCF22C /* iPhone.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = iPhone.entitlements; sourceTree = "<group>"; };
-		72F479CB2B36ACC600FCF22C /* iPhone.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = iPhone.plist; sourceTree = SOURCE_ROOT; };
 		72F479F72B36B95D00FCF22C /* Beginner Quran.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Beginner Quran.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		72F479F92B36B95D00FCF22C /* AlQuranApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlQuranApp.swift; sourceTree = "<group>"; };
 		72F479FB2B36B95D00FCF22C /* OtherView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OtherView.swift; sourceTree = "<group>"; };
 		72F479FD2B36B95E00FCF22C /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		72F47A162B36B9D300FCF22C /* Apple Watch.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "Apple Watch.entitlements"; sourceTree = "<group>"; };
-		72F47A172B36B9DB00FCF22C /* Apple Watch.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Apple Watch.plist"; sourceTree = SOURCE_ROOT; };
 		72F47A1A2B36BF0300FCF22C /* SplashScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplashScreen.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -161,7 +161,7 @@
 			isa = PBXGroup;
 			children = (
 				72F479CA2B36ACAD00FCF22C /* iPhone.entitlements */,
-				72F479CB2B36ACC600FCF22C /* iPhone.plist */,
+				7202968F2D419F28009BA21E /* iPhone.plist */,
 				729E23802B367CA800E1E0DA /* Assets.xcassets */,
 				729E237C2B367CA700E1E0DA /* AlQuranApp.swift */,
 				72F47A1A2B36BF0300FCF22C /* SplashScreen.swift */,
@@ -227,7 +227,7 @@
 			isa = PBXGroup;
 			children = (
 				72F47A162B36B9D300FCF22C /* Apple Watch.entitlements */,
-				72F47A172B36B9DB00FCF22C /* Apple Watch.plist */,
+				7202968D2D419F1B009BA21E /* Apple Watch.plist */,
 				72F479FD2B36B95E00FCF22C /* Assets.xcassets */,
 				72F479F92B36B95D00FCF22C /* AlQuranApp.swift */,
 				72F479FB2B36B95D00FCF22C /* OtherView.swift */,
@@ -528,7 +528,7 @@
 				DEVELOPMENT_TEAM = 8HQMC4MQ59;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = iPhone.plist;
+				INFOPLIST_FILE = iPhone/iPhone.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Al-Quran";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -561,7 +561,7 @@
 				DEVELOPMENT_TEAM = 8HQMC4MQ59;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = iPhone.plist;
+				INFOPLIST_FILE = iPhone/iPhone.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Al-Quran";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -594,7 +594,7 @@
 				DEVELOPMENT_TEAM = 8HQMC4MQ59;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = "Apple Watch.plist";
+				INFOPLIST_FILE = "Apple Watch/Apple Watch.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "Al-Quran";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = "com.Quran.Elmallah.Beginner-Quran";
@@ -626,7 +626,7 @@
 				DEVELOPMENT_TEAM = 8HQMC4MQ59;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = "Apple Watch.plist";
+				INFOPLIST_FILE = "Apple Watch/Apple Watch.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "Al-Quran";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = "com.Quran.Elmallah.Beginner-Quran";

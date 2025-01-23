@@ -42,40 +42,48 @@ struct CreditsView: View {
                 .font(.body)
                 .multilineTextAlignment(.leading)
             
-            Link("Credit for the Arabic and English transliteration of the Quran data goes to Risan Bagja Pradana", destination: URL(string: "https://github.com/risan/quran-json")!)
-                .foregroundColor(settings.accentColor.color)
+            Link("View the source code on GitHub: github.com/TheAbubakrAbu/Al-Quran-Beginner-Quran", destination: URL(string: "https://github.com/TheAbubakrAbu/Al-Quran-Beginner-Quran")!)
                 .font(.body)
-            
-            Link("Credit for the English Saheeh International translation of the Quran data goes to Global Quran", destination: URL(string: "https://globalquran.com/download/data/")!)
                 .foregroundColor(settings.accentColor.color)
-                .font(.body)
             
-            Link("Credit for the Uthmani Hafs Quran font goes to Urdu Nigar", destination: URL(string: "https://urdunigaar.com/download/hafs-quran-ttf-font/")!)
-                .foregroundColor(settings.accentColor.color)
-                .font(.body)
+            Section(header: Text("CREDITS")) {
+                Link("Credit for the Arabic and English transliteration of the Quran data goes to Risan Bagja Pradana", destination: URL(string: "https://github.com/risan/quran-json")!)
+                    .foregroundColor(settings.accentColor.color)
+                    .font(.body)
+                
+                Link("Credit for the English Saheeh International translation of the Quran data goes to Global Quran", destination: URL(string: "https://globalquran.com/download/data/")!)
+                    .foregroundColor(settings.accentColor.color)
+                    .font(.body)
+                
+                Link("Credit for the Uthmani Hafs Quran font goes to Urdu Nigar", destination: URL(string: "https://urdunigaar.com/download/hafs-quran-ttf-font/")!)
+                    .foregroundColor(settings.accentColor.color)
+                    .font(.body)
+                
+                Link("Credit for the Indopak Quran font goes to Urdu Nigar", destination: URL(string: "https://urdunigaar.com/download/al-mushaf-arabic-font-ttf-font-download/")!)
+                    .foregroundColor(settings.accentColor.color)
+                    .font(.body)
+                
+                Link("Credit for the 99 Names of Allah from KabDeveloper", destination: URL(string: "https://github.com/KabDeveloper/99-Names-Of-Allah/tree/main")!)
+                    .foregroundColor(settings.accentColor.color)
+                    .font(.body)
+                
+                Link("Credit for the Quran Recitations goes to Al Quran", destination: URL(string: "https://alquran.cloud/cdn")!)
+                    .foregroundColor(settings.accentColor.color)
+                    .font(.body)
+                
+                Link("Credit for the Ayah Quran Recitations goes to Al Quran", destination: URL(string: "https://alquran.cloud/cdn")!)
+                    .foregroundColor(settings.accentColor.color)
+                    .font(.body)
+                
+                Link("Credit for the Surah Quran Recitations goes to MP3 Quran", destination: URL(string: "https://mp3quran.net/eng")!)
+                    .foregroundColor(settings.accentColor.color)
+                    .font(.body)
+            }
             
-            Link("Credit for the Indopak Quran font goes to Urdu Nigar", destination: URL(string: "https://urdunigaar.com/download/al-mushaf-arabic-font-ttf-font-download/")!)
-                .foregroundColor(settings.accentColor.color)
-                .font(.body)
-            
-            Link("Credit for the 99 Names of Allah from KabDeveloper", destination: URL(string: "https://github.com/KabDeveloper/99-Names-Of-Allah/tree/main")!)
-                .foregroundColor(settings.accentColor.color)
-                .font(.body)
-            
-            Link("Credit for the Quran Recitations goes to Al Quran", destination: URL(string: "https://alquran.cloud/cdn")!)
-                .foregroundColor(settings.accentColor.color)
-                .font(.body)
-            
-            Link("Credit for the Ayah Quran Recitations goes to Al Quran", destination: URL(string: "https://alquran.cloud/cdn")!)
-                .foregroundColor(settings.accentColor.color)
-                .font(.body)
-            
-            Link("Credit for the Surah Quran Recitations goes to MP3 Quran", destination: URL(string: "https://mp3quran.net/eng")!)
-                .foregroundColor(settings.accentColor.color)
-                .font(.body)
-            
-            Text("Version 1.3.2")
-                .font(.caption)
+            Section {
+                Text("Version 1.3.2")
+                    .font(.caption)
+            }
 
             Section(header: Text("APPS BY ABUBAKR ELMALLAH")) {
                 HStack {

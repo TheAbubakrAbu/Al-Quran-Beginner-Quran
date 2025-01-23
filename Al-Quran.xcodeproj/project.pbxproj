@@ -90,6 +90,8 @@
 		729E237C2B367CA700E1E0DA /* AlQuranApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlQuranApp.swift; sourceTree = "<group>"; };
 		729E23802B367CA800E1E0DA /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		72CA76F92CD48B11002D4EFB /* quran_en.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = quran_en.json; sourceTree = "<group>"; };
+		72E4E58D2D41B26D00E7FADD /* LICENSE.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = LICENSE.txt; sourceTree = "<group>"; };
+		72E4E58E2D41B26D00E7FADD /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		72F479A82B367DE200FCF22C /* LaunchScreen.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = LaunchScreen.swift; sourceTree = "<group>"; };
 		72F479AC2B367DE200FCF22C /* quran.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = quran.json; sourceTree = "<group>"; };
 		72F479AD2B367DE200FCF22C /* SurahsView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SurahsView.swift; sourceTree = "<group>"; };
@@ -140,6 +142,8 @@
 		729E23702B367CA700E1E0DA = {
 			isa = PBXGroup;
 			children = (
+				72E4E58D2D41B26D00E7FADD /* LICENSE.txt */,
+				72E4E58E2D41B26D00E7FADD /* README.md */,
 				72F479B02B367DE200FCF22C /* Fonts */,
 				72F479AA2B367DE200FCF22C /* JSONs */,
 				729E237B2B367CA700E1E0DA /* iPhone */,

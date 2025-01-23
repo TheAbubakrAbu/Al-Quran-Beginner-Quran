@@ -151,6 +151,10 @@ struct ArabicLetterView: View {
                     }
                 }
             }
+            #if !os(watchOS)
+            .applyConditionalListStyle(defaultView: true)
+            .dismissKeyboardOnScroll()
+            #endif
             
             #if !os(watchOS)
             Picker("Arabic Font", selection: $settings.useFontArabic.animation(.easeInOut)) {
@@ -162,10 +166,6 @@ struct ArabicLetterView: View {
             .padding(.bottom, 12)
             #endif
         }
-        #if !os(watchOS)
-        .applyConditionalListStyle(defaultView: true)
-        .dismissKeyboardOnScroll()
-        #endif
         .navigationTitle(letterData.letter)
     }
 }
@@ -180,6 +180,7 @@ extension Array {
 
 struct TashkeelRow: View {
     @EnvironmentObject var settings: Settings
+    
     let letterData: LetterData
     let tashkeels: [Tashkeel]
 

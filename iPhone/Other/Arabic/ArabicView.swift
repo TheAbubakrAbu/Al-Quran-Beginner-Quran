@@ -91,77 +91,14 @@ struct ArabicView: View {
                     }
                     
                     Section(header: Text("QURAN SIGNS")) {
-                        HStack {
-                            Text("Make Sujood (Prostration)")
-                                .font(.subheadline)
-                            Spacer()
-                            Text("۩")
-                                .font(.subheadline)
-                                .foregroundColor(settings.accentColor.color)
-                        }
-                        
-                        HStack {
-                            Text("The Mandatory Stop")
-                                .font(.subheadline)
-                            Spacer()
-                            Text("مـ")
-                                .font(.subheadline)
-                                .foregroundColor(settings.accentColor.color)
-                        }
-                        
-                        HStack {
-                            Text("The Preferred Stop")
-                                .font(.subheadline)
-                            Spacer()
-                            Text("قلى")
-                                .font(.subheadline)
-                                .foregroundColor(settings.accentColor.color)
-                        }
-                        
-                        HStack {
-                            Text("The Permissible Stop")
-                                .font(.subheadline)
-                            Spacer()
-                            Text("ج")
-                                .font(.subheadline)
-                                .foregroundColor(settings.accentColor.color)
-                        }
-                        
-                        HStack {
-                            Text("The Short Pause")
-                                .font(.subheadline)
-                            Spacer()
-                            Text("س")
-                                .font(.subheadline)
-                                .foregroundColor(settings.accentColor.color)
-                        }
-                        
-                        HStack {
-                            Text("Stop at One")
-                                .font(.subheadline)
-                            Spacer()
-                            Text("∴ ∴")
-                                .font(.subheadline)
-                                .foregroundColor(settings.accentColor.color)
-                        }
-                        
-                        HStack {
-                            Text("The Preferred Continuation")
-                                .font(.subheadline)
-                            Spacer()
-                            Text("صلى")
-                                .font(.subheadline)
-                                .foregroundColor(settings.accentColor.color)
-                        }
-                        
-                        HStack {
-                            Text("The Mandatory Continuation")
-                                .font(.subheadline)
-                            Spacer()
-                            Text("لا")
-                                .font(.subheadline)
-                                .foregroundColor(settings.accentColor.color)
-                        }
+                        StopInfoRow(title: "Make Sujood (Prostration)", symbol: "۩", color: settings.accentColor.color)
+                        StopInfoRow(title: "The Mandatory Stop", symbol: "مـ", color: settings.accentColor.color)
+                        StopInfoRow(title: "The Preferred Stop", symbol: "قلى", color: settings.accentColor.color)
+                        StopInfoRow(title: "The Permissible Stop", symbol: "ج", color: settings.accentColor.color)
+                        StopInfoRow(title: "The Short Pause", symbol: "س", color: settings.accentColor.color)
+                        StopInfoRow(title: "Stop at One", symbol: "∴ ∴", color: settings.accentColor.color)
+                        StopInfoRow(title: "The Preferred Continuation", symbol: "صلى", color: settings.accentColor.color)
+                        StopInfoRow(title: "The Mandatory Continuation", symbol: "لا", color: settings.accentColor.color)
                         
                         Link("View More: Tajweed Rules & Stopping/Pausing Signs",
                              destination: URL(string: "https://studioarabiya.com/blog/tajweed-rules-stopping-pausing-signs/")!)
@@ -310,6 +247,23 @@ struct ArabicNumberRow: View {
             Text(numberData.number)
                 .font(.title2)
                 .foregroundColor(settings.accentColor.color)
+        }
+    }
+}
+
+struct StopInfoRow: View {
+    let title: String
+    let symbol: String
+    let color: Color
+    
+    var body: some View {
+        HStack {
+            Text(title)
+                .font(.subheadline)
+            Spacer()
+            Text(symbol)
+                .font(.subheadline)
+                .foregroundColor(color)
         }
     }
 }

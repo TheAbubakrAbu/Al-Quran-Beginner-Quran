@@ -1,6 +1,7 @@
 # Al-Quran | Beginner Quran
 
 A free, beginner-friendly Quran app with unique Arabic learning tools, recitations, and translations.
+Published on the App Store on December 26, 2023.
 
 ## Overview
 

@@ -38,17 +38,24 @@ struct CreditsView: View {
             }
             .listRowSeparator(.hidden)
             
-            Text("This app was inspired by my desire to help new reverts and non-Muslims learn about Islam and easily access the Quran and prayer times. I’m deeply grateful to my parents for instilling in me a love for the faith—may Allah reward them. I also extend my thanks to my teacher, Mr. Joe Silvey, who, though not Muslim, has been a constant ally, supporting our school's Muslim Student Association and helping us hold weekly Jummuah prayers.")
-                .font(.body)
-                .multilineTextAlignment(.leading)
+            Section {
+                Text("This app was inspired by my desire to help new reverts and non-Muslims learn about Islam and easily access the Quran and prayer times. I’m deeply grateful to my parents for instilling in me a love for the faith—may Allah reward them. I also extend my thanks to my teacher, Mr. Joe Silvey, who, though not Muslim, has been a constant ally, supporting our school's Muslim Student Association and helping us hold weekly Jummuah prayers.")
+                    .font(.body)
+                    .multilineTextAlignment(.leading)
+                
+                Link("View the source code on GitHub: github.com/TheAbubakrAbu/Al-Quran-Beginner-Quran", destination: URL(string: "https://github.com/TheAbubakrAbu/Al-Quran-Beginner-Quran")!)
+                    .font(.body)
+                    .foregroundColor(settings.accentColor.color)
+                
+                Link("This app won the Swift Student Challenge 2024. View its source code on GitHub here", destination: URL(string: "https://github.com/TheAbubakrAbu/Al-Quran-Swift-Student-Challenge-2024")!)
+                    .font(.body)
+                    .foregroundColor(settings.accentColor.color)
+            }
             
-            Link("View the source code on GitHub: github.com/TheAbubakrAbu/Al-Quran-Beginner-Quran", destination: URL(string: "https://github.com/TheAbubakrAbu/Al-Quran-Beginner-Quran")!)
-                .font(.body)
-                .foregroundColor(settings.accentColor.color)
-            
-            Link("This app won the Swift Student Challenge 2024. View its source code on GitHub here.", destination: URL(string: "https://github.com/TheAbubakrAbu/Al-Quran-Swift-Student-Challenge-2024")!)
-                .font(.body)
-                .foregroundColor(settings.accentColor.color)
+            Section {
+                Text("Version 1.3.3")
+                    .font(.caption)
+            }
             
             Section(header: Text("CREDITS")) {
                 Link("Credit for the Arabic and English transliteration of the Quran data goes to Risan Bagja Pradana", destination: URL(string: "https://github.com/risan/quran-json")!)
@@ -82,11 +89,6 @@ struct CreditsView: View {
                 Link("Credit for the Surah Quran Recitations goes to MP3 Quran", destination: URL(string: "https://mp3quran.net/eng")!)
                     .foregroundColor(settings.accentColor.color)
                     .font(.body)
-            }
-            
-            Section {
-                Text("Version 1.3.3")
-                    .font(.caption)
             }
 
             Section(header: Text("APPS BY ABUBAKR ELMALLAH")) {

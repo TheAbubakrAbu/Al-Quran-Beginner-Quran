@@ -46,6 +46,10 @@ struct CreditsView: View {
                 .font(.body)
                 .foregroundColor(settings.accentColor.color)
             
+            Link("This app won the Swift Student Challenge 2024. View its source code on GitHub here.", destination: URL(string: "https://github.com/TheAbubakrAbu/Al-Quran-Swift-Student-Challenge-2024")!)
+                .font(.body)
+                .foregroundColor(settings.accentColor.color)
+            
             Section(header: Text("CREDITS")) {
                 Link("Credit for the Arabic and English transliteration of the Quran data goes to Risan Bagja Pradana", destination: URL(string: "https://github.com/risan/quran-json")!)
                     .foregroundColor(settings.accentColor.color)
@@ -81,7 +85,7 @@ struct CreditsView: View {
             }
             
             Section {
-                Text("Version 1.3.2")
+                Text("Version 1.3.3")
                     .font(.caption)
             }
 

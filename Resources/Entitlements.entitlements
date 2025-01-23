@@ -2,14 +2,9 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>UIAppFonts</key>
+	<key>com.apple.security.application-groups</key>
 	<array>
-		<string>Indopak.ttf</string>
-		<string>Hafs.ttf</string>
-	</array>
-	<key>UIBackgroundModes</key>
-	<array>
-		<string>audio</string>
+		<string>group.com.IslamicPillars.AppGroup</string>
 	</array>
 </dict>
 </plist>

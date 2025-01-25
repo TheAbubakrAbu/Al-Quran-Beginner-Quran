@@ -6,7 +6,7 @@ Discover **Al-Quran**: A free, beginner-friendly app featuring Arabic Beginner M
 
 I was a **17-year-old** high school student when this app was published on the App Store on **December 26, 2023**.
 
-[Download Al-Quran on the App Store here](https://apps.apple.com/us/app/al-quran-beginner-quran/id6474894373?platform=iphone)
+[**Download Al-Quran on the App Store here**](https://apps.apple.com/us/app/al-quran-beginner-quran/id6474894373?platform=iphone)
 
 ## Overview
 

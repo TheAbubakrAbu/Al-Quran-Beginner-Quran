@@ -1,7 +1,12 @@
 # Al-Quran | Beginner Quran
 
-A free, beginner-friendly Quran app with unique Arabic learning tools, recitations, and translations.
-Published on the App Store on December 26, 2023.
+**Apple Ecosystem App** – Available on iPhone, iPad, Mac, and Apple Watch
+
+Discover **Al-Quran**: A free, beginner-friendly app featuring Arabic Beginner Mode with spaced letters, recitations, and the ability to share ayahs as text or images!
+
+I was a **17-year-old** high school student when this app was published on the App Store on **December 26, 2023**.
+
+[Download Al-Quran on the App Store here](https://apps.apple.com/us/app/al-quran-beginner-quran/id6474894373?platform=iphone)
 
 ## Overview
 

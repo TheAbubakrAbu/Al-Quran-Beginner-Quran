@@ -19,7 +19,6 @@ struct SplashScreen: View {
                     .resizable()
                     .aspectRatio(contentMode: .fit)
                     .cornerRadius(10)
-                    .frame(maxWidth: 300)
                     .padding()
                 
                 Spacer()

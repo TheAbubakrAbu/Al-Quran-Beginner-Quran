@@ -151,10 +151,8 @@ struct ArabicLetterView: View {
                     }
                 }
             }
-            #if !os(watchOS)
             .applyConditionalListStyle(defaultView: true)
             .dismissKeyboardOnScroll()
-            #endif
             
             #if !os(watchOS)
             Picker("Arabic Font", selection: $settings.useFontArabic.animation(.easeInOut)) {

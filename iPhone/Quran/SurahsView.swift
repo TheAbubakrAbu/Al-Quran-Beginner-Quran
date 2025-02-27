@@ -167,7 +167,7 @@ struct SurahsView: View {
                                         NavigationLink(destination: AyahsView(surah: surah).transition(.opacity)
                                             .animation(.easeInOut, value: lastListenedSurah.surahName)) {
                                             HStack {
-                                                Text(lastListenedSurah.surahName)
+                                                Text("Surah \(lastListenedSurah.surahNumber): \(lastListenedSurah.surahName)")
                                                     .font(.headline)
                                                     .foregroundColor(settings.accentColor.color)
                                                     .lineLimit(1)
@@ -1028,10 +1028,9 @@ struct SurahsView: View {
                            }
                         }
                     }
-                    #if !os(watchOS)
                     .applyConditionalListStyle(defaultView: settings.defaultView)
                     .dismissKeyboardOnScroll()
-                    #else
+                    #if os(watchOS)
                     .searchable(text: $searchText)
                     #endif
                     .onChange(of: scrollToSurahID) { id in

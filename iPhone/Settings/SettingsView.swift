@@ -16,9 +16,7 @@ struct SettingsView: View {
                                 .environmentObject(quranData)
                                 .environmentObject(settings)
                         }
-                        #if !os(watchOS)
                         .applyConditionalListStyle(defaultView: true)
-                        #endif
                         .navigationTitle("Al-Quran Settings")
                         .navigationBarTitleDisplayMode(.inline)
                     ) {
@@ -104,9 +102,7 @@ struct SettingsView: View {
                 }
             }
             .navigationTitle("Settings")
-            #if !os(watchOS)
             .applyConditionalListStyle(defaultView: true)
-            #endif
         }
         .navigationViewStyle(.stack)
     }

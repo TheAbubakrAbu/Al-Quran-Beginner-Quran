@@ -47,32 +47,7 @@ struct SettingsView: View {
                             .multilineTextAlignment(.center)
                     }
                     .sheet(isPresented: $showingCredits) {
-                        NavigationView {
-                            VStack {
-                                Text("Credits")
-                                    .foregroundColor(settings.accentColor.color)
-                                    .font(.title)
-                                    .padding(.top, 20)
-                                    .padding(.bottom, 4)
-                                    .padding(.horizontal)
-                                
-                                CreditsView()
-                                
-                                Button(action: {
-                                    settings.hapticFeedback()
-                                    
-                                    showingCredits = false
-                                }) {
-                                    Text("Done")
-                                        .padding()
-                                        .frame(maxWidth: .infinity)
-                                        .background(settings.accentColor.color)
-                                        .foregroundColor(.primary)
-                                        .cornerRadius(10)
-                                        .padding(.horizontal, 16)
-                                }
-                            }
-                        }
+                        CreditsView()
                     }
                     #endif
                     
@@ -142,14 +117,12 @@ struct SettingsQuranView: View {
         Section(header: Text("ARABIC TEXT")) {
             Toggle("Show Arabic Quran Text", isOn: $settings.showArabicText.animation(.easeInOut))
                 .font(.subheadline)
-                .tint(settings.accentColor.color)
                 .disabled(!settings.showTransliteration && !settings.showEnglishTranslation)
             
             if settings.showArabicText {
                 VStack(alignment: .leading) {
                     Toggle("Remove Arabic Tashkeel (Vowel Diacritics) and Signs", isOn: $settings.cleanArabicText.animation(.easeInOut))
                         .font(.subheadline)
-                        .tint(settings.accentColor.color)
                         .disabled(!settings.showArabicText)
                     
                     #if !os(watchOS)
@@ -182,7 +155,6 @@ struct SettingsQuranView: View {
                 VStack(alignment: .leading) {
                     Toggle("Enable Arabic Beginner Mode", isOn: $settings.beginnerMode.animation(.easeInOut))
                         .font(.subheadline)
-                        .tint(settings.accentColor.color)
                         .disabled(!settings.showArabicText)
                     
                     Text("Puts a space between each Arabic letter to make it easier for beginners to read the Quran.")
@@ -196,12 +168,10 @@ struct SettingsQuranView: View {
         Section(header: Text("ENGLISH TEXT")) {
             Toggle("Show Transliteration", isOn: $settings.showTransliteration.animation(.easeInOut))
                 .font(.subheadline)
-                .tint(settings.accentColor.color)
                 .disabled(!settings.showArabicText && !settings.showEnglishTranslation)
             
             Toggle("Show English Translation", isOn: $settings.showEnglishTranslation.animation(.easeInOut))
                 .font(.subheadline)
-                .tint(settings.accentColor.color)
                 .disabled(!settings.showArabicText && !settings.showTransliteration)
             
             if settings.showTransliteration || settings.showEnglishTranslation {
@@ -213,7 +183,6 @@ struct SettingsQuranView: View {
             
             Toggle("Use System Font Size", isOn: $settings.useSystemFontSize.animation(.easeInOut))
                 .font(.subheadline)
-                .tint(settings.accentColor.color)
                 .onChange(of: settings.useSystemFontSize) { useSystemFontSize in
                     if useSystemFontSize {
                         settings.englishFontSize = UIFont.preferredFont(forTextStyle: .body).pointSize
@@ -452,7 +421,6 @@ struct SettingsAppearanceView: View {
         VStack(alignment: .leading) {
             Toggle("Default List View", isOn: $settings.defaultView.animation(.easeInOut))
                 .font(.subheadline)
-                .tint(settings.accentColor.color)
             
             Text("The default list view is the standard interface found in many of Apple's first party apps, including Notes. This setting only applies to the main view.")
                 .font(.caption)
@@ -464,7 +432,6 @@ struct SettingsAppearanceView: View {
         VStack(alignment: .leading) {
             Toggle("Haptic Feedback", isOn: $settings.hapticOn.animation(.easeInOut))
                 .font(.subheadline)
-                .tint(settings.accentColor.color)
         }
     }
 }

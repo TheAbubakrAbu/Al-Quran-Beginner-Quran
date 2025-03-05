@@ -9,40 +9,42 @@ I was a **17-year-old** high school student when this app was published on the A
 [**Download Al-Quran on the App Store here**](https://apps.apple.com/us/app/al-quran-beginner-quran/id6474894373?platform=iphone)
 
 ## Overview
+Al-Quran | Beginner Quran is a complete Quranic experience designed for new learners, reverts, and those seeking a focused Quran study tool. With intuitive features and a seamless design, this app helps users read, understand, and interact with the Quran effortlessly.
 
-Discover **Al-Quran | Beginner Quran**, a streamlined and user-friendly app designed for beginners, reverts, and anyone seeking a focused study of the Holy Quran. With an innovative approach to learning Arabic and engaging Quranic features, this app serves as a comprehensive tool for spiritual growth and reflection.
+## Unique Features
+- **Arabic Beginner Mode** – Struggling with Arabic script? This mode spaces out each letter, making it easier to recognize and read Arabic, perfect for beginners.
+- **Unique Ayah Sharing** – Share Quranic verses as text or images effortlessly.
 
-## Features  
+## The Complete Quran
+- **View by Surah or Juz** – Browse by Surah (114 chapters) or by Juz, with the starting Ayah of each section displayed.
+- **Read in Arabic, English Transliteration, and Translation** – Engage with the Quran in your preferred way.
+- **Bookmark and Favorite Ayahs** – Save important verses for later.
+- **Last Read and Last Listened Ayah** – Quickly return to where you left off.
+- **Powerful Quran Search** – Find any Ayah instantly using `Surah:Ayah` format (e.g., `5:27`) or keyword search.
+- **Remove Tashkeel (Diacritics)** – Enable a mode that removes vowel markings for a cleaner reading experience.
+- **Listen to Recitations** – Choose from 10+ reciters with Surah and Ayah-by-Ayah playback.
+- **Random Surah Mode** – Discover new chapters by letting the app select a Surah for you.
 
-### Beginner-Friendly Arabic Learning
+## Essential Islamic Tools
+- **Common Adhkar and Duas** – Strengthen your spiritual connection with daily supplications.
+- **Tasbih Counter** – Track your dhikr with an intuitive counter.
+- **99 Names of Allah** – Learn and reflect on Allah’s beautiful names and meanings.
+- **Hijri Calendar & Converter** – View both Hijri and Gregorian dates and convert between them.
+- **Islamic Wallpapers** – Access inspiring wallpapers for spiritual reflection.
 
-- **Arabic Beginner Mode** – Spaces between each letter to help new learners **recognize and understand Arabic script** more easily.  
-- **Complete Arabic Alphabet** – Learn **all Arabic letters, special letters, and numbers** with clear examples of different letter forms.  
+## Learn the Arabic Alphabet Easily
+- **Complete Arabic Alphabet** – View all Arabic letters, special letters, and numbers.
+- **Letter Forms & Diacritics** – See how letters change in different positions with vowel markings.
+- **Quranic Stopping Signs** – Learn essential symbols used in Quranic recitation.
 
-### Quranic Study Tools
+## Fully Customizable and User-Friendly
+- **Customize Quran Text Size, Arabic Fonts, and Accent Colors** – Adjust settings for a personalized reading experience.
+- **Apple Watch Support** – Quickly access your last read Ayah and Quranic tools on your wrist.
+- **Simple and Clean Interface** – Designed for distraction-free Quran study.
 
-- **Read and Listen** –  
-  - Access the **entire Quran in Arabic**, with **English translation and transliteration**.  
-  - Listen to recitations of **Ayahs and Surahs** with a choice of **multiple reciters**.  
-- **Ayah Sharing** – Share **Quranic verses as text or images**, making it easier to spread the message of the Quran.  
-- **Customizable Quran Reading** –  
-  - Remove **tashkeel (vowel diacritics)** for a cleaner reading experience.  
-  - Choose **your preferred Arabic font and accent color**.  
-
-### Additional Features
-
-- **Bookmark and Favorite Ayahs** – Save your **favorite Surahs and Ayahs**, and keep track of your **last read and last listened Ayah**.  
-- **Adhkar and Duas** – Access **common supplications** to enhance your spiritual journey.  
-- **Tasbih Counter** – Track your **dhikr (remembrance of Allah)** effortlessly.  
-- **99 Names of Allah** – Explore and reflect on **Allah’s beautiful names and attributes**.  
-- **Hijri Calendar & Converter** – View **both Hijri and Gregorian dates** and convert between them seamlessly.  
-- **Islamic Wallpapers** – Access **beautiful wallpapers** for inspiration.  
-
-### Privacy and Accessibility
-
-- **Completely Free** – No fees, subscriptions, or in-app purchases.  
-- **Ad-Free Experience** – Focus on your spiritual journey without distractions.  
-- **Privacy-Focused** – Your data **never leaves your device**, ensuring complete security and privacy.
+## 100% Free, Ad-Free, and Privacy-Focused
+- No ads, fees, or subscriptions.
+- Your data never leaves your device, ensuring complete privacy and security.
 
 ## License
 

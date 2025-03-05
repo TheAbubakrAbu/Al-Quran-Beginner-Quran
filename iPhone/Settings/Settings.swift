@@ -55,9 +55,6 @@ class Settings: ObservableObject {
         self.appGroupUserDefaults = UserDefaults(suiteName: "group.com.IslamicPillars.AppGroup")
         
         self.accentColor = AccentColor(rawValue: appGroupUserDefaults?.string(forKey: "colorAccent") ?? "green") ?? .green
-        if appGroupUserDefaults?.object(forKey: "colorAccent") == nil {
-            appGroupUserDefaults?.set("green", forKey: "colorAccent")
-        }
         
         self.favoriteSurahsData = appGroupUserDefaults?.data(forKey: "favoriteSurahsData") ?? Data()
         self.bookmarkedAyahsData = appGroupUserDefaults?.data(forKey: "bookmarkedAyahsData") ?? Data()

@@ -30,6 +30,7 @@ struct BeginnerQuranApp: App {
             .environmentObject(namesData)
             .environmentObject(settings)
             .accentColor(settings.accentColor.color)
+            .tint(settings.accentColor.color)
             .preferredColorScheme(settings.colorScheme)
             .transition(.opacity)
         }

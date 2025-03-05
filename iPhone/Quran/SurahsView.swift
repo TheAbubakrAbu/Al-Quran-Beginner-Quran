@@ -67,13 +67,13 @@ struct JuzHeader: View {
                 Group {
                     if let randomS = randomSurah(for: juz) {
                         AyahsView(surah: randomS)
+                            .onDisappear {
+                                withAnimation {
+                                    randomSurah = randomSurah(for: juz)
+                                }
+                            }
                     } else {
                         Text("No surah found in Juz \(juz.id).")
-                    }
-                }
-                .onDisappear {
-                    withAnimation {
-                        randomSurah = randomSurah(for: juz)
                     }
                 }
             } label: {

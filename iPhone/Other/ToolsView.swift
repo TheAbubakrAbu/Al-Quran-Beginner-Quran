@@ -432,7 +432,6 @@ struct NamesView : View {
                                         .foregroundColor(.gray)
                                         .multilineTextAlignment(.center)
                                         .transition(.opacity)
-                                        .animation(.easeInOut)
                                     
                                     Spacer()
                                 }

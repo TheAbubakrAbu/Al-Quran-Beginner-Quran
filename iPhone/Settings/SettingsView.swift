@@ -181,18 +181,34 @@ struct SettingsQuranView: View {
                 }
             }
             
-            Toggle("Use System Font Size", isOn: $settings.useSystemFontSize.animation(.easeInOut))
-                .font(.subheadline)
-                .onChange(of: settings.useSystemFontSize) { useSystemFontSize in
-                    if useSystemFontSize {
-                        settings.englishFontSize = UIFont.preferredFont(forTextStyle: .body).pointSize
+            Toggle("Use System Font Size", isOn: Binding(
+                get: {
+                    let systemBodySize = Double(UIFont.preferredFont(forTextStyle: .body).pointSize)
+                    var usesSystemSizes = true
+                    
+                    if settings.showArabicText {
+                        usesSystemSizes = usesSystemSizes && (settings.fontArabicSize == systemBodySize + 10)
+                    }
+                    
+                    if settings.showTransliteration || settings.showEnglishTranslation {
+                        usesSystemSizes = usesSystemSizes && (settings.englishFontSize == systemBodySize)
+                    }
+                    return usesSystemSizes
+                },
+                set: { newValue in
+                    let systemBodySize = Double(UIFont.preferredFont(forTextStyle: .body).pointSize)
+                    withAnimation {
+                        if newValue {
+                            settings.fontArabicSize = systemBodySize + 10
+                            settings.englishFontSize = systemBodySize
+                        } else {
+                            settings.fontArabicSize = systemBodySize + 11
+                            settings.englishFontSize = systemBodySize + 1
+                        }
                     }
                 }
-                .onChange(of: settings.englishFontSize) { newValue in
-                    if newValue == UIFont.preferredFont(forTextStyle: .body).pointSize {
-                        settings.useSystemFontSize = true
-                    }
-                }
+            ))
+            .font(.subheadline)
         }
         
         #if !os(watchOS)

@@ -210,8 +210,6 @@ class Settings: ObservableObject {
         }
     }
 
-    @AppStorage("useSystemFontSize") var useSystemFontSize: Bool = true
-
     @AppStorage("groupBySurah") var groupBySurah: Bool = true
     @AppStorage("searchForSurahs") var searchForSurahs: Bool = true
 
@@ -257,13 +255,7 @@ class Settings: ObservableObject {
     @AppStorage("showTransliteration") var showTransliteration: Bool = true
     @AppStorage("showEnglishTranslation") var showEnglishTranslation: Bool = true
     
-    @AppStorage("englishFontSize") var englishFontSize: Double = Double(UIFont.preferredFont(forTextStyle: .body).pointSize) {
-        didSet {
-            if useSystemFontSize && englishFontSize != Double(UIFont.preferredFont(forTextStyle: .body).pointSize) {
-                useSystemFontSize = false
-            }
-        }
-    }
+    @AppStorage("englishFontSize") var englishFontSize: Double = Double(UIFont.preferredFont(forTextStyle: .body).pointSize)
     
     func toggleSurahFavorite(surah: Surah) {
         withAnimation {

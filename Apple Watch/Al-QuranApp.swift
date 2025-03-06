@@ -2,7 +2,7 @@ import SwiftUI
 import WatchConnectivity
 
 @main
-struct QuranWatchApp: App {
+struct AlQuranApp: App {
     @StateObject private var settings = Settings.shared
     @StateObject private var quranData = QuranData.shared
     @StateObject private var quranPlayer = QuranPlayer.shared

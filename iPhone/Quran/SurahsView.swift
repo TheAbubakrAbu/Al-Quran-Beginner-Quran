@@ -14,22 +14,23 @@ struct SurahsHeader: View {
             Spacer()
             
             NavigationLink {
-                if let randomS = randomSurah {
-                    AyahsView(surah: randomS)
-                        .onDisappear {
-                            withAnimation {
-                                randomSurah = quranData.quran.randomElement()
-                            }
-                        }
-                } else {
-                    Text("No surah found!")
+                Group {
+                    if let randomS = randomSurah {
+                        AyahsView(surah: randomS)
+                    } else {
+                        Text("No surah found!")
+                    }
+                }
+                .onDisappear {
+                    withAnimation {
+                        randomSurah = quranData.quran.randomElement()
+                    }
                 }
             } label: {
                 Image(systemName: "shuffle")
             }
             #endif
         }
-        .font(.subheadline)
         .onAppear {
             if randomSurah == nil {
                 withAnimation {
@@ -49,7 +50,7 @@ struct JuzHeader: View {
     
     @State private var randomSurah: Surah?
 
-    private func randomSurah(for juz: Juz) -> Surah? {
+    private func getRandomSurah() -> Surah? {
         let surahsInRange = quranData.quran.filter {
             $0.id >= juz.startSurah && $0.id <= juz.endSurah
         }
@@ -65,15 +66,17 @@ struct JuzHeader: View {
             
             NavigationLink {
                 Group {
-                    if let randomS = randomSurah(for: juz) {
+                    if let randomS = randomSurah {
                         AyahsView(surah: randomS)
-                            .onDisappear {
-                                withAnimation {
-                                    randomSurah = randomSurah(for: juz)
-                                }
-                            }
                     } else {
                         Text("No surah found in Juz \(juz.id).")
+                    }
+                }
+                .onDisappear {
+                    withAnimation {
+                        if let randomS = getRandomSurah() {
+                            randomSurah = randomS
+                        }
                     }
                 }
             } label: {
@@ -81,11 +84,12 @@ struct JuzHeader: View {
             }
             #endif
         }
-        .font(.subheadline)
         .onAppear {
             if randomSurah == nil {
                 withAnimation {
-                    randomSurah = randomSurah(for: juz)
+                    if let randomS = getRandomSurah() {
+                        randomSurah = randomS
+                    }
                 }
             }
         }
@@ -568,231 +572,263 @@ struct SurahsView: View {
                         }
                         
                         if !settings.bookmarkedAyahs.isEmpty && searchText.isEmpty {
-                            Section(header: Text("BOOKMARKED AYAHS")) {
-                                ForEach(settings.bookmarkedAyahs.sorted {
-                                    if $0.surah == $1.surah {
-                                        return $0.ayah < $1.ayah
-                                    } else {
-                                        return $0.surah < $1.surah
+                            Section(header:
+                                HStack {
+                                    Text("BOOKMARKED AYAHS")
+                                
+                                    Spacer()
+                                
+                                    Button(action: {
+                                        withAnimation {
+                                            settings.showBookmarks.toggle()
+                                        }
+                                    }) {
+                                        Image(systemName: settings.showBookmarks ? "chevron.down" : "chevron.up")
                                     }
-                                }, id: \.id) { bookmarkedAyah in
-                                    let surah = quranData.quran.first(where: { $0.id == bookmarkedAyah.surah })
-                                    let ayah = surah?.ayahs.first(where: { $0.id == bookmarkedAyah.ayah })
-                                    
-                                    if let surah = surah, let ayah = ayah {
-                                        NavigationLink(destination: AyahsView(surah: surah, ayah: ayah.id)) {
-                                            HStack {
-                                                VStack {
-                                                    Text("\(bookmarkedAyah.surah):\(bookmarkedAyah.ayah)")
-                                                        .font(.headline)
-                                                        .lineLimit(1)
-                                                        .minimumScaleFactor(0.5)
-                                                    
-                                                    Text(surah.nameTransliteration)
-                                                        .font(.caption)
-                                                        .lineLimit(1)
-                                                        .minimumScaleFactor(0.5)
-                                                }
-                                                .foregroundColor(settings.accentColor.color)
-                                                .padding(.trailing, 8)
-                                                
-                                                VStack {
-                                                    if(settings.showArabicText) {
-                                                        Text(ayah.textArabic)
-                                                            .font(.custom(settings.fontArabic, size: UIFont.preferredFont(forTextStyle: .subheadline).pointSize * 1.1))
-                                                            .frame(maxWidth: .infinity, alignment: .trailing)
+                                }
+                            ) {
+                                if settings.showBookmarks {
+                                    ForEach(settings.bookmarkedAyahs.sorted {
+                                        if $0.surah == $1.surah {
+                                            return $0.ayah < $1.ayah
+                                        } else {
+                                            return $0.surah < $1.surah
+                                        }
+                                    }, id: \.id) { bookmarkedAyah in
+                                        let surah = quranData.quran.first(where: { $0.id == bookmarkedAyah.surah })
+                                        let ayah = surah?.ayahs.first(where: { $0.id == bookmarkedAyah.ayah })
+                                        
+                                        if let surah = surah, let ayah = ayah {
+                                            NavigationLink(destination: AyahsView(surah: surah, ayah: ayah.id)) {
+                                                HStack {
+                                                    VStack {
+                                                        Text("\(bookmarkedAyah.surah):\(bookmarkedAyah.ayah)")
+                                                            .font(.headline)
                                                             .lineLimit(1)
-                                                    }
-                                                    
-                                                    if(settings.showTransliteration) {
-                                                        Text(ayah.textTransliteration ?? "")
-                                                            .font(.subheadline)
-                                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                                            .minimumScaleFactor(0.5)
+                                                        
+                                                        Text(surah.nameTransliteration)
+                                                            .font(.caption)
                                                             .lineLimit(1)
+                                                            .minimumScaleFactor(0.5)
                                                     }
+                                                    .foregroundColor(settings.accentColor.color)
+                                                    .padding(.trailing, 8)
                                                     
-                                                    if(settings.showEnglishTranslation) {
-                                                        Text(ayah.textEnglish ?? "")
-                                                            .font(.subheadline)
-                                                            .frame(maxWidth: .infinity, alignment: .leading)
-                                                            .lineLimit(1)
+                                                    VStack {
+                                                        if(settings.showArabicText) {
+                                                            Text(ayah.textArabic)
+                                                                .font(.custom(settings.fontArabic, size: UIFont.preferredFont(forTextStyle: .subheadline).pointSize * 1.1))
+                                                                .frame(maxWidth: .infinity, alignment: .trailing)
+                                                                .lineLimit(1)
+                                                        }
+                                                        
+                                                        if(settings.showTransliteration) {
+                                                            Text(ayah.textTransliteration ?? "")
+                                                                .font(.subheadline)
+                                                                .frame(maxWidth: .infinity, alignment: .leading)
+                                                                .lineLimit(1)
+                                                        }
+                                                        
+                                                        if(settings.showEnglishTranslation) {
+                                                            Text(ayah.textEnglish ?? "")
+                                                                .font(.subheadline)
+                                                                .frame(maxWidth: .infinity, alignment: .leading)
+                                                                .lineLimit(1)
+                                                        }
                                                     }
                                                 }
+                                                .padding(.vertical, 2)
                                             }
-                                            .padding(.vertical, 2)
-                                        }
-                                        #if !os(watchOS)
-                                        .swipeActions(edge: .trailing) {
-                                            Button(action: {
-                                                settings.hapticFeedback()
-                                                
-                                                quranPlayer.playSurah(surahNumber: surah.id, surahName: surah.nameTransliteration)
-                                            }) {
-                                                Image(systemName: "play.fill")
-                                            }
-                                            .tint(settings.accentColor.color)
-                                            
-                                            Button(action: {
-                                                settings.hapticFeedback()
-                                                
-                                                quranPlayer.playAyah(surahNumber: surah.id, ayahNumber: ayah.id)
-                                            }) {
-                                                Image(systemName: "play.circle")
-                                            }
-                                        }
-                                        .swipeActions(edge: .leading) {
-                                            Button(action: {
-                                                settings.hapticFeedback()
-                                                
-                                                settings.toggleSurahFavorite(surah: surah)
-                                            }) {
-                                                Image(systemName: settings.isSurahFavorite(surah: surah) ? "star.fill" : "star")
-                                            }
-                                            .tint(settings.accentColor.color)
-                                            
-                                            Button(action: {
-                                                settings.hapticFeedback()
-                                                
-                                                settings.toggleBookmark(surah: surah.id, ayah: ayah.id)
-                                            }) {
-                                                Image(systemName: settings.isBookmarked(surah: surah.id, ayah: ayah.id) ? "bookmark.fill" : "bookmark")
-                                            }
-                                        }
-                                        .contextMenu {
-                                            Button(role: .destructive, action: {
-                                                settings.hapticFeedback()
-                                                
-                                                settings.toggleBookmark(surah: surah.id, ayah: ayah.id)
-                                            }) {
-                                                Label(settings.isBookmarked(surah: surah.id, ayah: ayah.id) ? "Unbookmark Ayah" : "Bookmark Ayah", systemImage: settings.isBookmarked(surah: surah.id, ayah: ayah.id) ? "bookmark.fill" : "bookmark")
-                                            }
-                                            
-                                            Button(action: {
-                                                settings.hapticFeedback()
-                                                
-                                                quranPlayer.playAyah(surahNumber: surah.id, ayahNumber: ayah.id)
-                                            }) {
-                                                Label("Play Ayah", systemImage: "play.circle")
-                                            }
-                                            
-                                            Button(action: {
-                                                settings.hapticFeedback()
-                                                
-                                                quranPlayer.playAyah(surahNumber: surah.id, ayahNumber: ayah.id, continueRecitation: true)
-                                            }) {
-                                                Label("Play from Ayah", systemImage: "play.circle.fill")
-                                            }
-                                            
-                                            Button(action: {
-                                                settings.hapticFeedback()
-                                                
-                                                copySettings = CopySettings(arabic: settings.showArabicText, transliteration: settings.showTransliteration, translation: settings.showEnglishTranslation)
-                                                showingAyahSheet2 = true
-                                            }) {
-                                                Label("Share Ayah", systemImage: "square.and.arrow.up")
-                                            }
-                                            
-                                            Divider()
-                                            
-                                            Button(action: {
-                                                settings.hapticFeedback()
-                                                
-                                                settings.toggleSurahFavorite(surah: surah)
-                                            }) {
-                                                Label(settings.isSurahFavorite(surah: surah) ? "Unfavorite Surah" : "Favorite Surah", systemImage: settings.isSurahFavorite(surah: surah) ? "star.fill" : "star")
-                                            }
-                                            
-                                            Button(action: {
-                                                settings.hapticFeedback()
-                                                
-                                                quranPlayer.playSurah(surahNumber: surah.id, surahName: surah.nameTransliteration)
-                                            }) {
-                                                Label("Play Surah", systemImage: "play.fill")
-                                            }
-                                            
-                                            Button(action: {
-                                                settings.hapticFeedback()
-                                                
-                                                withAnimation {
-                                                    searchText = ""
-                                                    settings.groupBySurah = true
-                                                    scrollToSurahID = surah.id
-                                                    self.endEditing()
+                                            #if !os(watchOS)
+                                            .swipeActions(edge: .trailing) {
+                                                Button(action: {
+                                                    settings.hapticFeedback()
+                                                    
+                                                    quranPlayer.playSurah(surahNumber: surah.id, surahName: surah.nameTransliteration)
+                                                }) {
+                                                    Image(systemName: "play.fill")
                                                 }
-                                            }) {
-                                                Text("Scroll To Surah")
-                                                Image(systemName: "arrow.down.circle")
+                                                .tint(settings.accentColor.color)
+                                                
+                                                Button(action: {
+                                                    settings.hapticFeedback()
+                                                    
+                                                    quranPlayer.playAyah(surahNumber: surah.id, ayahNumber: ayah.id)
+                                                }) {
+                                                    Image(systemName: "play.circle")
+                                                }
                                             }
+                                            .swipeActions(edge: .leading) {
+                                                Button(action: {
+                                                    settings.hapticFeedback()
+                                                    
+                                                    settings.toggleSurahFavorite(surah: surah)
+                                                }) {
+                                                    Image(systemName: settings.isSurahFavorite(surah: surah) ? "star.fill" : "star")
+                                                }
+                                                .tint(settings.accentColor.color)
+                                                
+                                                Button(action: {
+                                                    settings.hapticFeedback()
+                                                    
+                                                    settings.toggleBookmark(surah: surah.id, ayah: ayah.id)
+                                                }) {
+                                                    Image(systemName: settings.isBookmarked(surah: surah.id, ayah: ayah.id) ? "bookmark.fill" : "bookmark")
+                                                }
+                                            }
+                                            .contextMenu {
+                                                Button(role: .destructive, action: {
+                                                    settings.hapticFeedback()
+                                                    
+                                                    settings.toggleBookmark(surah: surah.id, ayah: ayah.id)
+                                                }) {
+                                                    Label(settings.isBookmarked(surah: surah.id, ayah: ayah.id) ? "Unbookmark Ayah" : "Bookmark Ayah", systemImage: settings.isBookmarked(surah: surah.id, ayah: ayah.id) ? "bookmark.fill" : "bookmark")
+                                                }
+                                                
+                                                Button(action: {
+                                                    settings.hapticFeedback()
+                                                    
+                                                    quranPlayer.playAyah(surahNumber: surah.id, ayahNumber: ayah.id)
+                                                }) {
+                                                    Label("Play Ayah", systemImage: "play.circle")
+                                                }
+                                                
+                                                Button(action: {
+                                                    settings.hapticFeedback()
+                                                    
+                                                    quranPlayer.playAyah(surahNumber: surah.id, ayahNumber: ayah.id, continueRecitation: true)
+                                                }) {
+                                                    Label("Play from Ayah", systemImage: "play.circle.fill")
+                                                }
+                                                
+                                                Button(action: {
+                                                    settings.hapticFeedback()
+                                                    
+                                                    copySettings = CopySettings(arabic: settings.showArabicText, transliteration: settings.showTransliteration, translation: settings.showEnglishTranslation)
+                                                    showingAyahSheet2 = true
+                                                }) {
+                                                    Label("Share Ayah", systemImage: "square.and.arrow.up")
+                                                }
+                                                
+                                                Divider()
+                                                
+                                                Button(action: {
+                                                    settings.hapticFeedback()
+                                                    
+                                                    settings.toggleSurahFavorite(surah: surah)
+                                                }) {
+                                                    Label(settings.isSurahFavorite(surah: surah) ? "Unfavorite Surah" : "Favorite Surah", systemImage: settings.isSurahFavorite(surah: surah) ? "star.fill" : "star")
+                                                }
+                                                
+                                                Button(action: {
+                                                    settings.hapticFeedback()
+                                                    
+                                                    quranPlayer.playSurah(surahNumber: surah.id, surahName: surah.nameTransliteration)
+                                                }) {
+                                                    Label("Play Surah", systemImage: "play.fill")
+                                                }
+                                                
+                                                Button(action: {
+                                                    settings.hapticFeedback()
+                                                    
+                                                    withAnimation {
+                                                        searchText = ""
+                                                        settings.groupBySurah = true
+                                                        scrollToSurahID = surah.id
+                                                        self.endEditing()
+                                                    }
+                                                }) {
+                                                    Text("Scroll To Surah")
+                                                    Image(systemName: "arrow.down.circle")
+                                                }
+                                            }
+                                            .sheet(isPresented: $showingAyahSheet2) {
+                                                CopyAyahSheet(copySettings: $copySettings, surahNumber: surah.id, ayahNumber: ayah.id)
+                                            }
+                                            #endif
                                         }
-                                        .sheet(isPresented: $showingAyahSheet2) {
-                                            CopyAyahSheet(copySettings: $copySettings, surahNumber: surah.id, ayahNumber: ayah.id)
-                                        }
-                                        #endif
                                     }
                                 }
                             }
                         }
                         
                         if !settings.favoriteSurahs.isEmpty && searchText.isEmpty {
-                            Section(header: Text("FAVORITE SURAHS")) {
-                                ForEach(settings.favoriteSurahs.sorted(), id: \.self) { surahId in
-                                    if let surah = quranData.quran.first(where: { $0.id == surahId }) {
-                                        NavigationLink(destination: AyahsView(surah: surah)) {
-                                            SurahRow(surah: surah)
+                            Section(header:
+                                HStack {
+                                    Text("FAVORITE SURAHS")
+                                
+                                    Spacer()
+                                
+                                    Button(action: {
+                                        withAnimation {
+                                            settings.showFavorites.toggle()
                                         }
-                                        #if !os(watchOS)
-                                        .swipeActions(edge: .trailing) {
-                                            Button(action: {
-                                                settings.hapticFeedback()
-                                                
-                                                quranPlayer.playSurah(surahNumber: surah.id, surahName: surah.nameTransliteration)
-                                            }) {
-                                                Image(systemName: "play.fill")
+                                    }) {
+                                        Image(systemName: settings.showFavorites ? "chevron.down" : "chevron.up")
+                                    }
+                                }
+                            ) {
+                                if settings.showFavorites {
+                                    ForEach(settings.favoriteSurahs.sorted(), id: \.self) { surahId in
+                                        if let surah = quranData.quran.first(where: { $0.id == surahId }) {
+                                            NavigationLink(destination: AyahsView(surah: surah)) {
+                                                SurahRow(surah: surah)
                                             }
-                                            .tint(settings.accentColor.color)
-                                        }
-                                        .swipeActions(edge: .leading) {
-                                            Button(action: {
-                                                settings.hapticFeedback()
-                                                
-                                                settings.toggleSurahFavorite(surah: surah)
-                                            }) {
-                                                Image(systemName: settings.isSurahFavorite(surah: surah) ? "star.fill" : "star")
-                                            }
-                                            .tint(settings.accentColor.color)
-                                        }
-                                        .contextMenu {
-                                            Button(role: .destructive, action: {
-                                                settings.hapticFeedback()
-                                                
-                                                settings.toggleSurahFavorite(surah: surah)
-                                            }) {
-                                                Label(settings.isSurahFavorite(surah: surah) ? "Unfavorite Surah" : "Favorite Surah", systemImage: settings.isSurahFavorite(surah: surah) ? "star.fill" : "star")
-                                            }
-                                            
-                                            Button(action: {
-                                                settings.hapticFeedback()
-                                                
-                                                quranPlayer.playSurah(surahNumber: surah.id, surahName: surah.nameTransliteration)
-                                            }) {
-                                                Label("Play Surah", systemImage: "play.fill")
-                                            }
-                                            
-                                            Button(action: {
-                                                settings.hapticFeedback()
-                                                
-                                                withAnimation {
-                                                    searchText = ""
-                                                    settings.groupBySurah = true
-                                                    scrollToSurahID = surah.id
-                                                    self.endEditing()
+                                            #if !os(watchOS)
+                                            .swipeActions(edge: .trailing) {
+                                                Button(action: {
+                                                    settings.hapticFeedback()
+                                                    
+                                                    quranPlayer.playSurah(surahNumber: surah.id, surahName: surah.nameTransliteration)
+                                                }) {
+                                                    Image(systemName: "play.fill")
                                                 }
-                                            }) {
-                                                Text("Scroll To Surah")
-                                                Image(systemName: "arrow.down.circle")
+                                                .tint(settings.accentColor.color)
                                             }
+                                            .swipeActions(edge: .leading) {
+                                                Button(action: {
+                                                    settings.hapticFeedback()
+                                                    
+                                                    settings.toggleSurahFavorite(surah: surah)
+                                                }) {
+                                                    Image(systemName: settings.isSurahFavorite(surah: surah) ? "star.fill" : "star")
+                                                }
+                                                .tint(settings.accentColor.color)
+                                            }
+                                            .contextMenu {
+                                                Button(role: .destructive, action: {
+                                                    settings.hapticFeedback()
+                                                    
+                                                    settings.toggleSurahFavorite(surah: surah)
+                                                }) {
+                                                    Label(settings.isSurahFavorite(surah: surah) ? "Unfavorite Surah" : "Favorite Surah", systemImage: settings.isSurahFavorite(surah: surah) ? "star.fill" : "star")
+                                                }
+                                                
+                                                Button(action: {
+                                                    settings.hapticFeedback()
+                                                    
+                                                    quranPlayer.playSurah(surahNumber: surah.id, surahName: surah.nameTransliteration)
+                                                }) {
+                                                    Label("Play Surah", systemImage: "play.fill")
+                                                }
+                                                
+                                                Button(action: {
+                                                    settings.hapticFeedback()
+                                                    
+                                                    withAnimation {
+                                                        searchText = ""
+                                                        settings.groupBySurah = true
+                                                        scrollToSurahID = surah.id
+                                                        self.endEditing()
+                                                    }
+                                                }) {
+                                                    Text("Scroll To Surah")
+                                                    Image(systemName: "arrow.down.circle")
+                                                }
+                                            }
+                                            #endif
                                         }
-                                        #endif
                                     }
                                 }
                             }
@@ -897,6 +933,7 @@ struct SurahsView: View {
                                         Button(action: {
                                             settings.hapticFeedback()
                                             
+                                            copySettings = CopySettings(arabic: settings.showArabicText, transliteration: settings.showTransliteration, translation: settings.showEnglishTranslation)
                                             showingAyahSheet3 = true
                                         }) {
                                             Label("Share Ayah", systemImage: "square.and.arrow.up")
@@ -1239,12 +1276,17 @@ struct SurahsView: View {
                                 
                                 Button(action: {
                                     settings.hapticFeedback()
-                                    let randomSurahNumber = Int.random(in: 1...114)
                                     
-                                    if let randomSurah = quranData.quran.first(where: { $0.id == randomSurahNumber }) {
+                                    if let randomSurah = quranData.quran.randomElement() {
                                         quranPlayer.playSurah(surahNumber: randomSurah.id, surahName: randomSurah.nameTransliteration)
                                     } else {
-                                        quranPlayer.playSurah(surahNumber: randomSurahNumber, surahName: "Random Surah")
+                                        let randomSurahNumber = Int.random(in: 1...114)
+                                        
+                                        if let randomSurah = quranData.quran.first(where: { $0.id == randomSurahNumber }) {
+                                            quranPlayer.playSurah(surahNumber: randomSurah.id, surahName: randomSurah.nameTransliteration)
+                                        } else {
+                                            quranPlayer.playSurah(surahNumber: randomSurahNumber, surahName: "Random Surah")
+                                        }
                                     }
                                 }) {
                                     Label("Play Random Surah", systemImage: "shuffle")

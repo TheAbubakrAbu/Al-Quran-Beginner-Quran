@@ -55,6 +55,8 @@ class Settings: ObservableObject {
         self.appGroupUserDefaults = UserDefaults(suiteName: "group.com.IslamicPillars.AppGroup")
         
         self.accentColor = AccentColor(rawValue: appGroupUserDefaults?.string(forKey: "colorAccent") ?? "green") ?? .green
+        self.reciter = appGroupUserDefaults?.string(forKey: "reciterQuran") ?? "ar.minshawi"
+        self.reciteType = appGroupUserDefaults?.string(forKey: "reciteTypeQuran") ?? "Continue to Next"
         
         self.favoriteSurahsData = appGroupUserDefaults?.data(forKey: "favoriteSurahsData") ?? Data()
         self.bookmarkedAyahsData = appGroupUserDefaults?.data(forKey: "bookmarkedAyahsData") ?? Data()
@@ -89,6 +91,14 @@ class Settings: ObservableObject {
         didSet { appGroupUserDefaults?.setValue(accentColor.rawValue, forKey: "colorAccent") }
     }
     
+    @Published var reciter: String {
+        didSet { appGroupUserDefaults?.setValue(reciter, forKey: "reciterQuran") }
+    }
+    
+    @Published var reciteType: String {
+        didSet { appGroupUserDefaults?.setValue(reciteType, forKey: "reciteTypeQuran") }
+    }
+    
     @Published var favoriteSurahsData: Data {
         didSet {
             appGroupUserDefaults?.setValue(favoriteSurahsData, forKey: "favoriteSurahsData")
@@ -120,6 +130,9 @@ class Settings: ObservableObject {
             bookmarkedAyahsData = (try? encoder.encode(newValue)) ?? Data()
         }
     }
+    
+    @AppStorage("showBookmarks") var showBookmarks = true
+    @AppStorage("showFavorites") var showFavorites = true
 
     @Published var favoriteLetterData: Data {
         didSet {
@@ -141,7 +154,9 @@ class Settings: ObservableObject {
         let encoder = JSONEncoder()
         var dict: [String: Any] = [
             "accentColor": self.accentColor.rawValue,
-                        
+            "reciter": self.reciter,
+            "reciteType": self.reciteType,
+            
             "beginnerMode": self.beginnerMode,
             "lastReadSurah": self.lastReadSurah,
             "lastReadAyah": self.lastReadAyah,
@@ -173,6 +188,12 @@ class Settings: ObservableObject {
         if let accentColor = dict["accentColor"] as? String,
            let accentColorValue = AccentColor(rawValue: accentColor) {
             self.accentColor = accentColorValue
+        }
+        if let reciter = dict["reciter"] as? String {
+            self.reciter = reciter
+        }
+        if let reciteType = dict["reciteType"] as? String {
+            self.reciteType = reciteType
         }
         if let beginnerMode = dict["beginnerMode"] as? Bool {
             self.beginnerMode = beginnerMode
@@ -212,19 +233,15 @@ class Settings: ObservableObject {
 
     @AppStorage("groupBySurah") var groupBySurah: Bool = true
     @AppStorage("searchForSurahs") var searchForSurahs: Bool = true
-
-    @AppStorage("reciter") var reciter: String = "ar.minshawi"
-    @AppStorage("reciteType") var reciteType = "Continue to Next"
     
     @AppStorage("beginnerMode") var beginnerMode: Bool = false
     
     @AppStorage("lastReadSurah") var lastReadSurah: Int = 0
     @AppStorage("lastReadAyah") var lastReadAyah: Int = 0
     
-    @AppStorage("lastListenedSurahData") private var lastListenedSurahData: Data?
     var lastListenedSurah: LastListenedSurah? {
         get {
-            guard let data = lastListenedSurahData else { return nil }
+            guard let data = appGroupUserDefaults?.data(forKey: "lastListenedSurahDataQuran") else { return nil }
             do {
                 return try JSONDecoder().decode(LastListenedSurah.self, from: data)
             } catch {
@@ -235,12 +252,13 @@ class Settings: ObservableObject {
         set {
             if let newValue = newValue {
                 do {
-                    lastListenedSurahData = try JSONEncoder().encode(newValue)
+                    let data = try JSONEncoder().encode(newValue)
+                    appGroupUserDefaults?.set(data, forKey: "lastListenedSurahDataQuran")
                 } catch {
                     print("Failed to encode last listened surah: \(error)")
                 }
             } else {
-                lastListenedSurahData = nil
+                appGroupUserDefaults?.removeObject(forKey: "lastListenedSurahDataQuran")
             }
         }
     }

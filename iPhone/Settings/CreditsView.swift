@@ -44,7 +44,7 @@ struct CreditsView: View {
                         .font(.body)
                         .multilineTextAlignment(.leading)
                     
-                    Link("View the source code on GitHub: github.com/TheAbubakrAbu/Al-Quran-Beginner-Quran", destination: URL(string: "https://github.com/TheAbubakrAbu/Al-Quran-Beginner-Quran")!)
+                    Link("View the source code: github.com/TheAbubakrAbu/Al-Quran-Beginner-Quran", destination: URL(string: "https://github.com/TheAbubakrAbu/Al-Quran-Beginner-Quran")!)
                         .font(.body)
                         .foregroundColor(settings.accentColor.color)
                         .contextMenu {

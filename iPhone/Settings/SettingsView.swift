@@ -41,13 +41,34 @@ struct SettingsView: View {
                         
                         showingCredits = true
                     }) {
-                        Text("View Credits")
-                            .font(.subheadline)
-                            .foregroundColor(settings.accentColor.color)
-                            .multilineTextAlignment(.center)
+                        HStack {
+                            Image(systemName: "scroll.fill")
+                            
+                            Text("View Credits")
+                        }
+                        .font(.subheadline)
+                        .foregroundColor(settings.accentColor.color)
                     }
                     .sheet(isPresented: $showingCredits) {
                         CreditsView()
+                    }
+                    
+                    Button(action: {
+                        if settings.hapticOn { UIImpactFeedbackGenerator(style: .light).impactOccurred() }
+                        
+                        withAnimation(.smooth()) {
+                            if let url = URL(string: "itms-apps://itunes.apple.com/app/id6474894373?action=write-review") {
+                                UIApplication.shared.open(url)
+                            }
+                        }
+                    }) {
+                        HStack {
+                            Image(systemName: "rectangle.and.pencil.and.ellipsis.rtl")
+                            
+                            Text("Leave a Review")
+                        }
+                        .font(.subheadline)
+                        .foregroundColor(settings.accentColor.color)
                     }
                     #endif
                     

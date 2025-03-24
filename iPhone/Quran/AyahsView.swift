@@ -169,9 +169,9 @@ struct AyahRow: View {
     var body: some View {
         ZStack {
             if let currentSurahNumber = quranPlayer.currentSurahNumber, let currentAyahNumber = quranPlayer.currentAyahNumber, currentSurahNumber == surah.id {
-                RoundedRectangle(cornerRadius: 15)
+                RoundedRectangle(cornerRadius: 10)
                     .fill(ayah.id == currentAyahNumber ? settings.accentColor.color.opacity(settings.defaultView ? 0.1 : 0.25) : .clear)
-                    .padding(.horizontal, -12)
+                    .padding(.horizontal, settings.defaultView ? -15 : -12)
                     .transition(.opacity)
                     .animation(.easeInOut, value: ayah.id == currentAyahNumber)
             }
@@ -640,7 +640,6 @@ struct AyahsView: View {
         }
         #if !os(watchOS)
         .navigationTitle(surah.nameEnglish)
-        .navigationBarTitleDisplayMode(.inline)
         .navigationBarItems(trailing:
             Button(action: {
                 settings.hapticFeedback()
@@ -648,13 +647,11 @@ struct AyahsView: View {
             }) {
                 VStack(alignment: .trailing) {
                     Text("\(surah.nameArabic) - \(arabicNumberString(from: surah.id))")
-                        .font(.footnote)
-                        .foregroundColor(settings.accentColor.color)
                 
                     Text("\(surah.nameTransliteration) - \(surah.id)")
-                        .font(.footnote)
-                        .foregroundColor(settings.accentColor.color)
                 }
+                .font(.footnote)
+                .foregroundColor(settings.accentColor.color)
             }
         )
         .sheet(isPresented: $showingSettingsSheet) {
@@ -666,7 +663,6 @@ struct AyahsView: View {
                 .accentColor(settings.accentColor.color)
                 .preferredColorScheme(settings.colorScheme)
                 .navigationTitle("Al-Quran Settings")
-                .navigationBarTitleDisplayMode(.inline)
                 .applyConditionalListStyle(defaultView: true)
             }
         }

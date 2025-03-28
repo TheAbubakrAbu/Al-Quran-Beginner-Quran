@@ -9,7 +9,7 @@ I was a **17-year-old** high school student when this app was published on the A
 [**Download Al-Quran on the App Store here**](https://apps.apple.com/us/app/al-quran-beginner-quran/id6474894373?platform=iphone)
 
 ## Overview
-Al-Quran | Beginner Quran is a complete Quranic experience designed for new learners, reverts, and those seeking a focused Quran study tool. With intuitive features and a seamless design, this app helps users read, understand, and interact with the Quran effortlessly.
+Al-Quran is a complete Quranic experience designed for new learners, reverts, and those seeking a focused Quran study tool. With intuitive features and a seamless design, this app helps users read, understand, and interact with the Quran effortlessly.
 
 ## Unique Features
 - **Arabic Beginner Mode** – Struggling with Arabic script? This mode spaces out each letter, making it easier to recognize and read Arabic, perfect for beginners.

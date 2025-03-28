@@ -414,6 +414,8 @@ struct AyahsView: View {
     @EnvironmentObject var settings: Settings
     @EnvironmentObject var quranData: QuranData
     @EnvironmentObject var quranPlayer: QuranPlayer
+    
+    @Environment(\.scenePhase) private var scenePhase
 
     @State private var searchText = ""
     @State private var visibleAyahs: [Int] = []
@@ -628,6 +630,17 @@ struct AyahsView: View {
         }
         .environmentObject(quranPlayer)
         .onDisappear {
+            DispatchQueue.main.async {
+                withAnimation {
+                    settings.lastReadSurah = surah.id
+                    visibleAyahs.sort()
+                    if let firstVisible = visibleAyahs.first {
+                        settings.lastReadAyah = firstVisible
+                    }
+                }
+            }
+        }
+        .onChange(of: scenePhase) { _ in
             DispatchQueue.main.async {
                 withAnimation {
                     settings.lastReadSurah = surah.id

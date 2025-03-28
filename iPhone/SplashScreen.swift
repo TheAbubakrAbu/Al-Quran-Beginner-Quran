@@ -6,7 +6,7 @@ struct SplashScreen: View {
     var body: some View {
         NavigationView {
             VStack {
-                Text("Al-Quran | Beginner Quran is privacy-focused, ensuring that all data remains on your device. Enjoy an ad-free, subscription-free, and cost-free experience. This app is an extension of Al-Islam, which offers all the features of Al-Quran plus additional functionalities, including prayer times, Qibla direction, and widgets.")
+                Text("Al-Quran is privacy-focused, ensuring that all data remains on your device. Enjoy an ad-free, subscription-free, and cost-free experience. This app is an extension of Al-Islam, which offers all the features of Al-Quran plus additional functionalities, including prayer times, Qibla direction, and widgets.")
                     .font(.title3)
                     .foregroundColor(.primary)
                     .multilineTextAlignment(.leading)

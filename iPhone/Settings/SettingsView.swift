@@ -63,12 +63,24 @@ struct SettingsView: View {
                         }
                     }) {
                         HStack {
-                            Image(systemName: "rectangle.and.pencil.and.ellipsis.rtl")
+                            Image(systemName: "star.bubble.fill")
                             
                             Text("Leave a Review")
                         }
                         .font(.subheadline)
                         .foregroundColor(settings.accentColor.color)
+                    }
+                    .contextMenu {
+                        Button(action: {
+                            settings.hapticFeedback()
+                            
+                            UIPasteboard.general.string = "itms-apps://itunes.apple.com/app/id6474894373?action=write-review"
+                        }) {
+                            HStack {
+                                Image(systemName: "doc.on.doc")
+                                Text("Copy Website")
+                            }
+                        }
                     }
                     #endif
                     

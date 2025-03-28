@@ -9,7 +9,7 @@ struct CreditsView: View {
                 VStack(alignment: .center) {
                     HStack {
                         Spacer()
-                        Text("Al-Quran | Beginner Quran was created by Abubakr Elmallah (أبوبكر الملاح), who was a 17-year-old high school student when this app was published on December 26, 2023.")
+                        Text("Al-Quran was created by Abubakr Elmallah (أبوبكر الملاح), who was a 17-year-old high school student when this app was published on December 26, 2023.")
                             .font(.headline)
                             .padding(.vertical, 4)
                             .multilineTextAlignment(.center)
@@ -74,7 +74,7 @@ struct CreditsView: View {
                 }
                 
                 Section {
-                    Text("Version 1.3.9")
+                    Text("Version 1.4")
                         .font(.caption)
                 }
                 

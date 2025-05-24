@@ -74,7 +74,7 @@ struct CreditsView: View {
                 }
                 
                 Section {
-                    Text("Version 1.4")
+                    Text("Version 1.4.2")
                         .font(.caption)
                 }
                 
@@ -96,10 +96,6 @@ struct CreditsView: View {
                         .font(.body)
                     
                     Link("Credit for the 99 Names of Allah from KabDeveloper", destination: URL(string: "https://github.com/KabDeveloper/99-Names-Of-Allah/tree/main")!)
-                        .foregroundColor(settings.accentColor.color)
-                        .font(.body)
-                    
-                    Link("Credit for the Quran Recitations goes to Al Quran", destination: URL(string: "https://alquran.cloud/cdn")!)
                         .foregroundColor(settings.accentColor.color)
                         .font(.body)
                     

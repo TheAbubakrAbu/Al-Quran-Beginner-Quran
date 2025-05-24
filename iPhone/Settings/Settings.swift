@@ -1,5 +1,4 @@
 import SwiftUI
-import WatchConnectivity
 
 struct LetterData: Identifiable, Codable, Equatable, Comparable {
     let id: Int
@@ -47,7 +46,7 @@ enum AccentColor: String, CaseIterable, Identifiable {
 
 let accentColors: [AccentColor] = AccentColor.allCases
 
-class Settings: ObservableObject {
+final class Settings: ObservableObject {
     static let shared = Settings()
     private var appGroupUserDefaults: UserDefaults?
     
@@ -55,7 +54,14 @@ class Settings: ObservableObject {
         self.appGroupUserDefaults = UserDefaults(suiteName: "group.com.IslamicPillars.AppGroup")
         
         self.accentColor = AccentColor(rawValue: appGroupUserDefaults?.string(forKey: "colorAccent") ?? "green") ?? .green
-        self.reciter = appGroupUserDefaults?.string(forKey: "reciterQuran") ?? "ar.minshawi"
+        
+        if let reciterID = appGroupUserDefaults?.string(forKey: "reciterQuran"), reciterID.starts(with: "ar"),
+           let reciter = reciters.first(where: { $0.ayahIdentifier == reciterID }) {
+            self.reciter = reciter.name
+        } else {
+            self.reciter = appGroupUserDefaults?.string(forKey: "reciterQuran") ?? "Muhammad Al-Minshawi (Murattal)"
+        }
+        
         self.reciteType = appGroupUserDefaults?.string(forKey: "reciteTypeQuran") ?? "Continue to Next"
         
         self.favoriteSurahsData = appGroupUserDefaults?.data(forKey: "favoriteSurahsData") ?? Data()
@@ -114,6 +120,8 @@ class Settings: ObservableObject {
             favoriteSurahsData = (try? encoder.encode(newValue)) ?? Data()
         }
     }
+    
+    @Published var favoriteSurahsCopy: [Int] = []
 
     @Published var bookmarkedAyahsData: Data {
         didSet {
@@ -130,6 +138,8 @@ class Settings: ObservableObject {
             bookmarkedAyahsData = (try? encoder.encode(newValue)) ?? Data()
         }
     }
+    
+    @Published var bookmarkedAyahsCopy: [BookmarkedAyah] = []
     
     @AppStorage("showBookmarks") var showBookmarks = true
     @AppStorage("showFavorites") var showFavorites = true
@@ -284,9 +294,23 @@ class Settings: ObservableObject {
             }
         }
     }
+    
+    func toggleSurahFavoriteCopy(surah: Surah) {
+        withAnimation {
+            if isSurahFavoriteCopy(surah: surah) {
+                favoriteSurahsCopy.removeAll(where: { $0 == surah.id })
+            } else {
+                favoriteSurahsCopy.append(surah.id)
+            }
+        }
+    }
 
     func isSurahFavorite(surah: Surah) -> Bool {
         return favoriteSurahs.contains(surah.id)
+    }
+    
+    func isSurahFavoriteCopy(surah: Surah) -> Bool {
+        return favoriteSurahsCopy.contains(surah.id)
     }
 
     func toggleBookmark(surah: Int, ayah: Int) {
@@ -299,10 +323,26 @@ class Settings: ObservableObject {
             }
         }
     }
+    
+    func toggleBookmarkCopy(surah: Int, ayah: Int) {
+        withAnimation {
+            let bookmark = BookmarkedAyah(surah: surah, ayah: ayah)
+            if let index = bookmarkedAyahsCopy.firstIndex(where: {$0.id == bookmark.id}) {
+                bookmarkedAyahsCopy.remove(at: index)
+            } else {
+                bookmarkedAyahsCopy.append(bookmark)
+            }
+        }
+    }
 
     func isBookmarked(surah: Int, ayah: Int) -> Bool {
         let bookmark = BookmarkedAyah(surah: surah, ayah: ayah)
         return bookmarkedAyahs.contains(where: {$0.id == bookmark.id})
+    }
+    
+    func isBookmarkedCopy(surah: Int, ayah: Int) -> Bool {
+        let bookmark = BookmarkedAyah(surah: surah, ayah: ayah)
+        return bookmarkedAyahsCopy.contains(where: {$0.id == bookmark.id})
     }
 
     func toggleLetterFavorite(letterData: LetterData) {

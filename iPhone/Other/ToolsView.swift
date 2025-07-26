@@ -224,10 +224,16 @@ struct TasbihView: View {
                     ZStack {
                         RoundedRectangle(cornerRadius: 8)
                             .fill(selectedDhikrIndex == index ? settings.accentColor.color.opacity(0.15) : settings.accentColor.color.opacity(0.0001))
+                            #if !os(watchOS)
                             .padding(.horizontal, -12)
+                            #else
+                            .padding(.horizontal, -6)
+                            .padding(.vertical, -7)
+                            #endif
                         
                         TasbihRow(tasbih: tasbihData[index], counter: binding(for: index))
                     }
+                    .padding(.vertical, 12)
                     .onTapGesture {
                         settings.hapticFeedback()
                         withAnimation {
@@ -248,7 +254,11 @@ struct TasbihView: View {
                     
                     VStack(alignment: .center, spacing: 5) {
                         Text(selectedDhikr.arabic)
+                            #if !os(watchOS)
                             .font(.title2)
+                            #else
+                            .font(.title3)
+                            #endif
                             .fontWeight(.bold)
                             .foregroundColor(settings.accentColor.color)
                         

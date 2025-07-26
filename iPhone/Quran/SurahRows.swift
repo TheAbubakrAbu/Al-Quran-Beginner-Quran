@@ -15,13 +15,23 @@ struct SurahRow: View {
                     .fill(favoriteSurahs.contains(surah.id)
                           ? settings.accentColor.color.opacity(settings.defaultView ? 0.15 : 0.25)
                           : settings.accentColor.color.opacity(0.0001))
+                    #if !os(watchOS)
                     .padding(.leading, 19)
                     .padding(.horizontal, settings.defaultView ? -31 : -26)
+                    #else
+                    .padding(.horizontal, -8)
+                    .padding(.vertical, -3)
+                    #endif
             } else {
                 RoundedRectangle(cornerRadius: 8)
                     .fill(settings.accentColor.color.opacity(settings.defaultView ? 0.15 : 0.25))
+                    #if !os(watchOS)
                     .padding(.leading, 19)
                     .padding(.horizontal, settings.defaultView ? -31 : -26)
+                    #else
+                    .padding(.horizontal, -8)
+                    .padding(.vertical, -3)
+                    #endif
             }
                 
             #if !os(watchOS)
@@ -113,8 +123,13 @@ struct SurahAyahRow: View {
                     .fill(favoriteSurahs.contains(surah.id)
                           ? settings.accentColor.color.opacity(settings.defaultView ? 0.15 : 0.25)
                           : settings.accentColor.color.opacity(0.0001))
+                    #if !os(watchOS)
                     .padding(.leading, 19)
                     .padding(.horizontal, settings.defaultView ? -31 : -26)
+                    #else
+                    .padding(.horizontal, -8)
+                    .padding(.vertical, 3)
+                    #endif
             }
             
             HStack {
@@ -127,7 +142,11 @@ struct SurahAyahRow: View {
                 }
                 .lineLimit(1)
                 .minimumScaleFactor(0.5)
+                #if !os(watchOS)
                 .frame(width: 65, alignment: .center)
+                #else
+                .frame(width: 40, alignment: .center)
+                #endif
                 .foregroundColor(settings.accentColor.color)
                 .padding(.trailing, 8)
                 

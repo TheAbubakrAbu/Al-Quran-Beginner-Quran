@@ -303,6 +303,7 @@ struct QuranView: View {
                             }
                         }
                         
+                        #if !os(watchOS)
                         if !searchText.isEmpty {
                             Section(header: Text("AYAH SEARCH RESULTS (\(verseHits.count)+)")) {
                                 ForEach(verseHits) { hit in
@@ -348,6 +349,7 @@ struct QuranView: View {
                                 }
                             }
                         }
+                        #endif
                     }
                     .applyConditionalListStyle(defaultView: settings.defaultView)
                     .dismissKeyboardOnScroll()
@@ -472,7 +474,6 @@ struct QuranView: View {
                     verseHits = quranData.searchVerses(term: txt, limit: hitPageSize, offset: 0)
                 }
             }
-
             #endif
             
             if let lastSurah = lastReadSurah, let lastAyah = lastReadAyah {

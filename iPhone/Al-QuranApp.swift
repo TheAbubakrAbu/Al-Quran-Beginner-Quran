@@ -27,7 +27,25 @@ struct AlQuranApp: App {
                 } else if settings.firstLaunch {
                     SplashScreen()
                 } else {
-                    SurahsView()
+                    TabView {
+                        QuranView()
+                            .tabItem {
+                                Image(systemName: "character.book.closed.ar")
+                                Text("Quran")
+                            }
+                        
+                        OtherView()
+                            .tabItem {
+                                Image(systemName: "moon.stars")
+                                Text("Tools")
+                            }
+                        
+                        SettingsView()
+                            .tabItem {
+                                Image(systemName: "gearshape")
+                                Text("Settings")
+                            }
+                    }
                 }
             }
             .environmentObject(quranData)
@@ -38,6 +56,7 @@ struct AlQuranApp: App {
             .tint(settings.accentColor.color)
             .preferredColorScheme(settings.colorScheme)
             .transition(.opacity)
+            .animation(.easeInOut, value: isLaunching)
             .onAppear {
                 if shouldShowRateAlert {
                     startTime = Date()
@@ -74,11 +93,13 @@ struct AlQuranApp: App {
         .onChange(of: settings.lastReadAyah) { _ in
             sendMessageToWatch()
         }
-        .onChange(of: settings.favoriteSurahs) { _ in
+        .onChange(of: settings.favoriteSurahs) { newSurahs in
             sendMessageToWatch()
+            settings.favoriteSurahsCopy = newSurahs
         }
-        .onChange(of: settings.bookmarkedAyahs) { _ in
+        .onChange(of: settings.bookmarkedAyahs) { newBookmarks in
             sendMessageToWatch()
+            settings.bookmarkedAyahsCopy = newBookmarks
         }
         .onChange(of: settings.favoriteLetters) { _ in
             sendMessageToWatch()

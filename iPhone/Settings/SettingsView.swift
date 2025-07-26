@@ -256,9 +256,15 @@ struct SettingsQuranView: View {
                 .font(.subheadline)
                 .disabled(!settings.showArabicText && !settings.showEnglishTranslation)
             
-            Toggle("Show English Translation", isOn: $settings.showEnglishTranslation.animation(.easeInOut))
-                .font(.subheadline)
-                .disabled(!settings.showArabicText && !settings.showTransliteration)
+            VStack(alignment: .leading) {
+                Toggle("Show English Translation", isOn: $settings.showEnglishTranslation.animation(.easeInOut))
+                    .font(.subheadline)
+                    .disabled(!settings.showArabicText && !settings.showTransliteration)
+                
+                Text("English translation by Saheeh International.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
             
             if settings.showTransliteration || settings.showEnglishTranslation {
                 Stepper(value: $settings.englishFontSize.animation(.easeInOut), in: 13...20, step: 1) {
@@ -524,7 +530,7 @@ struct SettingsAppearanceView: View {
             Toggle("Default List View", isOn: $settings.defaultView.animation(.easeInOut))
                 .font(.subheadline)
             
-            Text("The default list view is the standard interface found in many of Apple's first party apps, including Notes. This setting only applies to the main view.")
+            Text("The default list view is the standard interface found in many of Apple's first party apps, including Notes. This setting only applies to the Quran and Tools views.")
                 .font(.caption)
                 .foregroundColor(.secondary)
                 .padding(.vertical, 2)

@@ -21,7 +21,7 @@ struct AlQuranApp: App {
                     LaunchScreen(isLaunching: $isLaunching)
                 } else {
                     TabView {
-                        SurahsView()
+                        QuranView()
                         
                         OtherView()
                         
@@ -37,6 +37,7 @@ struct AlQuranApp: App {
             .tint(settings.accentColor.color)
             .preferredColorScheme(settings.colorScheme)
             .transition(.opacity)
+            .animation(.easeInOut, value: isLaunching)
         }
         .onChange(of: settings.lastReadSurah) { newValue in
             sendMessageToPhone()
@@ -51,6 +52,9 @@ struct AlQuranApp: App {
             sendMessageToPhone()
         }
         .onChange(of: settings.favoriteLetters) { newValue in
+            sendMessageToPhone()
+        }
+        .onChange(of: settings.accentColor) { _ in
             sendMessageToPhone()
         }
     }

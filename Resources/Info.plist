@@ -11,5 +11,7 @@
 	<array>
 		<string>audio</string>
 	</array>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Used to save wallpapers you choose to your Photo Library.</string>
 </dict>
 </plist>

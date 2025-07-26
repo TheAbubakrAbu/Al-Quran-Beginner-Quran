@@ -4,9 +4,21 @@
 
 Discover **Al-Quran**: A free, beginner-friendly app featuring Arabic Beginner Mode with spaced letters, recitations, and the ability to share ayahs as text or images!
 
-I was a **17-year-old** high school student when this app was published on the App Store on **December 26, 2023**.
+Created by **Abubakr Elmallah**, who was a **17-year-old** high school student when this app was published on the App Store on **December 26, 2023**.
+
+🏆 **Winner of the Swift Student Challenge 2024**
+I was selected from thousands of high school and college students while still in high school, and I had the incredible opportunity to attend **WWDC 2024** right after graduating in June 2024 — where I got to meet **Tim Cook** and celebrate at **Apple Park**.
 
 [**Download Al-Quran on the App Store here**](https://apps.apple.com/us/app/al-quran-beginner-quran/id6474894373?platform=iphone)
+
+<a href="https://apps.apple.com/us/app/al-quran-beginner-quran/id6474894373?platform=iphone">
+  <img src="Resources/Logo.jpg" alt="Logo" width="120" style="border-radius:10px;"/>
+</a>
+
+### 📂 Related Projects on GitHub
+
+- [**Al-Quran Swift Student Challenge 2024 Submission**](https://github.com/TheAbubakrAbu/Al-Quran-Swift-Student-Challenge-2024)
+- [**Quran Swift Playground for Kids**](https://github.com/TheAbubakrAbu/Quran-Swift-Playground-for-Kids)
 
 ## Overview
 Al-Quran is a complete Quranic experience designed for new learners, reverts, and those seeking a focused Quran study tool. With intuitive features and a seamless design, this app helps users read, understand, and interact with the Quran effortlessly.

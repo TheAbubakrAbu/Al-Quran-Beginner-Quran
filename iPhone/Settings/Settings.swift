@@ -1,56 +1,16 @@
 import SwiftUI
 
-struct LetterData: Identifiable, Codable, Equatable, Comparable {
-    let id: Int
-    let letter: String
-    let forms: [String]
-    let name: String
-    let transliteration: String
-    let showTashkeel: Bool
-    let sound: String
-    
-    static func < (lhs: LetterData, rhs: LetterData) -> Bool {
-        return lhs.id < rhs.id
-    }
-}
-
-extension Date {
-    func isSameDay(as date: Date) -> Bool {
-        let calendar = Calendar.current
-        return calendar.isDate(self, inSameDayAs: date)
-    }
-}
-
-enum AccentColor: String, CaseIterable, Identifiable {
-    var id: String { self.rawValue }
-
-    case red, orange, yellow, green, blue, indigo, cyan, teal, mint, purple, pink, brown
-
-    var color: Color {
-        switch self {
-        case .red: return .red
-        case .orange: return .orange
-        case .yellow: return .yellow
-        case .green: return .green
-        case .blue: return .blue
-        case .indigo: return .indigo
-        case .cyan: return .cyan
-        case .teal: return .teal
-        case .mint: return .mint
-        case .purple: return .purple
-        case .pink: return .pink
-        case .brown: return .brown
-        }
-    }
-}
-
-let accentColors: [AccentColor] = AccentColor.allCases
-
 final class Settings: ObservableObject {
     static let shared = Settings()
+    
     private var appGroupUserDefaults: UserDefaults?
     
-    init() {
+    static let encoder: JSONEncoder = JSONEncoder()
+    static let decoder: JSONDecoder = JSONDecoder()
+    
+    private static let arabicDigits = ["٠","١","٢","٣","٤","٥","٦","٧","٨","٩"]
+    
+    private init() {
         self.appGroupUserDefaults = UserDefaults(suiteName: "group.com.IslamicPillars.AppGroup")
         
         self.accentColor = AccentColor(rawValue: appGroupUserDefaults?.string(forKey: "colorAccent") ?? "green") ?? .green
@@ -67,20 +27,11 @@ final class Settings: ObservableObject {
         self.favoriteSurahsData = appGroupUserDefaults?.data(forKey: "favoriteSurahsData") ?? Data()
         self.bookmarkedAyahsData = appGroupUserDefaults?.data(forKey: "bookmarkedAyahsData") ?? Data()
         self.favoriteLetterData = appGroupUserDefaults?.data(forKey: "favoriteLetterData") ?? Data()
-    }
-    
-    func arabicNumberString(from numberString: String) -> String {
-        let arabicNumbers = ["٠", "١", "٢", "٣", "٤", "٥", "٦", "٧", "٨", "٩"]
-
-        var arabicNumberString = ""
-        for character in numberString {
-            if let digit = Int(String(character)) {
-                arabicNumberString += arabicNumbers[digit]
-            } else {
-                arabicNumberString += String(character)
-            }
+        
+        withAnimation {
+            self.favoriteSurahsCopy = self.favoriteSurahs
+            self.bookmarkedAyahsCopy = self.bookmarkedAyahs
         }
-        return arabicNumberString
     }
     
     func hapticFeedback() {
@@ -112,12 +63,10 @@ final class Settings: ObservableObject {
     }
     var favoriteSurahs: [Int] {
         get {
-            let decoder = JSONDecoder()
-            return (try? decoder.decode([Int].self, from: favoriteSurahsData)) ?? []
+            return (try? Self.decoder.decode([Int].self, from: favoriteSurahsData)) ?? []
         }
         set {
-            let encoder = JSONEncoder()
-            favoriteSurahsData = (try? encoder.encode(newValue)) ?? Data()
+            favoriteSurahsData = (try? Self.encoder.encode(newValue)) ?? Data()
         }
     }
     
@@ -130,12 +79,10 @@ final class Settings: ObservableObject {
     }
     var bookmarkedAyahs: [BookmarkedAyah] {
         get {
-            let decoder = JSONDecoder()
-            return (try? decoder.decode([BookmarkedAyah].self, from: bookmarkedAyahsData)) ?? []
+            return (try? Self.decoder.decode([BookmarkedAyah].self, from: bookmarkedAyahsData)) ?? []
         }
         set {
-            let encoder = JSONEncoder()
-            bookmarkedAyahsData = (try? encoder.encode(newValue)) ?? Data()
+            bookmarkedAyahsData = (try? Self.encoder.encode(newValue)) ?? Data()
         }
     }
     
@@ -151,17 +98,14 @@ final class Settings: ObservableObject {
     }
     var favoriteLetters: [LetterData] {
         get {
-            let decoder = JSONDecoder()
-            return (try? decoder.decode([LetterData].self, from: favoriteLetterData)) ?? []
+            return (try? Self.decoder.decode([LetterData].self, from: favoriteLetterData)) ?? []
         }
         set {
-            let encoder = JSONEncoder()
-            favoriteLetterData = (try? encoder.encode(newValue)) ?? Data()
+            favoriteLetterData = (try? Self.encoder.encode(newValue)) ?? Data()
         }
     }
     
     func dictionaryRepresentation() -> [String: Any] {
-        let encoder = JSONEncoder()
         var dict: [String: Any] = [
             "accentColor": self.accentColor.rawValue,
             "reciter": self.reciter,
@@ -173,19 +117,19 @@ final class Settings: ObservableObject {
         ]
         
         do {
-            dict["favoriteSurahsData"] = try encoder.encode(self.favoriteSurahs)
+            dict["favoriteSurahsData"] = try Self.encoder.encode(self.favoriteSurahs)
         } catch {
             print("Error encoding favoriteSurahs: \(error)")
         }
 
         do {
-            dict["bookmarkedAyahsData"] = try encoder.encode(self.bookmarkedAyahs)
+            dict["bookmarkedAyahsData"] = try Self.encoder.encode(self.bookmarkedAyahs)
         } catch {
             print("Error encoding bookmarkedAyahs: \(error)")
         }
 
         do {
-            dict["favoriteLetterData"] = try encoder.encode(self.favoriteLetters)
+            dict["favoriteLetterData"] = try Self.encoder.encode(self.favoriteLetters)
         } catch {
             print("Error encoding favoriteLetters: \(error)")
         }
@@ -194,7 +138,6 @@ final class Settings: ObservableObject {
     }
 
     func update(from dict: [String: Any]) {
-        let decoder = JSONDecoder()
         if let accentColor = dict["accentColor"] as? String,
            let accentColorValue = AccentColor(rawValue: accentColor) {
             self.accentColor = accentColorValue
@@ -215,13 +158,13 @@ final class Settings: ObservableObject {
             self.lastReadAyah = lastReadAyah
         }
         if let favoriteSurahsData = dict["favoriteSurahsData"] as? Data {
-            self.favoriteSurahs = (try? decoder.decode([Int].self, from: favoriteSurahsData)) ?? []
+            self.favoriteSurahs = (try? Self.decoder.decode([Int].self, from: favoriteSurahsData)) ?? []
         }
         if let bookmarkedAyahsData = dict["bookmarkedAyahsData"] as? Data {
-            self.bookmarkedAyahs = (try? decoder.decode([BookmarkedAyah].self, from: bookmarkedAyahsData)) ?? []
+            self.bookmarkedAyahs = (try? Self.decoder.decode([BookmarkedAyah].self, from: bookmarkedAyahsData)) ?? []
         }
         if let favoriteLetterData = dict["favoriteLetterData"] as? Data {
-            self.favoriteLetters = (try? decoder.decode([LetterData].self, from: favoriteLetterData)) ?? []
+            self.favoriteLetters = (try? Self.decoder.decode([LetterData].self, from: favoriteLetterData)) ?? []
         }
     }
     
@@ -253,7 +196,7 @@ final class Settings: ObservableObject {
         get {
             guard let data = appGroupUserDefaults?.data(forKey: "lastListenedSurahDataQuran") else { return nil }
             do {
-                return try JSONDecoder().decode(LastListenedSurah.self, from: data)
+                return try Self.decoder.decode(LastListenedSurah.self, from: data)
             } catch {
                 print("Failed to decode last listened surah: \(error)")
                 return nil
@@ -262,7 +205,7 @@ final class Settings: ObservableObject {
         set {
             if let newValue = newValue {
                 do {
-                    let data = try JSONEncoder().encode(newValue)
+                    let data = try Self.encoder.encode(newValue)
                     appGroupUserDefaults?.set(data, forKey: "lastListenedSurahDataQuran")
                 } catch {
                     print("Failed to encode last listened surah: \(error)")
@@ -285,32 +228,32 @@ final class Settings: ObservableObject {
     
     @AppStorage("englishFontSize") var englishFontSize: Double = Double(UIFont.preferredFont(forTextStyle: .body).pointSize)
     
-    func toggleSurahFavorite(surah: Surah) {
+    func toggleSurahFavorite(surah: Int) {
         withAnimation {
             if isSurahFavorite(surah: surah) {
-                favoriteSurahs.removeAll(where: { $0 == surah.id })
+                favoriteSurahs.removeAll(where: { $0 == surah })
             } else {
-                favoriteSurahs.append(surah.id)
+                favoriteSurahs.append(surah)
             }
         }
     }
     
-    func toggleSurahFavoriteCopy(surah: Surah) {
+    func toggleSurahFavoriteCopy(surah: Int) {
         withAnimation {
             if isSurahFavoriteCopy(surah: surah) {
-                favoriteSurahsCopy.removeAll(where: { $0 == surah.id })
+                favoriteSurahsCopy.removeAll(where: { $0 == surah })
             } else {
-                favoriteSurahsCopy.append(surah.id)
+                favoriteSurahsCopy.append(surah)
             }
         }
     }
 
-    func isSurahFavorite(surah: Surah) -> Bool {
-        return favoriteSurahs.contains(surah.id)
+    func isSurahFavorite(surah: Int) -> Bool {
+        return favoriteSurahs.contains(surah)
     }
     
-    func isSurahFavoriteCopy(surah: Surah) -> Bool {
-        return favoriteSurahsCopy.contains(surah.id)
+    func isSurahFavoriteCopy(surah: Int) -> Bool {
+        return favoriteSurahsCopy.contains(surah)
     }
 
     func toggleBookmark(surah: Int, ayah: Int) {
@@ -359,6 +302,22 @@ final class Settings: ObservableObject {
         return favoriteLetters.contains(where: {$0.id == letterData.id})
     }
     
+    private static let unwantedCharSet: CharacterSet = {
+        CharacterSet(charactersIn: "-[]()'\"").union(.nonBaseCharacters)
+    }()
+
+    func cleanSearch(_ text: String, whitespace: Bool = false) -> String {
+        var cleaned = String(text.unicodeScalars
+            .filter { !Self.unwantedCharSet.contains($0) }
+        ).lowercased()
+
+        if whitespace {
+            cleaned = cleaned.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+
+        return cleaned
+    }
+    
     func colorSchemeFromString(_ colorScheme: String) -> ColorScheme? {
         switch colorScheme {
         case "light":
@@ -380,28 +339,4 @@ final class Settings: ObservableObject {
             return "system"
         }
     }
-}
-
-struct CustomColorSchemeKey: EnvironmentKey {
-    static let defaultValue: ColorScheme? = nil
-}
-
-extension EnvironmentValues {
-    var customColorScheme: ColorScheme? {
-        get { self[CustomColorSchemeKey.self] }
-        set { self[CustomColorSchemeKey.self] = newValue }
-    }
-}
-
-func arabicNumberString(from number: Int) -> String {
-    let arabicNumbers = ["٠", "١", "٢", "٣", "٤", "٥", "٦", "٧", "٨", "٩"]
-    let numberString = String(number)
-    
-    var arabicNumberString = ""
-    for character in numberString {
-        if let digit = Int(String(character)) {
-            arabicNumberString += arabicNumbers[digit]
-        }
-    }
-    return arabicNumberString
 }

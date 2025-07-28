@@ -111,7 +111,7 @@ struct AlQuranApp: App {
     
     private func sendMessageToWatch() {
         guard WCSession.default.isPaired else {
-            print("No Apple Watch is paired")
+            logger.debug("No Apple Watch is paired")
             return
         }
         
@@ -119,13 +119,13 @@ struct AlQuranApp: App {
         let message = ["settings": settingsData]
 
         if WCSession.default.isReachable {
-            print("Watch is reachable. Sending message to watch: \(message)")
+            logger.debug("Watch is reachable. Sending message to watch: \(message)")
 
             WCSession.default.sendMessage(message, replyHandler: nil) { error in
-                print("Error sending message to watch: \(error.localizedDescription)")
+                logger.debug("Error sending message to watch: \(error.localizedDescription)")
             }
         } else {
-            print("Watch is not reachable. Transferring user info to watch: \(message)")
+            logger.debug("Watch is not reachable. Transferring user info to watch: \(message)")
             WCSession.default.transferUserInfo(message)
         }
     }

@@ -24,12 +24,17 @@ struct AyahsView: View {
                 
                 let filteredAyahs = surah.ayahs.filter { a in
                     guard !cleanQuery.isEmpty else { return true }
-                    return settings.cleanSearch(a.textClearArabic).contains(cleanQuery) ||
-                           settings.cleanSearch(a.textTransliteration ?? "").contains(cleanQuery) ||
-                           settings.cleanSearch(a.textEnglish ?? "").contains(cleanQuery) ||
-                           settings.cleanSearch(String(a.id)).contains(cleanQuery) ||
-                           settings.cleanSearch(arabicNumberString(from: a.id)).contains(cleanQuery) ||
-                           Int(cleanQuery) == a.id
+
+                    let rawArabic   = settings.cleanSearch(a.textArabic)
+                    let clearArabic = settings.cleanSearch(a.textClearArabic)
+
+                    return rawArabic.contains(cleanQuery)
+                        || clearArabic.contains(cleanQuery)
+                        || settings.cleanSearch(a.textTransliteration ?? "").contains(cleanQuery)
+                        || settings.cleanSearch(a.textEnglish ?? "").contains(cleanQuery)
+                        || settings.cleanSearch(String(a.id)).contains(cleanQuery)
+                        || settings.cleanSearch(arabicNumberString(from: a.id)).contains(cleanQuery)
+                        || Int(cleanQuery) == a.id
                 }
                 
                 List {

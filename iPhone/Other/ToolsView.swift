@@ -233,7 +233,9 @@ struct TasbihView: View {
                         
                         TasbihRow(tasbih: tasbihData[index], counter: binding(for: index))
                     }
+                    #if os(watchOS)
                     .padding(.vertical, 12)
+                    #endif
                     .onTapGesture {
                         settings.hapticFeedback()
                         withAnimation {
@@ -250,15 +252,11 @@ struct TasbihView: View {
                 ZStack {
                     ProgressCircleView(progress: counterBinding.wrappedValue)
                         .scaledToFit()
-                        .frame(maxWidth: 175, maxHeight: 175)
+                        .frame(maxWidth: 185, maxHeight: 185)
                     
                     VStack(alignment: .center, spacing: 5) {
                         Text(selectedDhikr.arabic)
-                            #if !os(watchOS)
-                            .font(.title2)
-                            #else
                             .font(.title3)
-                            #endif
                             .fontWeight(.bold)
                             .foregroundColor(settings.accentColor.color)
                         
@@ -271,6 +269,10 @@ struct TasbihView: View {
                 .padding()
                 .cornerRadius(15)
                 .frame(maxWidth: .infinity, alignment: .center)
+                .onTapGesture {
+                    settings.hapticFeedback()
+                    counters[selectedDhikrIndex, default: 0] += 1
+                }
             }
         }
         .onAppear {
@@ -311,29 +313,15 @@ struct CounterView: View {
     @Binding var counter: Int
 
     var body: some View {
-        HStack {
-            Image(systemName: "minus.circle")
-                .font(.title2)
-                .foregroundColor(counter == 0 ? .secondary : settings.accentColor.color)
-                .onTapGesture {
-                    if counter > 0 {
-                        settings.hapticFeedback()
-                        counter -= 1
-                    }
-                }
-
+        VStack(alignment: .center) {
             Text("\(counter)")
                 .font(.title)
                 .fontWeight(.semibold)
                 .padding(.horizontal, 2)
 
             Image(systemName: "plus.circle")
-                .font(.title2)
+                .font(.title3)
                 .foregroundColor(settings.accentColor.color)
-                .onTapGesture {
-                    settings.hapticFeedback()
-                    counter += 1
-                }
         }
     }
 }
@@ -469,7 +457,7 @@ final class NamesViewModel: ObservableObject {
     
     private func loadJSON() {
         guard let url = Bundle.main.url(forResource: "99_Names_Of_Allah", withExtension: "json") else {
-            print("❌ 99 Names JSON not found."); return
+            logger.debug("❌ 99 Names JSON not found."); return
         }
         DispatchQueue.global(qos: .utility).async {
             do {
@@ -477,7 +465,7 @@ final class NamesViewModel: ObservableObject {
                 let root = try JSONDecoder().decode(Root.self, from: data)
                 DispatchQueue.main.async { self.namesOfAllah = root.data }
             } catch {
-                print("❌ JSON decode error:", error)
+                logger.debug("❌ JSON decode error: \(error)")
             }
         }
     }

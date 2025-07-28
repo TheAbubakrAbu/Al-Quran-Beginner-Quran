@@ -1,4 +1,7 @@
 import SwiftUI
+import os
+
+let logger = Logger(subsystem: "com.Quran.Elmallah.Beginner-Quran", category: "Al-Quran")
 
 final class Settings: ObservableObject {
     static let shared = Settings()
@@ -119,19 +122,19 @@ final class Settings: ObservableObject {
         do {
             dict["favoriteSurahsData"] = try Self.encoder.encode(self.favoriteSurahs)
         } catch {
-            print("Error encoding favoriteSurahs: \(error)")
+            logger.debug("Error encoding favoriteSurahs: \(error)")
         }
 
         do {
             dict["bookmarkedAyahsData"] = try Self.encoder.encode(self.bookmarkedAyahs)
         } catch {
-            print("Error encoding bookmarkedAyahs: \(error)")
+            logger.debug("Error encoding bookmarkedAyahs: \(error)")
         }
 
         do {
             dict["favoriteLetterData"] = try Self.encoder.encode(self.favoriteLetters)
         } catch {
-            print("Error encoding favoriteLetters: \(error)")
+            logger.debug("Error encoding favoriteLetters: \(error)")
         }
         
         return dict
@@ -198,7 +201,7 @@ final class Settings: ObservableObject {
             do {
                 return try Self.decoder.decode(LastListenedSurah.self, from: data)
             } catch {
-                print("Failed to decode last listened surah: \(error)")
+                logger.debug("Failed to decode last listened surah: \(error)")
                 return nil
             }
         }
@@ -208,7 +211,7 @@ final class Settings: ObservableObject {
                     let data = try Self.encoder.encode(newValue)
                     appGroupUserDefaults?.set(data, forKey: "lastListenedSurahDataQuran")
                 } catch {
-                    print("Failed to encode last listened surah: \(error)")
+                    logger.debug("Failed to encode last listened surah: \(error)")
                 }
             } else {
                 appGroupUserDefaults?.removeObject(forKey: "lastListenedSurahDataQuran")

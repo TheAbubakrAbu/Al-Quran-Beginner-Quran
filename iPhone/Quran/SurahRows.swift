@@ -152,7 +152,9 @@ struct SurahAyahRow: View {
                 
                 VStack {
                     if(settings.showArabicText) {
-                        Text(ayah.textArabic)
+                        let text = settings.cleanArabicText ? ayah.textClearArabic : ayah.textArabic
+                        
+                        Text(settings.beginnerMode ? text.map { "\($0) " }.joined() : text)
                             .font(.custom(settings.fontArabic, size: UIFont.preferredFont(forTextStyle: .subheadline).pointSize * 1.1))
                             .frame(maxWidth: .infinity, alignment: .trailing)
                     }
@@ -552,7 +554,7 @@ struct LastListenedSurahRow: View {
                     HStack {
                         Text(lastListenedSurah.reciter.name)
                             .font(.caption)
-                            .foregroundColor(.secondary)
+                            .foregroundColor(.primary)
                             .lineLimit(1)
                             .minimumScaleFactor(0.5)
 
@@ -856,6 +858,12 @@ struct AyahSearchRow: View {
     let english: String?
     let translit: String?
     
+    let favoriteSurahs: Set<Int>
+    let bookmarkedAyahs: Set<String>
+    
+    @Binding var searchText: String
+    @Binding var scrollToSurahID: Int
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("\(surahName) \(surah):\(ayah)")
@@ -868,7 +876,8 @@ struct AyahSearchRow: View {
                     term: query,
                     font: .custom(settings.fontArabic, size: UIFont.preferredFont(forTextStyle: .body).pointSize),
                     accent: settings.accentColor.color,
-                    fg: .primary
+                    fg: .primary,
+                    selectable: false
                 )
                 .frame(maxWidth: .infinity, alignment: .trailing)
                 .multilineTextAlignment(.trailing)
@@ -881,7 +890,8 @@ struct AyahSearchRow: View {
                     term: query,
                     font: .subheadline,
                     accent: settings.accentColor.color,
-                    fg: .secondary
+                    fg: .secondary,
+                    selectable: false
                 )
             }
             
@@ -892,69 +902,37 @@ struct AyahSearchRow: View {
                     term: query,
                     font: .footnote,
                     accent: settings.accentColor.color,
-                    fg: .secondary
+                    fg: .secondary,
+                    selectable: false
                 )
             }
         }
         .padding(.vertical, 2)
-    }
-}
-
-struct HighlightedSnippet: View {
-    @EnvironmentObject var settings: Settings
-    
-    let source: String
-    let term: String
-    let font: Font
-    let accent: Color
-    let fg: Color
-
-    var body: some View {
-        let result = highlight(source: source, term: term)
-        Text(result)
-            .font(font)
-    }
-
-    private func highlight(source: String, term: String) -> AttributedString {
-        var attributed = AttributedString(source)
-        attributed.foregroundColor = fg
-
-        let normalizedSource = settings.cleanSearch(source)
-        let normalizedTerm = settings.cleanSearch(term, whitespace: true)
-
-        guard !normalizedTerm.isEmpty,
-              let matchRange = normalizedSource.range(of: normalizedTerm)
-        else {
-            return attributed
+        .swipeActions(edge: .trailing) {
+            RightSwipeActions(
+                surahID: surah,
+                surahName: surahName,
+                ayahID: ayah,
+                searchText: $searchText,
+                scrollToSurahID: $scrollToSurahID
+            )
         }
-
-        var originalStart: String.Index? = nil
-        var originalEnd: String.Index? = nil
-        var normIndex = normalizedSource.startIndex
-        var origIndex = source.startIndex
-
-        while normIndex < matchRange.lowerBound && origIndex < source.endIndex {
-            let foldedOrig = settings.cleanSearch(String(source[origIndex]))
-            normIndex = normalizedSource.index(normIndex, offsetBy: foldedOrig.count)
-            origIndex = source.index(after: origIndex)
+        .swipeActions(edge: .leading) {
+            LeftSwipeActions(
+                surah: surah,
+                favoriteSurahs: favoriteSurahs,
+                bookmarkedAyahs: bookmarkedAyahs,
+                bookmarkedSurah: surah,
+                bookmarkedAyah: ayah
+            )
         }
-
-        originalStart = origIndex
-
-        var lengthLeft = normalizedTerm.count
-        while lengthLeft > 0 && origIndex < source.endIndex {
-            let foldedOrig = settings.cleanSearch(String(source[origIndex]))
-            lengthLeft -= foldedOrig.count
-            origIndex = source.index(after: origIndex)
-        }
-
-        originalEnd = origIndex
-
-        if let start = originalStart, let end = originalEnd,
-           let rangeInAttr = attributed.range(of: String(source[start..<end])) {
-            attributed[rangeInAttr].foregroundColor = accent
-        }
-
-        return attributed
+        .ayahContextMenuModifier(
+            surah: surah,
+            ayah: ayah,
+            favoriteSurahs: favoriteSurahs,
+            bookmarkedAyahs: bookmarkedAyahs,
+            searchText: $searchText,
+            scrollToSurahID: $scrollToSurahID
+        )
     }
 }

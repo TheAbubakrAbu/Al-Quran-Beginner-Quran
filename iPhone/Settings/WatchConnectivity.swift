@@ -29,8 +29,8 @@ final class WatchConnectivityManager: NSObject, WCSessionDelegate {
     func queue(message: [String:Any]) { outgoing.send(message) }
 
     func session(_ session: WCSession, activationDidCompleteWith activationState: WCSessionActivationState, error: Error?) {
-        if let error { print("WC activation failed: \(error)") }
-        print("WC activation →", activationState.rawValue)
+        if let error { logger.debug("WC activation failed: \(error)") }
+        logger.debug("WC activation → \(activationState.rawValue)")
     }
 
     #if os(iOS)
@@ -55,11 +55,11 @@ final class WatchConnectivityManager: NSObject, WCSessionDelegate {
         lastPayload = data
 
         do { try session.updateApplicationContext(payload) }
-        catch { print("WC updateApplicationContext error: \(error)") }
+        catch { logger.debug("WC updateApplicationContext error: \(error)") }
 
         if session.isReachable {
             session.sendMessage(payload, replyHandler: nil) { err in
-                print("WC sendMessage error: \(err.localizedDescription)")
+                logger.debug("WC sendMessage error: \(err.localizedDescription)")
             }
             return
         }

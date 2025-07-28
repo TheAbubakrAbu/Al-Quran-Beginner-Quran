@@ -64,12 +64,12 @@ struct AlQuranApp: App {
         let message = ["settings": settingsData]
 
         if WCSession.default.isReachable {
-            print("Phone is reachable. Sending message to phone: \(message)")
+            logger.debug("Phone is reachable. Sending message to phone: \(message)")
             WCSession.default.sendMessage(message, replyHandler: nil) { error in
-                print("Error sending message to phone: \(error.localizedDescription)")
+                logger.debug("Error sending message to phone: \(error.localizedDescription)")
             }
         } else {
-            print("Phone is not reachable. Transferring user info to phone: \(message)")
+            logger.debug("Phone is not reachable. Transferring user info to phone: \(message)")
             WCSession.default.transferUserInfo(message)
         }
     }

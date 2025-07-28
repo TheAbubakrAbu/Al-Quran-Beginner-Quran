@@ -51,14 +51,14 @@ final class QuranPlayer: ObservableObject {
             let s = AVAudioSession.sharedInstance()
             try s.setCategory(.playback)
             try s.setActive(true, options: .notifyOthersOnDeactivation)
-        } catch { print("Audio session setup failed:", error) }
+        } catch { logger.debug("Audio session setup failed: \(error)") }
     }
     
     private func deactivateAudioSession() {
         do {
             try AVAudioSession.sharedInstance().setActive(false,
                                                           options: .notifyOthersOnDeactivation)
-        } catch { print("Audio session deactivate failed:", error) }
+        } catch { logger.debug("Audio session deactivate failed: \(error)") }
     }
     
     @objc private func handleInterruption(notification: Notification) {

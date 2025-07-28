@@ -71,57 +71,7 @@ struct AyahRow: View {
                     }
                     
                     Menu {
-                        Button(role: isBookmarked ? .destructive : nil) {
-                            settings.hapticFeedback()
-                            settings.toggleBookmarkCopy(surah: surah.id, ayah: ayah.id)
-                        } label: {
-                            Label(
-                                isBookmarked ? "Unbookmark Ayah" : "Bookmark Ayah",
-                                systemImage: isBookmarked ? "bookmark.fill" : "bookmark"
-                            )
-                        }
-                        
-                        if showArabic && !settings.beginnerMode {
-                            Button {
-                                settings.hapticFeedback()
-                                withAnimation { ayahBeginnerMode.toggle() }
-                            } label: {
-                                Label("Beginner Mode",
-                                      systemImage: ayahBeginnerMode
-                                      ? "textformat.size.larger.ar"
-                                      : "textformat.size.ar")
-                            }
-                        }
-                        
-                        Divider()
-                        
-                        Button {
-                            settings.hapticFeedback()
-                            quranPlayer.playAyah(surahNumber: surah.id, ayahNumber: ayah.id)
-                        } label: {
-                            Label("Play Ayah", systemImage: "play.circle")
-                        }
-                        
-                        Button {
-                            settings.hapticFeedback()
-                            quranPlayer.playAyah(surahNumber: surah.id, ayahNumber: ayah.id, continueRecitation: true)
-                        } label: {
-                            Label("Play from Ayah", systemImage: "play.circle.fill")
-                        }
-                        
-                        Divider()
-                        
-                        Button {
-                            settings.hapticFeedback()
-                            shareSettings = ShareSettings(
-                                arabic: showArabic,
-                                transliteration: showTranslit,
-                                translation: showEnglish
-                            )
-                            showingAyahSheet = true
-                        } label: {
-                            Label("Share Ayah", systemImage: "square.and.arrow.up")
-                        }
+                        menuBlock(isBookmarked: isBookmarked)
                     } label: {
                         ZStack(alignment: .trailing) {
                             Rectangle().fill(.clear).frame(width: 32, height: 32)
@@ -175,55 +125,7 @@ struct AyahRow: View {
         .lineLimit(nil)
         #if !os(watchOS)
         .contextMenu {
-            Button(role: isBookmarked ? .destructive : nil) {
-                settings.hapticFeedback()
-                settings.toggleBookmarkCopy(surah: surah.id, ayah: ayah.id)
-            } label: {
-                Label(
-                    isBookmarked ? "Unbookmark Ayah" : "Bookmark Ayah",
-                    systemImage: isBookmarked ? "bookmark.fill" : "bookmark"
-                )
-            }
-            
-            if showArabic && !settings.beginnerMode {
-                Button {
-                    settings.hapticFeedback()
-                    withAnimation { ayahBeginnerMode.toggle() }
-                } label: {
-                    Label(
-                        "Beginner Mode",
-                        systemImage: ayahBeginnerMode
-                        ? "textformat.size.larger.ar"
-                        : "textformat.size.ar"
-                    )
-                }
-            }
-            
-            Divider()
-            
-            Button {
-                settings.hapticFeedback()
-                quranPlayer.playAyah(surahNumber: surah.id, ayahNumber: ayah.id)
-            } label: {
-                Label("Play Ayah", systemImage: "play.circle")
-            }
-            
-            Button {
-                settings.hapticFeedback()
-                quranPlayer.playAyah(surahNumber: surah.id, ayahNumber: ayah.id, continueRecitation: true)
-            } label: {
-                Label("Play from Ayah", systemImage: "play.circle.fill")
-            }
-            
-            Divider()
-            
-            Button {
-                settings.hapticFeedback()
-                shareSettings = ShareSettings(arabic: showArabic, transliteration: showTranslit, translation: showEnglish)
-                showingAyahSheet = true
-            } label: {
-                Label("Share Ayah", systemImage: "square.and.arrow.up")
-            }
+            menuBlock(isBookmarked: isBookmarked)
         }
         #endif
         .animation(.easeInOut, value: quranPlayer.currentAyahNumber)
@@ -238,7 +140,8 @@ struct AyahRow: View {
                     term: searchText,
                     font: .custom(settings.fontArabic, size: settings.fontArabicSize),
                     accent: settings.accentColor.color,
-                    fg: .primary
+                    fg: .primary,
+                    beginnerMode: (settings.beginnerMode || ayahBeginnerMode)
                 )
                 .multilineTextAlignment(.trailing)
                 .frame(maxWidth: .infinity, alignment: .trailing)
@@ -271,5 +174,70 @@ struct AyahRow: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.top, 4)
         .padding(.bottom, 2)
+    }
+    
+    @ViewBuilder
+    private func menuBlock(isBookmarked: Bool) -> some View {
+        #if !os(watchOS)
+        VStack(alignment: .leading) {
+            Button(role: isBookmarked ? .destructive : nil) {
+                settings.hapticFeedback()
+                settings.toggleBookmarkCopy(surah: surah.id, ayah: ayah.id)
+            } label: {
+                Label(
+                    isBookmarked ? "Unbookmark Ayah" : "Bookmark Ayah",
+                    systemImage: isBookmarked ? "bookmark.fill" : "bookmark"
+                )
+            }
+            
+            if settings.showArabicText && !settings.beginnerMode {
+                Button {
+                    settings.hapticFeedback()
+                    withAnimation {
+                        ayahBeginnerMode.toggle()
+                    }
+                } label: {
+                    Label("Beginner Mode",
+                          systemImage: ayahBeginnerMode
+                          ? "textformat.size.larger.ar"
+                          : "textformat.size.ar")
+                }
+            }
+            
+            Divider()
+            
+            Button {
+                settings.hapticFeedback()
+                quranPlayer.playAyah(surahNumber: surah.id, ayahNumber: ayah.id)
+            } label: {
+                Label("Play Ayah", systemImage: "play.circle")
+            }
+            
+            Button {
+                settings.hapticFeedback()
+                quranPlayer.playAyah(surahNumber: surah.id, ayahNumber: ayah.id, continueRecitation: true)
+            } label: {
+                Label("Play from Ayah", systemImage: "play.circle.fill")
+            }
+            
+            Divider()
+            
+            Button {
+                settings.hapticFeedback()
+                shareSettings = ShareSettings(
+                    arabic: settings.showArabicText,
+                    transliteration: settings.showTransliteration,
+                    translation: settings.showEnglishTranslation
+                )
+                showingAyahSheet = true
+            } label: {
+                Label("Share Ayah", systemImage: "square.and.arrow.up")
+            }
+        }
+        .lineLimit(nil)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.top, 4)
+        .padding(.bottom, 2)
+        #endif
     }
 }

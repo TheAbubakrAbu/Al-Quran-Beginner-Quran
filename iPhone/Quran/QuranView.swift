@@ -11,8 +11,9 @@ struct QuranView: View {
     
     @State private var verseHits: [VerseIndexEntry] = []
     @State private var hitOffset = 0
+    @State private var hasMoreHits = true
+    @State private var showAyahSearch = false
     private let hitPageSize = 10
-    @State private var searchDebounceTask: DispatchWorkItem?
     
     private static let arFormatter: NumberFormatter = {
         let f = NumberFormatter()
@@ -305,7 +306,7 @@ struct QuranView: View {
                         
                         #if !os(watchOS)
                         if !searchText.isEmpty {
-                            Section(header: Text("AYAH SEARCH RESULTS (\(verseHits.count)+)")) {
+                            Section(header: Text("AYAH SEARCH RESULTS (\(verseHits.count)\(hasMoreHits && verseHits.count >= hitPageSize ? "+" : ""))")) {
                                 ForEach(verseHits) { hit in
                                     if let surah = quranData.surah(hit.surah),
                                        let ayah = quranData.ayah(surah: hit.surah, ayah: hit.ayah) {
@@ -320,31 +321,66 @@ struct QuranView: View {
                                                 query: searchText,
                                                 arabic: ayah.textArabic,
                                                 english: ayah.textEnglish,
-                                                translit: ayah.textTransliteration
+                                                translit: ayah.textTransliteration,
+                                                favoriteSurahs: favoriteSurahs,
+                                                bookmarkedAyahs: bookmarkedAyahs,
+                                                searchText: $searchText,
+                                                scrollToSurahID: $scrollToSurahID
                                             )
                                         }
                                     }
                                 }
 
-                                if verseHits.count == hitPageSize {
+                                if verseHits.count >= hitPageSize && hasMoreHits {
                                     HStack {
                                         Spacer()
+                                        
                                         Button {
                                             settings.hapticFeedback()
                                             hitOffset += hitPageSize
-                                            let more = quranData.searchVerses(
-                                                term: searchText,
-                                                limit: hitPageSize,
-                                                offset: hitOffset
-                                            )
+                                            let currentCount = verseHits.count
+                                            let more = quranData.searchVerses(term: searchText, limit: hitPageSize, offset: hitOffset)
                                             withAnimation {
                                                 verseHits.append(contentsOf: more)
+                                                
+                                                if verseHits.count == currentCount {
+                                                    hasMoreHits = false
+                                                }
                                             }
                                         } label: {
                                             Text("Load more ayahs…")
                                                 .foregroundColor(settings.accentColor.color)
                                         }
+                                        
                                         Spacer()
+                                    }
+                                }
+                            }
+                            .onAppear {
+                                withAnimation {
+                                    showAyahSearch = true
+                                }
+                            }
+                            .onDisappear {
+                                withAnimation {
+                                    showAyahSearch = false
+                                }
+                            }
+                            .onChange(of: searchText) { txt in
+                                if showAyahSearch {
+                                    withAnimation {
+                                        hitOffset = 0
+                                        hasMoreHits = true
+                                        verseHits = quranData.searchVerses(term: txt, limit: hitPageSize, offset: 0)
+                                    }
+                                }
+                            }
+                            .onChange(of: showAyahSearch) { newValue in
+                                if newValue {
+                                    withAnimation {
+                                        hitOffset = 0
+                                        hasMoreHits = true
+                                        verseHits = quranData.searchVerses(term: searchText, limit: hitPageSize, offset: 0)
                                     }
                                 }
                             }
@@ -466,12 +502,6 @@ struct QuranView: View {
                     }
                     .applyConditionalListStyle(defaultView: true)
                     .navigationTitle("Al-Quran Settings")
-                }
-            }
-            .onChange(of: searchText) { txt in
-                withAnimation {
-                    hitOffset = 0
-                    verseHits = quranData.searchVerses(term: txt, limit: hitPageSize, offset: 0)
                 }
             }
             #endif

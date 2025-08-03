@@ -452,11 +452,13 @@ struct QuranView: View {
                                         quranPlayer.playSurah(
                                             surahNumber: last.surahNumber,
                                             surahName: last.surahName,
-                                            certainReciter: true)
+                                            certainReciter: true
+                                        )
                                     } label: {
                                         Label("Play Last Listened Surah (\(surah.nameTransliteration))", systemImage: "play.fill")
                                     }
                                 }
+                                
                                 Button {
                                     settings.hapticFeedback()
                                     if let randomSurah = quranData.quran.randomElement() {

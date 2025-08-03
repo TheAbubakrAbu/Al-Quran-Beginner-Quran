@@ -14,7 +14,7 @@ struct SurahRow: View {
                 RoundedRectangle(cornerRadius: 8)
                     .fill(favoriteSurahs.contains(surah.id)
                           ? settings.accentColor.color.opacity(settings.defaultView ? 0.15 : 0.25)
-                          : settings.accentColor.color.opacity(0.0001))
+                          : .white.opacity(0.0001))
                     #if !os(watchOS)
                     .padding(.leading, 19)
                     .padding(.horizontal, settings.defaultView ? -31 : -26)
@@ -122,7 +122,7 @@ struct SurahAyahRow: View {
                 RoundedRectangle(cornerRadius: 8)
                     .fill(favoriteSurahs.contains(surah.id)
                           ? settings.accentColor.color.opacity(settings.defaultView ? 0.15 : 0.25)
-                          : settings.accentColor.color.opacity(0.0001))
+                          : .white.opacity(0.0001))
                     #if !os(watchOS)
                     .padding(.leading, 19)
                     .padding(.horizontal, settings.defaultView ? -31 : -26)
@@ -160,13 +160,13 @@ struct SurahAyahRow: View {
                     }
                     
                     if(settings.showTransliteration) {
-                        Text(ayah.textTransliteration ?? "")
+                        Text(ayah.textTransliteration)
                             .font(.subheadline)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     
                     if(settings.showEnglishTranslation) {
-                        Text(ayah.textEnglish ?? "")
+                        Text(ayah.textEnglish)
                             .font(.subheadline)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }

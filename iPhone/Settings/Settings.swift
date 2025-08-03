@@ -6,35 +6,22 @@ let logger = Logger(subsystem: "com.Quran.Elmallah.Beginner-Quran", category: "A
 final class Settings: ObservableObject {
     static let shared = Settings()
     
-    private var appGroupUserDefaults: UserDefaults?
+    private let appGroupUserDefaults = UserDefaults(suiteName: "group.com.BeginnerQuran.AppGroup")
     
-    static let encoder: JSONEncoder = JSONEncoder()
-    static let decoder: JSONDecoder = JSONDecoder()
-    
-    private static let arabicDigits = ["٠","١","٢","٣","٤","٥","٦","٧","٨","٩"]
-    
+    private static let encoder: JSONEncoder = {
+        let enc = JSONEncoder()
+        enc.dateEncodingStrategy = .millisecondsSince1970
+        return enc
+    }()
+
+    private static let decoder: JSONDecoder = {
+        let dec = JSONDecoder()
+        dec.dateDecodingStrategy = .millisecondsSince1970
+        return dec
+    }()
+        
     private init() {
-        self.appGroupUserDefaults = UserDefaults(suiteName: "group.com.IslamicPillars.AppGroup")
-        
-        self.accentColor = AccentColor(rawValue: appGroupUserDefaults?.string(forKey: "colorAccent") ?? "green") ?? .green
-        
-        if let reciterID = appGroupUserDefaults?.string(forKey: "reciterQuran"), reciterID.starts(with: "ar"),
-           let reciter = reciters.first(where: { $0.ayahIdentifier == reciterID }) {
-            self.reciter = reciter.name
-        } else {
-            self.reciter = appGroupUserDefaults?.string(forKey: "reciterQuran") ?? "Muhammad Al-Minshawi (Murattal)"
-        }
-        
-        self.reciteType = appGroupUserDefaults?.string(forKey: "reciteTypeQuran") ?? "Continue to Next"
-        
-        self.favoriteSurahsData = appGroupUserDefaults?.data(forKey: "favoriteSurahsData") ?? Data()
-        self.bookmarkedAyahsData = appGroupUserDefaults?.data(forKey: "bookmarkedAyahsData") ?? Data()
-        self.favoriteLetterData = appGroupUserDefaults?.data(forKey: "favoriteLetterData") ?? Data()
-        
-        withAnimation {
-            self.favoriteSurahsCopy = self.favoriteSurahs
-            self.bookmarkedAyahsCopy = self.bookmarkedAyahs
-        }
+        self.accentColor = AccentColor(rawValue: appGroupUserDefaults?.string(forKey: "accentColor") ?? "green") ?? .green
     }
     
     func hapticFeedback() {
@@ -48,60 +35,40 @@ final class Settings: ObservableObject {
     }
     
     @Published var accentColor: AccentColor {
-        didSet { appGroupUserDefaults?.setValue(accentColor.rawValue, forKey: "colorAccent") }
+        didSet { appGroupUserDefaults?.setValue(accentColor.rawValue, forKey: "accentColor") }
     }
     
-    @Published var reciter: String {
-        didSet { appGroupUserDefaults?.setValue(reciter, forKey: "reciterQuran") }
-    }
+    @AppStorage("reciter") var reciter: String = "Muhammad Al-Minshawi (Murattal)"
     
-    @Published var reciteType: String {
-        didSet { appGroupUserDefaults?.setValue(reciteType, forKey: "reciteTypeQuran") }
-    }
+    @AppStorage("reciteType") var reciteType: String = "Continue to Next"
     
-    @Published var favoriteSurahsData: Data {
-        didSet {
-            appGroupUserDefaults?.setValue(favoriteSurahsData, forKey: "favoriteSurahsData")
-        }
-    }
+    @AppStorage("favoriteSurahsData") private var favoriteSurahsData = Data()
     var favoriteSurahs: [Int] {
         get {
-            return (try? Self.decoder.decode([Int].self, from: favoriteSurahsData)) ?? []
+            (try? Self.decoder.decode([Int].self, from: favoriteSurahsData)) ?? []
         }
         set {
             favoriteSurahsData = (try? Self.encoder.encode(newValue)) ?? Data()
         }
     }
     
-    @Published var favoriteSurahsCopy: [Int] = []
-
-    @Published var bookmarkedAyahsData: Data {
-        didSet {
-            appGroupUserDefaults?.setValue(bookmarkedAyahsData, forKey: "bookmarkedAyahsData")
-        }
-    }
+    @AppStorage("bookmarkedAyahsData") private var bookmarkedAyahsData = Data()
     var bookmarkedAyahs: [BookmarkedAyah] {
         get {
-            return (try? Self.decoder.decode([BookmarkedAyah].self, from: bookmarkedAyahsData)) ?? []
+            (try? Self.decoder.decode([BookmarkedAyah].self, from: bookmarkedAyahsData)) ?? []
         }
         set {
             bookmarkedAyahsData = (try? Self.encoder.encode(newValue)) ?? Data()
         }
     }
-    
-    @Published var bookmarkedAyahsCopy: [BookmarkedAyah] = []
-    
+        
     @AppStorage("showBookmarks") var showBookmarks = true
     @AppStorage("showFavorites") var showFavorites = true
 
-    @Published var favoriteLetterData: Data {
-        didSet {
-            appGroupUserDefaults?.setValue(favoriteLetterData, forKey: "favoriteLetterData")
-        }
-    }
+    @AppStorage("favoriteLetterData") private var favoriteLetterData = Data()
     var favoriteLetters: [LetterData] {
         get {
-            return (try? Self.decoder.decode([LetterData].self, from: favoriteLetterData)) ?? []
+            (try? Self.decoder.decode([LetterData].self, from: favoriteLetterData)) ?? []
         }
         set {
             favoriteLetterData = (try? Self.encoder.encode(newValue)) ?? Data()
@@ -241,22 +208,8 @@ final class Settings: ObservableObject {
         }
     }
     
-    func toggleSurahFavoriteCopy(surah: Int) {
-        withAnimation {
-            if isSurahFavoriteCopy(surah: surah) {
-                favoriteSurahsCopy.removeAll(where: { $0 == surah })
-            } else {
-                favoriteSurahsCopy.append(surah)
-            }
-        }
-    }
-
     func isSurahFavorite(surah: Int) -> Bool {
         return favoriteSurahs.contains(surah)
-    }
-    
-    func isSurahFavoriteCopy(surah: Int) -> Bool {
-        return favoriteSurahsCopy.contains(surah)
     }
 
     func toggleBookmark(surah: Int, ayah: Int) {
@@ -269,28 +222,12 @@ final class Settings: ObservableObject {
             }
         }
     }
-    
-    func toggleBookmarkCopy(surah: Int, ayah: Int) {
-        withAnimation {
-            let bookmark = BookmarkedAyah(surah: surah, ayah: ayah)
-            if let index = bookmarkedAyahsCopy.firstIndex(where: {$0.id == bookmark.id}) {
-                bookmarkedAyahsCopy.remove(at: index)
-            } else {
-                bookmarkedAyahsCopy.append(bookmark)
-            }
-        }
-    }
 
     func isBookmarked(surah: Int, ayah: Int) -> Bool {
         let bookmark = BookmarkedAyah(surah: surah, ayah: ayah)
         return bookmarkedAyahs.contains(where: {$0.id == bookmark.id})
     }
     
-    func isBookmarkedCopy(surah: Int, ayah: Int) -> Bool {
-        let bookmark = BookmarkedAyah(surah: surah, ayah: ayah)
-        return bookmarkedAyahsCopy.contains(where: {$0.id == bookmark.id})
-    }
-
     func toggleLetterFavorite(letterData: LetterData) {
         withAnimation {
             if isLetterFavorite(letterData: letterData) {

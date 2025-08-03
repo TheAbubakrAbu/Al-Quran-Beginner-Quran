@@ -141,13 +141,13 @@ struct SurahSectionHeader: View {
             }
             #endif
             
-            Image(systemName: settings.isSurahFavoriteCopy(surah: surah.id) ? "star.fill" : "star")
+            Image(systemName: settings.isSurahFavorite(surah: surah.id) ? "star.fill" : "star")
                 .foregroundColor(settings.accentColor.color)
                 .font(.subheadline)
                 .onTapGesture {
                     settings.hapticFeedback()
 
-                    settings.toggleSurahFavoriteCopy(surah: surah.id)
+                    settings.toggleSurahFavorite(surah: surah.id)
                 }
         }
     }

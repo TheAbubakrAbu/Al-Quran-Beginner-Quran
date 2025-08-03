@@ -90,7 +90,7 @@ struct AdhkarView: View {
             AdhkarRow(arabicText: "لَا إِلَٰهَ إِلَّا اللَّهُ وَحْدَهُ لَا شَرِيكَ لَهُ، لَهُ ٱلْمُلْكُ وَلَهُ ٱلْـحَمْدُ، وَهُوَ عَلَىٰ كُلِّ شَيْءٍ قَدِيرٌ", transliteration: "La ilaha illallah wahdahu la sharika lah, lahul-mulk wa lahul-hamd, wa huwa 'ala kulli shayin qadir", translation: "There is no deity worthy of worship except Allah, alone, without any partner. His is the sovereignty and His is the praise, and He is capable of all things")
             
             Section(header: Text("VIRTUES OF DHIKR")) {
-                Text("Dhikr (ذِكر) is a powerful spiritual act that nurtures the soul, polishes the heart, and brings one into divine presence. It is a means of drawing near to Allah ﷻ, increasing one’s reward, and protecting oneself from the whispers of Shayṭān. Dhikr revives the heart and is beloved to the Most Merciful.")
+                Text("Dhikr (ذِكر) is a powerful spiritual act that nurtures the soul, polishes the heart, and brings one into divine presence. It is a means of drawing near to Allah ﷻ, increasing one’s reward, and protecting oneself from the whispers of Shaytaan. Dhikr revives the heart and is beloved to the Most Merciful.")
                     .font(.subheadline)
                     .foregroundColor(.primary)
                 
@@ -107,7 +107,7 @@ struct AdhkarView: View {
                 Group {
                     Text("❖ Prophet Muhammad ﷺ said: “Shall I not tell you of the best of your deeds, which is the purest to your King, which raises you among your ranks, which is better for you than spending gold and money in charity...? It is the remembrance of Allah Almighty” (Tirmidhi 3377).")
                     Text("❖ Prophet Muhammad ﷺ said: “There are two phrases which are light on the tongue, heavy in the balance, and beloved to the Most Merciful: *SubhanAllahi wa bihamdihi, SubhanAllahil Adheem* (Glory is to Allah and praise is to Him. Glory is to Allah, the Most Great)” (Bukhari 6406).")
-                    Text("❖ Prophet Muhammad ﷺ said: “Whoever says: *La ilaha illallah wahdahu la sharika lah, lahul-mulk wa lahul-hamd, wa huwa 'ala kulli shayin qadir* (None has the right to be worshipped but Allah, the Alone Who has no partner. His is the Dominion and His is the Praise, and He is over all things All-Powerful) one hundred times in a day will have the reward of freeing ten slaves, one hundred good deeds will be recorded for him, one hundred sins will be erased, and he will be protected from Satan until evening. No one will surpass him except someone who has done more.” (Bukhari 3293)")
+                    Text("❖ Prophet Muhammad ﷺ said: “Whoever says: *La ilaha illallah wahdahu la sharika lah, lahul-mulk wa lahul-hamd, wa huwa 'ala kulli shayin qadir* (None has the right to be worshipped but Allah, the Alone Who has no partner. His is the Dominion and His is the Praise, and He is over all things All-Powerful) one hundred times in a day will have the reward of freeing ten slaves, one hundred good deeds will be recorded for him, one hundred sins will be erased, and he will be protected from Satan until evening. No one will surpass him except someone who has done more” (Bukhari 3293).")
                     Text("❖ Prophet Muhammad ﷺ said: “The example of the one who celebrates the Praises of his Lord and the one who does not celebrate His Praises is like the living and the dead” (Bukhari 6407).")
                     Text("❖ Prophet Muhammad ﷺ said: “No people gather to remember Allah Almighty but that the angels surround them, mercy covers them, tranquility descends upon them, and Allah mentions them to those near Him” (Muslim 2700).")
                     Text("❖ Prophet Muhammad ﷺ said: “Keep your tongue moist with the remembrance of Allah” (Tirmidhi 3375).")
@@ -223,7 +223,7 @@ struct TasbihView: View {
                 ForEach(tasbihData.indices, id: \.self) { index in
                     ZStack {
                         RoundedRectangle(cornerRadius: 8)
-                            .fill(selectedDhikrIndex == index ? settings.accentColor.color.opacity(0.15) : settings.accentColor.color.opacity(0.0001))
+                            .fill(selectedDhikrIndex == index ? settings.accentColor.color.opacity(0.15) : .white.opacity(0.0001))
                             #if !os(watchOS)
                             .padding(.horizontal, -12)
                             #else

@@ -9,6 +9,8 @@ struct AlQuranApp: App {
     @StateObject private var quranPlayer = QuranPlayer.shared
     @StateObject private var namesData = NamesViewModel.shared
     
+    @Environment(\.scenePhase) private var scenePhase
+    
     @State private var isLaunching = true
     
     @AppStorage("timeSpent") private var timeSpent: Double = 0
@@ -95,17 +97,18 @@ struct AlQuranApp: App {
         }
         .onChange(of: settings.favoriteSurahs) { newSurahs in
             sendMessageToWatch()
-            settings.favoriteSurahsCopy = newSurahs
         }
         .onChange(of: settings.bookmarkedAyahs) { newBookmarks in
             sendMessageToWatch()
-            settings.bookmarkedAyahsCopy = newBookmarks
         }
         .onChange(of: settings.favoriteLetters) { _ in
             sendMessageToWatch()
         }
         .onChange(of: settings.accentColor) { _ in
             sendMessageToWatch()
+        }
+        .onChange(of: scenePhase) { _ in
+            quranPlayer.saveLastListenedSurah()
         }
     }
     

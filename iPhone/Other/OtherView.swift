@@ -67,6 +67,8 @@ struct OtherView: View {
                 }
                 
                 ProphetQuote()
+                
+                AlIslamAppsSection()
             }
             .applyConditionalListStyle(defaultView: settings.defaultView)
             .navigationTitle("Tools")
@@ -93,7 +95,7 @@ struct ProphetQuote: View {
                 }
                 .padding(4)
                 
-                Text("\"All mankind is from Adam and Eve, an Arab has no superiority over a non-Arab nor a non-Arab has any superiority over an Arab; also a white has no superiority over a black, nor a black has any superiority over a white except by piety and good action.\"")
+                Text("“All mankind is from Adam and Eve, an Arab has no superiority over a non-Arab nor a non-Arab has any superiority over an Arab; also a white has no superiority over a black, nor a black has any superiority over a white except by piety and good action.“")
                     .font(.subheadline)
                     .multilineTextAlignment(.center)
                     .foregroundColor(settings.accentColor.color)
@@ -115,5 +117,86 @@ struct ProphetQuote: View {
             }
         }
         #endif
+    }
+}
+
+struct AlIslamAppsSection: View {
+    @EnvironmentObject var settings: Settings
+    
+    #if !os(watchOS)
+    let spacing: CGFloat = 20
+    #else
+    let spacing: CGFloat = 10
+    #endif
+
+    var body: some View {
+        Section(header: Text("AL-ISLAMIC APPS")) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(
+                        LinearGradient(
+                            gradient: Gradient(colors: [.yellow.opacity(0.25), .green.opacity(0.25)]),
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .shadow(color: .primary.opacity(0.25), radius: 5, x: 0, y: 1)
+                    .padding(.horizontal, -12)
+                
+                HStack(spacing: spacing) {
+                    Card(
+                        title: "Al-Adhan",
+                        url: URL(string: "https://apps.apple.com/us/app/al-adhan-prayer-times/id6475015493")!
+                    )
+                    
+                    Card(
+                        title: "Al-Islam",
+                        url: URL(string: "https://apps.apple.com/us/app/al-islam-islamic-pillars/id6449729655")!
+                    )
+                    
+                    Card(
+                        title: "Al-Quran",
+                        url: URL(string: "https://apps.apple.com/us/app/al-quran-beginner-quran/id6474894373")!
+                    )
+                }
+                .frame(maxWidth: .infinity, alignment: .center)
+                .scaledToFit()
+                .padding(.vertical, 8)
+                .padding(.horizontal)
+            }
+        }
+    }
+}
+
+private struct Card: View {
+    @EnvironmentObject var settings: Settings
+    @Environment(\.openURL) private var openURL
+    
+    let title: String
+    let url: URL
+
+    var body: some View {
+        Button(action: {
+            settings.hapticFeedback()
+            
+            openURL(url)
+        }) {
+            VStack {
+                Image(title)
+                    .resizable()
+                    .scaledToFit()
+                    .cornerRadius(10)
+                    .shadow(radius: 4)
+
+                #if !os(watchOS)
+                Text(title)
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.primary)
+                    .padding(.top, 4)
+                #endif
+            }
+        }
+        .buttonStyle(PlainButtonStyle())
     }
 }

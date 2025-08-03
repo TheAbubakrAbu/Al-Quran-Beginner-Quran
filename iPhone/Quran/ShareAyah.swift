@@ -1,7 +1,6 @@
 import SwiftUI
 import Combine
 
-#if !os(watchOS)
 enum ActionMode { case text, image }
 
 final class Debouncer {
@@ -251,19 +250,19 @@ struct ShareAyahSheet: View {
         if shareSettings.transliteration && shareSettings.translation {
             if text.length > 0 { append("\n\n", bodyAttr) }
             append("[\(surah.nameTransliteration) \(surah.id):\(ayah.id)]\n", accentAttr)
-            append(ayah.textTransliteration ?? "No transliteration", bodyAttr)
+            append(ayah.textTransliteration, bodyAttr)
             append("\n\n[\(surah.nameEnglish) \(surah.id):\(ayah.id)]\n", accentAttr)
-            append(ayah.textEnglish ?? "No translation", bodyAttr)
+            append(ayah.textEnglish, bodyAttr)
         } else {
             if shareSettings.transliteration {
                 if text.length > 0 { append("\n\n", bodyAttr) }
                 append("[\(surah.nameTransliteration) | \(surah.nameEnglish) \(surah.id):\(ayah.id)]\n", accentAttr)
-                append(ayah.textTransliteration ?? "No transliteration", bodyAttr)
+                append(ayah.textTransliteration, bodyAttr)
             }
             if shareSettings.translation {
                 if text.length > 0 { append("\n\n", bodyAttr) }
                 append("[\(surah.nameEnglish) | \(surah.nameTransliteration) \(surah.id):\(ayah.id)]\n", accentAttr)
-                append(ayah.textEnglish ?? "No translation", bodyAttr)
+                append(ayah.textEnglish, bodyAttr)
             }
         }
         if shareSettings.showFooter {
@@ -333,4 +332,3 @@ struct ActivityView: UIViewControllerRepresentable {
 }
 
 extension Color { var uiColor: UIColor { UIColor(self) } }
-#endif

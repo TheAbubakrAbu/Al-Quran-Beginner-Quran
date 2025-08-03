@@ -12,43 +12,6 @@ struct Juz: Codable, Identifiable {
     let endAyah: Int
 }
 
-struct Surah: Codable, Identifiable {
-    let id: Int
-    let nameArabic: String
-    let nameTransliteration: String
-    let nameEnglish: String
-    
-    let type: String
-    let numberOfAyahs: Int
-    
-    var ayahs: [Ayah]
-    
-    enum CodingKeys: String, CodingKey {
-        case id
-        case nameArabic = "name"
-        case nameTransliteration = "transliteration"
-        case nameEnglish = "translation"
-        case type = "type"
-        case numberOfAyahs = "total_verses"
-        case ayahs = "verses"
-    }
-}
-
-struct Ayah: Codable, Identifiable {
-    let id: Int
-    let textArabic: String
-    var textClearArabic: String { textArabic.removingArabicDiacriticsAndSigns }
-    let textTransliteration: String?
-    var textEnglish: String?
-
-    enum CodingKeys: String, CodingKey {
-        case id
-        case textArabic = "text"
-        case textTransliteration = "transliteration"
-        case textEnglish = "translation"
-    }
-}
-
 struct BookmarkedAyah: Codable, Identifiable, Equatable, Hashable {
     var id: String { "\(surah)-\(ayah)" }
     var surah: Int
@@ -123,9 +86,29 @@ let reciters = [
     Reciter(name: "Abdullah Al-Mattrod", ayahIdentifier: "ar.minshawi", ayahBitrate: "128", surahLink: "https://server8.mp3quran.net/mtrod/"),
 ].sorted()
 
+struct Surah: Codable, Identifiable {
+    let id: Int
+    let nameArabic: String
+    let nameTransliteration: String
+    let nameEnglish: String
+    
+    let type: String
+    let numberOfAyahs: Int
+    
+    var ayahs: [Ayah]
+}
+
+struct Ayah: Codable, Identifiable {
+    let id: Int
+    let textArabic: String
+    var textClearArabic: String { textArabic.removingArabicDiacriticsAndSigns }
+    let textTransliteration: String
+    var textEnglish: String
+}
+
 final class QuranData: ObservableObject {
     static let shared = QuranData()
-    @ObservedObject var settings = Settings.shared
+    private let settings = Settings.shared
 
     @Published private(set) var quran: [Surah] = []
 
@@ -137,67 +120,27 @@ final class QuranData: ObservableObject {
     }
     
     private func load() async {
-        guard
-            let arURL = Bundle.main.url(forResource: "quran", withExtension: "json"),
-            let enURL = Bundle.main.url(forResource: "quran_en", withExtension: "json")
-        else {
-            assertionFailure("Quran JSON missing from bundle")
-            return
+        guard let url = Bundle.main.url(forResource: "quran", withExtension: "json") else {
+            fatalError("quran.json missing")
         }
-
         do {
-            async let arData = Data(contentsOf: arURL)
-            async let enData = Data(contentsOf: enURL)
+            let data = try Data(contentsOf: url)
+            let surahs = try JSONDecoder().decode([Surah].self, from: data)
 
-            var quran = try JSONDecoder().decode([Surah].self, from: try await arData)
+            buildIndexes(for: surahs)
 
-            buildIndexes(for: &quran)
-
-            try await mergeEnglish(into: &quran, englishData: enData)
-
-            let finalQuran = quran
-            let verseIdx = buildVerseSearchIndex(from: quran)
-
-            await MainActor.run {
-                self.quran = finalQuran
-                self.verseIndex = verseIdx
-            }
+            await MainActor.run { self.quran = surahs }
         } catch {
-            assertionFailure("Quran load failed: \(error)")
+            fatalError("Failed to load Quran: \(error)")
         }
     }
 
-    private func buildIndexes(for quran: inout [Surah]) {
-        surahIndex.reserveCapacity(quran.count)
-        ayahIndex = Array(repeating: [:], count: quran.count)
-
-        for (sIdx, surah) in quran.enumerated() {
-            surahIndex[surah.id] = sIdx
-            var map = [Int:Int]()
-            map.reserveCapacity(surah.ayahs.count)
-            for (aIdx, ayah) in surah.ayahs.enumerated() {
-                map[ayah.id] = aIdx
-            }
-            ayahIndex[sIdx] = map
-        }
-    }
-
-    private func mergeEnglish(into quran: inout [Surah], englishData: Data) throws {
-        let root = try JSONSerialization.jsonObject(with: englishData) as! [String:Any]
-        guard
-            let verses = (root["quran"] as? [String:Any])?["en.sahih"] as? [String:[String:Any]]
-        else { return }
-
-        for v in verses.values {
-            guard
-                let s = v["surah"]  as? Int,
-                let a = v["ayah"]   as? Int,
-                let t = v["verse"]  as? String,
-                let sIdx = surahIndex[s],
-                let aIdx = ayahIndex[sIdx][a]
-            else { continue }
-
-            quran[sIdx].ayahs[aIdx].textEnglish = t
+    private func buildIndexes(for surahs: [Surah]) {
+        surahIndex = Dictionary(uniqueKeysWithValues: surahs.enumerated().map { ($1.id, $0) }
+        )
+        ayahIndex = surahs.map { surah in
+            Dictionary(uniqueKeysWithValues: surah.ayahs.enumerated().map { ($1.id, $0) }
+            )
         }
     }
     
@@ -422,30 +365,27 @@ final class QuranData: ObservableObject {
         )
     ]
     
-    @Published private(set) var verseIndex: [VerseIndexEntry] = []
+    lazy var verseIndex: [VerseIndexEntry] = {
+        quran.flatMap { surah in
+            surah.ayahs.map { ayah in
+                let blob = [
+                    ayah.textArabic,
+                    ayah.textClearArabic,
+                    ayah.textEnglish,
+                    ayah.textTransliteration
+                ]
+                .map { settings.cleanSearch($0) }
+                .joined(separator: " ")
 
-    private func buildVerseSearchIndex(from quran: [Surah]) -> [VerseIndexEntry] {
-        var idx: [VerseIndexEntry] = []
-        idx.reserveCapacity(6_400)
-
-        for surah in quran {
-            for ayah in surah.ayahs {
-                let blob =
-                settings.cleanSearch(ayah.textArabic) + " " +
-                settings.cleanSearch(ayah.textClearArabic) + " " +
-                settings.cleanSearch(ayah.textEnglish ?? "") + " " +
-                settings.cleanSearch(ayah.textTransliteration ?? "")
-                
-                idx.append(VerseIndexEntry(
+                return VerseIndexEntry(
                     id: "\(surah.id):\(ayah.id)",
                     surah: surah.id,
-                    ayah:  ayah.id,
-                    searchBlob: blob)
+                    ayah: ayah.id,
+                    searchBlob: blob
                 )
             }
         }
-        return idx
-    }
+    }()
 
     func searchVerses(term raw: String, limit: Int = 10, offset: Int = 0) -> [VerseIndexEntry] {
         let cleanedSearch = settings.cleanSearch(raw, whitespace: true)
@@ -456,9 +396,9 @@ final class QuranData: ObservableObject {
     }
 }
 
-struct VerseIndexEntry: Identifiable {
+struct VerseIndexEntry: Identifiable, Hashable {
     let id: String
     let surah: Int
     let ayah: Int
-    let searchBlob: String // stripped / lower‑cased Arabic + English
+    let searchBlob: String
 }

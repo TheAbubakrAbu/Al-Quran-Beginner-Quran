@@ -45,10 +45,10 @@ struct AlQuranApp: App {
         .onChange(of: settings.lastReadAyah) { newValue in
             sendMessageToPhone()
         }
-        .onChange(of: settings.favoriteSurahs) { newValue in
+        .onChange(of: settings.favoriteSurahs) { newSurahs in
             sendMessageToPhone()
         }
-        .onChange(of: settings.bookmarkedAyahs) { newValue in
+        .onChange(of: settings.bookmarkedAyahs) { newBookmarks in
             sendMessageToPhone()
         }
         .onChange(of: settings.favoriteLetters) { newValue in

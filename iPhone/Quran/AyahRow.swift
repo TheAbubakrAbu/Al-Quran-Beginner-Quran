@@ -23,7 +23,7 @@ struct AyahRow: View {
     }
     
     var body: some View {
-        let isBookmarked = settings.isBookmarkedCopy(surah: surah.id, ayah: ayah.id)
+        let isBookmarked = settings.isBookmarked(surah: surah.id, ayah: ayah.id)
         let showArabic = settings.showArabicText
         let showTranslit = settings.showTransliteration
         let showEnglish = settings.showEnglishTranslation
@@ -35,9 +35,9 @@ struct AyahRow: View {
                     .fill(
                         currentAyah == ayah.id
                         ? settings.accentColor.color.opacity(settings.defaultView ? 0.15 : 0.25)
-                        : settings.accentColor.color.opacity(0.0001)
+                        : .white.opacity(0.0001)
                     )
-                    .padding(.horizontal, settings.defaultView ? -15 : -12)
+                    .padding(.horizontal, -12)
                     .transition(.opacity)
                     .animation(.easeInOut, value: currentAyah == ayah.id)
             }
@@ -60,7 +60,7 @@ struct AyahRow: View {
                         .font(.system(size: UIFont.preferredFont(forTextStyle: .title3).pointSize))
                         .onTapGesture {
                             settings.hapticFeedback()
-                            settings.toggleBookmarkCopy(surah: surah.id, ayah: ayah.id)
+                            settings.toggleBookmark(surah: surah.id, ayah: ayah.id)
                         }
                     #else
                     if isBookmarked {
@@ -150,7 +150,7 @@ struct AyahRow: View {
             
             if showTranslit {
                 HighlightedSnippet(
-                    source: "\(ayah.id). \(ayah.textTransliteration ?? "")",
+                    source: "\(ayah.id). \(ayah.textTransliteration)",
                     term: searchText,
                     font: .system(size: fontSizeEN),
                     accent: settings.accentColor.color,
@@ -161,7 +161,7 @@ struct AyahRow: View {
             
             if showEnglish {
                 HighlightedSnippet(
-                    source: showTranslit ? (ayah.textEnglish ?? "") : "\(ayah.id). \(ayah.textEnglish ?? "")",
+                    source: showTranslit ? (ayah.textEnglish) : "\(ayah.id). \(ayah.textEnglish)",
                     term: searchText,
                     font: .system(size: fontSizeEN),
                     accent: settings.accentColor.color,
@@ -182,7 +182,7 @@ struct AyahRow: View {
         VStack(alignment: .leading) {
             Button(role: isBookmarked ? .destructive : nil) {
                 settings.hapticFeedback()
-                settings.toggleBookmarkCopy(surah: surah.id, ayah: ayah.id)
+                settings.toggleBookmark(surah: surah.id, ayah: ayah.id)
             } label: {
                 Label(
                     isBookmarked ? "Unbookmark Ayah" : "Bookmark Ayah",

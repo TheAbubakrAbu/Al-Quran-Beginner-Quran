@@ -30,8 +30,8 @@ struct AyahsView: View {
 
                     return rawArabic.contains(cleanQuery)
                         || clearArabic.contains(cleanQuery)
-                        || settings.cleanSearch(a.textTransliteration ?? "").contains(cleanQuery)
-                        || settings.cleanSearch(a.textEnglish ?? "").contains(cleanQuery)
+                        || settings.cleanSearch(a.textTransliteration).contains(cleanQuery)
+                        || settings.cleanSearch(a.textEnglish).contains(cleanQuery)
                         || settings.cleanSearch(String(a.id)).contains(cleanQuery)
                         || settings.cleanSearch(arabicNumberString(from: a.id)).contains(cleanQuery)
                         || Int(cleanQuery) == a.id
@@ -294,8 +294,6 @@ struct AyahsView: View {
                 if let firstVisible = visibleAyahs.first {
                     settings.lastReadAyah = firstVisible
                 }
-                settings.favoriteSurahs = settings.favoriteSurahsCopy
-                settings.bookmarkedAyahs = settings.bookmarkedAyahsCopy
             }
         }
     }

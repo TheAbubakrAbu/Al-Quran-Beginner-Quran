@@ -146,7 +146,11 @@ final class QuranPlayer: ObservableObject {
             player = nil; currentSurahNumber = nil; currentAyahNumber = nil
             isPlayingSurah = false; isPlaying = false; isPaused = false
         }
-        updateNowPlayingInfo(clear: true); deactivateAudioSession()
+        updateNowPlayingInfo(clear: true)
+        deactivateAudioSession()
+        #if !os(watchOS)
+        UIApplication.shared.isIdleTimerDisabled = false
+        #endif
     }
     
     private func removeAllObservers() {
@@ -167,7 +171,8 @@ final class QuranPlayer: ObservableObject {
             currentAyahNumber = nil
             isPlayingSurah = true
         }
-        continueRecitationFromAyah = false; backButtonClickCount = 0
+        continueRecitationFromAyah = false
+        backButtonClickCount = 0
         
         guard let reciterPref = reciters.first(where: { $0.name == settings.reciter }) else { return }
         let reciter: Reciter = (certainReciter && settings.lastListenedSurah?.reciter != nil)
@@ -191,21 +196,32 @@ final class QuranPlayer: ObservableObject {
                 case .readyToPlay:
                     self.isLoading = false
                     self.player?.play()
-                    self.isPlaying = true; self.isPaused = false
-                    self.nowPlayingTitle = "Surah \(surahNumber): \(surahName)"
+                    self.isPlaying = true
+                    self.isPaused = false
+                    self.nowPlayingTitle  = "Surah \(surahNumber): \(surahName)"
                     self.nowPlayingReciter = reciter.name
                     self.updateNowPlayingInfo()
-                    if !certainReciter || !skipSurah { self.saveLastListenedSurah() }
-                    if certainReciter,
-                       let last = self.settings.lastListenedSurah,
-                       surahNumber == last.surahNumber,
-                       last.currentDuration < last.fullDuration
-                    {
+
+                    #if !os(watchOS)
+                    UIApplication.shared.isIdleTimerDisabled = true
+                    #endif
+                    
+                    var didResume = false
+                    if certainReciter, let last = self.settings.lastListenedSurah, last.surahNumber == surahNumber, last.currentDuration > 1 {
                         let seekT = CMTime(seconds: last.currentDuration, preferredTimescale: 1)
-                        self.player?.seek(to: seekT) { _ in self.updateNowPlayingInfo() }
+                        self.player?.seek(to: seekT) { _ in
+                            self.updateNowPlayingInfo()
+                        }
+                        didResume = true
+                    }
+
+                    if !didResume && (!certainReciter || !skipSurah) {
+                        self.saveLastListenedSurah()
                     }
                 default:
-                    self.isLoading = false; self.isPlaying = false; self.isPaused = false
+                    self.isLoading = false
+                    self.isPlaying = false
+                    self.isPaused  = false
                     self.showInternetAlert = true
                 }
             }
@@ -303,6 +319,9 @@ final class QuranPlayer: ObservableObject {
                 guard let self = self else { return }
                 DispatchQueue.main.async {
                     self.isLoading = false
+                    #if !os(watchOS)
+                    UIApplication.shared.isIdleTimerDisabled = true
+                    #endif
                     if itm.status == .readyToPlay {
                         self.queuePlayer?.play()
                         self.isPlaying = true; self.isPaused = false
@@ -409,12 +428,14 @@ final class QuranPlayer: ObservableObject {
         backButtonClickTimestamp = now
         
         if backButtonClickCount == 2 {
-            if a > 1           { playAyah(surahNumber: s, ayahNumber: a - 1, continueRecitation: continueRecitationFromAyah) }
-            else if s > 1,
-                    let prev = quranData.quran.first(where: { $0.id == s - 1 }) {
-                playAyah(surahNumber: s - 1,
-                         ayahNumber: prev.numberOfAyahs,
-                         continueRecitation: continueRecitationFromAyah)
+            if a > 1 {
+                playAyah(surahNumber: s, ayahNumber: a - 1, continueRecitation: continueRecitationFromAyah)
+            } else if s > 1, let prev = quranData.quran.first(where: { $0.id == s - 1 }) {
+                playAyah(
+                    surahNumber: s - 1,
+                    ayahNumber: prev.numberOfAyahs,
+                    continueRecitation: continueRecitationFromAyah
+                )
             }
             backButtonClickCount = 0
         } else {
@@ -497,10 +518,16 @@ final class QuranPlayer: ObservableObject {
     }
     
     func getSurahDuration(surahNumber: Int) -> Double {
+        #if os(watchOS)
+        // The watch doesn't rely on this value, so just return 0
+        return 0
+        #else
         guard
             let rec = reciters.first(where: { $0.name == settings.reciter }),
             let url = URL(string: "\(rec.surahLink)\(String(format: "%03d", surahNumber)).mp3")
         else { return 0 }
+
         return CMTimeGetSeconds(AVURLAsset(url: url).duration)
+        #endif
     }
 }

@@ -162,9 +162,10 @@ final class Settings: ObservableObject {
     @AppStorage("lastReadSurah") var lastReadSurah: Int = 0
     @AppStorage("lastReadAyah") var lastReadAyah: Int = 0
     
+    @AppStorage("lastListenedSurahData") private var lastListenedSurahData: Data?
     var lastListenedSurah: LastListenedSurah? {
         get {
-            guard let data = appGroupUserDefaults?.data(forKey: "lastListenedSurahDataQuran") else { return nil }
+            guard let data = lastListenedSurahData else { return nil }
             do {
                 return try Self.decoder.decode(LastListenedSurah.self, from: data)
             } catch {
@@ -175,13 +176,12 @@ final class Settings: ObservableObject {
         set {
             if let newValue = newValue {
                 do {
-                    let data = try Self.encoder.encode(newValue)
-                    appGroupUserDefaults?.set(data, forKey: "lastListenedSurahDataQuran")
+                    lastListenedSurahData = try Self.encoder.encode(newValue)
                 } catch {
                     logger.debug("Failed to encode last listened surah: \(error)")
                 }
             } else {
-                appGroupUserDefaults?.removeObject(forKey: "lastListenedSurahDataQuran")
+                lastListenedSurahData = nil
             }
         }
     }

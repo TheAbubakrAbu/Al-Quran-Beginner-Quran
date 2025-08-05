@@ -29,24 +29,36 @@ struct AlQuranApp: App {
                 } else if settings.firstLaunch {
                     SplashScreen()
                 } else {
-                    TabView {
-                        QuranView()
-                            .tabItem {
-                                Image(systemName: "character.book.closed.ar")
-                                Text("Quran")
+                    VStack {
+                        TabView {
+                            QuranView()
+                                .tabItem {
+                                    Image(systemName: "character.book.closed.ar")
+                                    Text("Quran")
+                                }
+                            
+                            VStack {
+                                OtherView()
+                                
+                                NowPlayingView(quranView: false)
+                                    .padding(.bottom, 9)
                             }
-                        
-                        OtherView()
                             .tabItem {
                                 Image(systemName: "moon.stars")
                                 Text("Tools")
                             }
-                        
-                        SettingsView()
+                            
+                            VStack {
+                                SettingsView()
+                                
+                                NowPlayingView(quranView: false)
+                                    .padding(.bottom, 9)
+                            }
                             .tabItem {
                                 Image(systemName: "gearshape")
                                 Text("Settings")
                             }
+                        }
                     }
                 }
             }

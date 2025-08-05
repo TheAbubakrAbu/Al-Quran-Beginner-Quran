@@ -41,20 +41,16 @@ struct SettingsView: View {
                         
                         showingCredits = true
                     }) {
-                        HStack {
-                            Image(systemName: "scroll.fill")
-                            
-                            Text("View Credits")
-                        }
-                        .font(.subheadline)
-                        .foregroundColor(settings.accentColor.color)
+                        Label("View Credits", systemImage: "scroll.fill")
+                            .font(.subheadline)
+                            .foregroundColor(settings.accentColor.color)
                     }
                     .sheet(isPresented: $showingCredits) {
                         CreditsView()
                     }
-                    
+
                     Button(action: {
-                        if settings.hapticOn { UIImpactFeedbackGenerator(style: .light).impactOccurred() }
+                        settings.hapticFeedback()
                         
                         withAnimation(.smooth()) {
                             if let url = URL(string: "itms-apps://itunes.apple.com/app/id6474894373?action=write-review") {
@@ -62,13 +58,9 @@ struct SettingsView: View {
                             }
                         }
                     }) {
-                        HStack {
-                            Image(systemName: "star.bubble.fill")
-                            
-                            Text("Leave a Review")
-                        }
-                        .font(.subheadline)
-                        .foregroundColor(settings.accentColor.color)
+                        Label("Leave a Review", systemImage: "star.bubble.fill")
+                            .font(.subheadline)
+                            .foregroundColor(settings.accentColor.color)
                     }
                     .contextMenu {
                         Button(action: {
@@ -82,12 +74,52 @@ struct SettingsView: View {
                             }
                         }
                     }
+
+                    Button(action: {
+                        settings.hapticFeedback()
+                        
+                        withAnimation(.smooth()) {
+                            if let url = URL(string: UIApplication.openSettingsURLString) {
+                                UIApplication.shared.open(url, options: [:], completionHandler: nil)
+                            }
+                        }
+                    }) {
+                        Label("Open App Settings", systemImage: "gearshape.fill")
+                            .font(.subheadline)
+                            .foregroundColor(settings.accentColor.color)
+                    }
                     #endif
-                    
+
                     HStack {
-                        Text("Contact me at: ")
+                        Text("Website: ")
                             .font(.subheadline)
                             .multilineTextAlignment(.leading)
+                            .frame(width: glyphWidth)
+                        
+                        Link("abubakrelmallah.com", destination: URL(string: "https://abubakrelmallah.com/")!)
+                            .font(.subheadline)
+                            .foregroundColor(settings.accentColor.color)
+                            .multilineTextAlignment(.leading)
+                            .padding(.leading, -4)
+                    }
+                    #if !os(watchOS)
+                    .contextMenu {
+                        Button(action: {
+                            UIPasteboard.general.string = "abubakrelmallah.com"
+                        }) {
+                            HStack {
+                                Image(systemName: "doc.on.doc")
+                                Text("Copy Website")
+                            }
+                        }
+                    }
+                    #endif
+
+                    HStack {
+                        Text("Contact: ")
+                            .font(.subheadline)
+                            .multilineTextAlignment(.leading)
+                            .frame(width: glyphWidth)
                         
                         Text("ammelmallah@icloud.com")
                             .font(.subheadline)
@@ -115,6 +147,23 @@ struct SettingsView: View {
             .applyConditionalListStyle(defaultView: true)
         }
         .navigationViewStyle(.stack)
+    }
+    
+    private func columnWidth(for textStyle: UIFont.TextStyle, extra: CGFloat = 4, sample: String? = nil, fontName: String? = nil) -> CGFloat {
+        let sampleString = (sample ?? "M") as NSString
+        let font: UIFont
+
+        if let fontName = fontName, let customFont = UIFont(name: fontName, size: UIFont.preferredFont(forTextStyle: textStyle).pointSize) {
+            font = customFont
+        } else {
+            font = UIFont.preferredFont(forTextStyle: textStyle)
+        }
+
+        return ceil(sampleString.size(withAttributes: [.font: font]).width) + extra
+    }
+
+    private var glyphWidth: CGFloat {
+        columnWidth(for: .subheadline, extra: 0, sample: "Contact: ")
     }
 }
 

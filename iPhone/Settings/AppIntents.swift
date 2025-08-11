@@ -1,6 +1,6 @@
 import AppIntents
 
-@available(iOS 16.0, *)
+@available(iOS 16.0, watchOS 9.0, *)
 struct AppShortcutsRoot: AppShortcutsProvider {
     @AppShortcutsBuilder
     static var appShortcuts: [AppShortcut] {

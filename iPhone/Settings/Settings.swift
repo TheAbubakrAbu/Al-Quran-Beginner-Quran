@@ -22,6 +22,14 @@ final class Settings: ObservableObject {
         
     private init() {
         self.accentColor = AccentColor(rawValue: appGroupUserDefaults?.string(forKey: "accentColor") ?? "green") ?? .green
+        
+        if self.reciter.starts(with: "ar") {
+            if let match = reciters.first(where: { $0.ayahIdentifier == self.reciter }) {
+                self.reciter = match.name
+            } else {
+                self.reciter = "Muhammad Al-Minshawi (Murattal)"
+            }
+        }
     }
     
     func hapticFeedback() {

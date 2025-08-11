@@ -12,14 +12,18 @@
 		7202968A2D419D13009BA21E /* ArabicLetterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 720296892D419D13009BA21E /* ArabicLetterView.swift */; };
 		7202968B2D419D13009BA21E /* ArabicLetterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 720296892D419D13009BA21E /* ArabicLetterView.swift */; };
 		720D00892C1AABB000D00D7E /* ShareAyah.swift in Sources */ = {isa = PBXBuildFile; fileRef = 720D00882C1AABB000D00D7E /* ShareAyah.swift */; };
-		720D008C2C1AABB600D00D7E /* QuranPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 720D008B2C1AABB600D00D7E /* QuranPlayer.swift */; };
-		720D008D2C1AABB600D00D7E /* QuranPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 720D008B2C1AABB600D00D7E /* QuranPlayer.swift */; };
 		720DEC6A2D24581D006EA342 /* CreditsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 720DEC692D24581D006EA342 /* CreditsView.swift */; };
 		721EEE202D7B036F00FFE5F6 /* NowPlayingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 721EEE1F2D7B036F00FFE5F6 /* NowPlayingView.swift */; };
 		7247DB9D2CD4DB84000803F2 /* Hafs.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7247DB9C2CD4DB84000803F2 /* Hafs.ttf */; };
 		7247DB9E2CD4DB84000803F2 /* Hafs.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7247DB9C2CD4DB84000803F2 /* Hafs.ttf */; };
 		7247DBA92CD4DE92000803F2 /* Indopak.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7247DBA82CD4DE92000803F2 /* Indopak.ttf */; };
 		7247DBAA2CD4DE92000803F2 /* Indopak.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7247DBA82CD4DE92000803F2 /* Indopak.ttf */; };
+		72574CA72E49543B00BFF138 /* QuranPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72574CA22E49543B00BFF138 /* QuranPlayer.swift */; };
+		72574CAA2E49543B00BFF138 /* QuranPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72574CA22E49543B00BFF138 /* QuranPlayer.swift */; };
+		72574CBE2E49E49500BFF138 /* QuranShortcuts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72574CBD2E49E49500BFF138 /* QuranShortcuts.swift */; };
+		72574CBF2E49E49500BFF138 /* QuranShortcuts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72574CBD2E49E49500BFF138 /* QuranShortcuts.swift */; };
+		72574CD12E49F33800BFF138 /* AppIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72574CD02E49F33800BFF138 /* AppIntents.swift */; };
+		72574CD22E49F33800BFF138 /* AppIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72574CD02E49F33800BFF138 /* AppIntents.swift */; };
 		726B52382D700F4D00305A68 /* ConditionalStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72CCAE7D2D42D14900871A6A /* ConditionalStyle.swift */; };
 		726B52392D700F5C00305A68 /* DismissKeyboard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72CCAE802D42D16500871A6A /* DismissKeyboard.swift */; };
 		72827EB72E3D71BB00EBA534 /* QuranSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72827EB62E3D71BB00EBA534 /* QuranSettingsView.swift */; };
@@ -80,6 +84,26 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
+		72574C6B2E49534800BFF138 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		72574C852E49536100BFF138 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		72F479E12B36B5D900FCF22C /* Embed Watch Content */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 12;
@@ -97,11 +121,13 @@
 		720296862D419CFE009BA21E /* Arabic.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Arabic.swift; sourceTree = "<group>"; };
 		720296892D419D13009BA21E /* ArabicLetterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArabicLetterView.swift; sourceTree = "<group>"; };
 		720D00882C1AABB000D00D7E /* ShareAyah.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareAyah.swift; sourceTree = "<group>"; };
-		720D008B2C1AABB600D00D7E /* QuranPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuranPlayer.swift; sourceTree = "<group>"; };
 		720DEC692D24581D006EA342 /* CreditsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreditsView.swift; sourceTree = "<group>"; };
 		721EEE1F2D7B036F00FFE5F6 /* NowPlayingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NowPlayingView.swift; sourceTree = "<group>"; };
 		7247DB9C2CD4DB84000803F2 /* Hafs.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = Hafs.ttf; sourceTree = "<group>"; };
 		7247DBA82CD4DE92000803F2 /* Indopak.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = Indopak.ttf; sourceTree = "<group>"; };
+		72574CA22E49543B00BFF138 /* QuranPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuranPlayer.swift; sourceTree = "<group>"; };
+		72574CBD2E49E49500BFF138 /* QuranShortcuts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuranShortcuts.swift; sourceTree = "<group>"; };
+		72574CD02E49F33800BFF138 /* AppIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppIntents.swift; sourceTree = "<group>"; };
 		72827EB62E3D71BB00EBA534 /* QuranSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuranSettingsView.swift; sourceTree = "<group>"; };
 		72827EBC2E3D757F00EBA534 /* quran.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = quran.json; sourceTree = "<group>"; };
 		729E23792B367CA700E1E0DA /* iPhone.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = iPhone.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -112,7 +138,7 @@
 		72BC6B2E2E2D781E00ACD832 /* Logo.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; path = Logo.jpg; sourceTree = "<group>"; };
 		72BC6B302E2F9FB300ACD832 /* AyahRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AyahRow.swift; sourceTree = "<group>"; };
 		72BC6B332E3190B800ACD832 /* Globals.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Globals.swift; sourceTree = "<group>"; };
-		72CCAE7A2D42D06600871A6A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		72CCAE7A2D42D06600871A6A /* Info-Main.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Info-Main.plist"; sourceTree = "<group>"; };
 		72CCAE7D2D42D14900871A6A /* ConditionalStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConditionalStyle.swift; sourceTree = "<group>"; };
 		72CCAE802D42D16500871A6A /* DismissKeyboard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DismissKeyboard.swift; sourceTree = "<group>"; };
 		72CCAE832D42D17900871A6A /* SearchBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchBar.swift; sourceTree = "<group>"; };
@@ -167,7 +193,7 @@
 			isa = PBXGroup;
 			children = (
 				72F479CA2B36ACAD00FCF22C /* Entitlements.entitlements */,
-				72CCAE7A2D42D06600871A6A /* Info.plist */,
+				72CCAE7A2D42D06600871A6A /* Info-Main.plist */,
 				729E23802B367CA800E1E0DA /* Assets.xcassets */,
 				72BC6B2E2E2D781E00ACD832 /* Logo.jpg */,
 				72F479B02B367DE200FCF22C /* Fonts */,
@@ -229,7 +255,7 @@
 				72BC6B252E2C338300ACD832 /* SurahsHeader.swift */,
 				72F479AE2B367DE200FCF22C /* AyahsView.swift */,
 				72BC6B302E2F9FB300ACD832 /* AyahRow.swift */,
-				720D008B2C1AABB600D00D7E /* QuranPlayer.swift */,
+				72574CA22E49543B00BFF138 /* QuranPlayer.swift */,
 				721EEE1F2D7B036F00FFE5F6 /* NowPlayingView.swift */,
 				720D00882C1AABB000D00D7E /* ShareAyah.swift */,
 				72F11CD32E38190D00655461 /* Highlighted.swift */,
@@ -263,6 +289,8 @@
 				720DEC692D24581D006EA342 /* CreditsView.swift */,
 				72F479B52B367DE200FCF22C /* Settings.swift */,
 				72BC6B332E3190B800ACD832 /* Globals.swift */,
+				72574CD02E49F33800BFF138 /* AppIntents.swift */,
+				72574CBD2E49E49500BFF138 /* QuranShortcuts.swift */,
 				72CCAE862D42D18500871A6A /* WatchConnectivity.swift */,
 			);
 			path = Settings;
@@ -297,6 +325,7 @@
 				729E23762B367CA700E1E0DA /* Frameworks */,
 				729E23772B367CA700E1E0DA /* Resources */,
 				72F479E12B36B5D900FCF22C /* Embed Watch Content */,
+				72574C6B2E49534800BFF138 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
@@ -315,6 +344,7 @@
 				72F479F32B36B95D00FCF22C /* Sources */,
 				72F479F42B36B95D00FCF22C /* Frameworks */,
 				72F479F52B36B95D00FCF22C /* Resources */,
+				72574C852E49536100BFF138 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
@@ -332,7 +362,7 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 1510;
+				LastSwiftUpdateCheck = 1640;
 				LastUpgradeCheck = 1630;
 				TargetAttributes = {
 					729E23782B367CA700E1E0DA = {
@@ -406,6 +436,8 @@
 				72CCAE842D42D17900871A6A /* SearchBar.swift in Sources */,
 				729E237D2B367CA700E1E0DA /* Al-QuranApp.swift in Sources */,
 				72CCAE7E2D42D14900871A6A /* ConditionalStyle.swift in Sources */,
+				72574CBE2E49E49500BFF138 /* QuranShortcuts.swift in Sources */,
+				72574CD22E49F33800BFF138 /* AppIntents.swift in Sources */,
 				72BC6B312E2F9FB300ACD832 /* AyahRow.swift in Sources */,
 				72F479C12B367DE200FCF22C /* SettingsView.swift in Sources */,
 				72BC6B342E3190B800ACD832 /* Globals.swift in Sources */,
@@ -416,10 +448,10 @@
 				72BC6B292E2C33D600ACD832 /* SurahRows.swift in Sources */,
 				72CCAE812D42D16500871A6A /* DismissKeyboard.swift in Sources */,
 				72827EB72E3D71BB00EBA534 /* QuranSettingsView.swift in Sources */,
-				720D008C2C1AABB600D00D7E /* QuranPlayer.swift in Sources */,
 				72F479BC2B367DE200FCF22C /* QuranView.swift in Sources */,
 				72F479C72B36A83C00FCF22C /* ToolsView.swift in Sources */,
 				72F479BD2B367DE200FCF22C /* AyahsView.swift in Sources */,
+				72574CA72E49543B00BFF138 /* QuranPlayer.swift in Sources */,
 				7202968B2D419D13009BA21E /* ArabicLetterView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -442,11 +474,13 @@
 				72BC6B2A2E2C33D600ACD832 /* SurahRows.swift in Sources */,
 				72BC6B322E2F9FB300ACD832 /* AyahRow.swift in Sources */,
 				72F47A0B2B36B99A00FCF22C /* ArabicView.swift in Sources */,
-				720D008D2C1AABB600D00D7E /* QuranPlayer.swift in Sources */,
 				726B52392D700F5C00305A68 /* DismissKeyboard.swift in Sources */,
 				7202968A2D419D13009BA21E /* ArabicLetterView.swift in Sources */,
+				72574CBF2E49E49500BFF138 /* QuranShortcuts.swift in Sources */,
+				72574CD12E49F33800BFF138 /* AppIntents.swift in Sources */,
 				72827EB82E3D71BB00EBA534 /* QuranSettingsView.swift in Sources */,
 				72CCAE872D42D18500871A6A /* WatchConnectivity.swift in Sources */,
+				72574CAA2E49543B00BFF138 /* QuranPlayer.swift in Sources */,
 				72F47A0C2B36B99A00FCF22C /* ToolsView.swift in Sources */,
 				72F47A0D2B36B99D00FCF22C /* QuranView.swift in Sources */,
 				72F47A0F2B36B99D00FCF22C /* Quran.swift in Sources */,
@@ -601,7 +635,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = Resources/Info.plist;
+				INFOPLIST_FILE = "Resources/Info-Main.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "Al-Quran";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -614,7 +648,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.460;
+				MARKETING_VERSION = 1.470;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.Quran.Elmallah.Beginner-Quran";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -633,7 +667,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = Resources/Info.plist;
+				INFOPLIST_FILE = "Resources/Info-Main.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "Al-Quran";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -646,7 +680,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.460;
+				MARKETING_VERSION = 1.470;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.Quran.Elmallah.Beginner-Quran";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -665,7 +699,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = Resources/Info.plist;
+				INFOPLIST_FILE = "Resources/Info-Main.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "Al-Quran";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = "com.Quran.Elmallah.Beginner-Quran";
@@ -674,7 +708,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.460;
+				MARKETING_VERSION = 1.470;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.Quran.Elmallah.Beginner-Quran.watchkitapp";
 				PRODUCT_NAME = "Beginner Quran";
 				SDKROOT = watchos;
@@ -696,7 +730,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = Resources/Info.plist;
+				INFOPLIST_FILE = "Resources/Info-Main.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "Al-Quran";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = "com.Quran.Elmallah.Beginner-Quran";
@@ -705,7 +739,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.460;
+				MARKETING_VERSION = 1.470;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.Quran.Elmallah.Beginner-Quran.watchkitapp";
 				PRODUCT_NAME = "Beginner Quran";
 				SDKROOT = watchos;

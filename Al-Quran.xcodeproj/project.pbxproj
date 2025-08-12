@@ -46,6 +46,7 @@
 		72CCAE842D42D17900871A6A /* SearchBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72CCAE832D42D17900871A6A /* SearchBar.swift */; };
 		72CCAE872D42D18500871A6A /* WatchConnectivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72CCAE862D42D18500871A6A /* WatchConnectivity.swift */; };
 		72CCAE882D42D18500871A6A /* WatchConnectivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72CCAE862D42D18500871A6A /* WatchConnectivity.swift */; };
+		72D50D372E4C0416005D6E58 /* NowPlayingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 721EEE1F2D7B036F00FFE5F6 /* NowPlayingView.swift */; };
 		72F11CD42E38190D00655461 /* Highlighted.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72F11CD32E38190D00655461 /* Highlighted.swift */; };
 		72F11CD52E38190D00655461 /* Highlighted.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72F11CD32E38190D00655461 /* Highlighted.swift */; };
 		72F479B92B367DE200FCF22C /* LaunchScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72F479A82B367DE200FCF22C /* LaunchScreen.swift */; };
@@ -259,6 +260,7 @@
 				721EEE1F2D7B036F00FFE5F6 /* NowPlayingView.swift */,
 				720D00882C1AABB000D00D7E /* ShareAyah.swift */,
 				72F11CD32E38190D00655461 /* Highlighted.swift */,
+				72574CBD2E49E49500BFF138 /* QuranShortcuts.swift */,
 			);
 			path = Quran;
 			sourceTree = "<group>";
@@ -290,7 +292,6 @@
 				72F479B52B367DE200FCF22C /* Settings.swift */,
 				72BC6B332E3190B800ACD832 /* Globals.swift */,
 				72574CD02E49F33800BFF138 /* AppIntents.swift */,
-				72574CBD2E49E49500BFF138 /* QuranShortcuts.swift */,
 				72CCAE862D42D18500871A6A /* WatchConnectivity.swift */,
 			);
 			path = Settings;
@@ -474,6 +475,7 @@
 				72BC6B2A2E2C33D600ACD832 /* SurahRows.swift in Sources */,
 				72BC6B322E2F9FB300ACD832 /* AyahRow.swift in Sources */,
 				72F47A0B2B36B99A00FCF22C /* ArabicView.swift in Sources */,
+				72D50D372E4C0416005D6E58 /* NowPlayingView.swift in Sources */,
 				726B52392D700F5C00305A68 /* DismissKeyboard.swift in Sources */,
 				7202968A2D419D13009BA21E /* ArabicLetterView.swift in Sources */,
 				72574CBF2E49E49500BFF138 /* QuranShortcuts.swift in Sources */,

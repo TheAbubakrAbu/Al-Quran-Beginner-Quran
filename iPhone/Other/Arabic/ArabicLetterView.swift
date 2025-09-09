@@ -135,7 +135,7 @@ struct ArabicLetterView: View {
                     }
                 }
             }
-            .applyConditionalListStyle(defaultView: true)
+            .applyConditionalListStyle(defaultView: settings.defaultView)
             .dismissKeyboardOnScroll()
             
             #if !os(watchOS)

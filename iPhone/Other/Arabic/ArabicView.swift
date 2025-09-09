@@ -81,7 +81,7 @@ struct ArabicView: View {
             #if os(watchOS)
             .searchable(text: $searchText)
             #endif
-            .applyConditionalListStyle(defaultView: true)
+            .applyConditionalListStyle(defaultView: settings.defaultView)
             .dismissKeyboardOnScroll()
 
             #if !os(watchOS)

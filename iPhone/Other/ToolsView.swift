@@ -121,7 +121,7 @@ struct AdhkarView: View {
                     .foregroundColor(.primary)
             }
         }
-        .applyConditionalListStyle(defaultView: true)
+        .applyConditionalListStyle(defaultView: settings.defaultView)
         .navigationTitle("Common Adhkar")
     }
 }
@@ -192,7 +192,7 @@ struct DuaView: View {
                     .foregroundColor(.primary)
             }
         }
-        .applyConditionalListStyle(defaultView: true)
+        .applyConditionalListStyle(defaultView: settings.defaultView)
         .navigationTitle("Common Duas")
     }
 }
@@ -280,7 +280,7 @@ struct TasbihView: View {
                 counters[index] = counters[index] ?? 0
             }
         }
-        .applyConditionalListStyle(defaultView: true)
+        .applyConditionalListStyle(defaultView: settings.defaultView)
         .navigationTitle("Tasbih Counter")
     }
 }
@@ -513,7 +513,7 @@ struct NamesView: View {
             #if os(watchOS)
             .searchable(text: $searchText)
             #endif
-            .applyConditionalListStyle(defaultView: true)
+            .applyConditionalListStyle(defaultView: settings.defaultView)
             .dismissKeyboardOnScroll()
             
             #if !os(watchOS)
@@ -656,7 +656,7 @@ struct DateView: View {
             #endif
         }
         .navigationTitle("Hijri Converter")
-        .applyConditionalListStyle(defaultView: true)
+        .applyConditionalListStyle(defaultView: settings.defaultView)
     }
         
     @ViewBuilder
@@ -717,7 +717,7 @@ struct WallpaperView: View {
         List {
             ForEach(wallpapers) { WallpaperCell(wallpaper: $0) }
         }
-        .applyConditionalListStyle(defaultView: true)
+        .applyConditionalListStyle(defaultView: settings.defaultView)
         .navigationTitle("Wallpapers")
     }
 }

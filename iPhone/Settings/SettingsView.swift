@@ -11,14 +11,7 @@ struct SettingsView: View {
             List {
                 Section(header: Text("AL-QURAN")) {
                     NavigationLink(destination:
-                        List {
-                            SettingsQuranView(showEdits: true)
-                                .environmentObject(quranData)
-                                .environmentObject(settings)
-                        }
-                        .applyConditionalListStyle(defaultView: true)
-                        .navigationTitle("Al-Quran Settings")
-                        .navigationBarTitleDisplayMode(.inline)
+                        SettingsQuranView(showEdits: true)
                     ) {
                         Label("Quran Settings", systemImage: "character.book.closed.ar")
                     }
@@ -28,7 +21,6 @@ struct SettingsView: View {
                 Section(header: Text("APPEARANCE")) {
                     SettingsAppearanceView()
                 }
-                .accentColor(settings.accentColor.color)
                 
                 Section(header: Text("CREDITS")) {
                     Text("Made by Abubakr Elmallah, who was a 17-year-old high school student when this app was made.\n\nSpecial thanks to my parents and to Mr. Joe Silvey, my English teacher and Muslim Student Association Advisor.")
@@ -48,12 +40,12 @@ struct SettingsView: View {
                     .sheet(isPresented: $showingCredits) {
                         CreditsView()
                     }
-
+                    
                     Button(action: {
                         settings.hapticFeedback()
                         
                         withAnimation(.smooth()) {
-                            if let url = URL(string: "itms-apps://itunes.apple.com/app/id6474894373?action=write-review") {
+                            if let url = URL(string: "itms-apps://itunes.apple.com/app/id6449729655?action=write-review") {
                                 UIApplication.shared.open(url)
                             }
                         }
@@ -66,7 +58,7 @@ struct SettingsView: View {
                         Button(action: {
                             settings.hapticFeedback()
                             
-                            UIPasteboard.general.string = "itms-apps://itunes.apple.com/app/id6474894373?action=write-review"
+                            UIPasteboard.general.string = "itms-apps://itunes.apple.com/app/id6449729655?action=write-review"
                         }) {
                             HStack {
                                 Image(systemName: "doc.on.doc")
@@ -74,7 +66,7 @@ struct SettingsView: View {
                             }
                         }
                     }
-
+                    
                     Button(action: {
                         settings.hapticFeedback()
                         
@@ -89,7 +81,7 @@ struct SettingsView: View {
                             .foregroundColor(settings.accentColor.color)
                     }
                     #endif
-
+                    
                     HStack {
                         Text("Website: ")
                             .font(.subheadline)
@@ -114,7 +106,7 @@ struct SettingsView: View {
                         }
                     }
                     #endif
-
+                    
                     HStack {
                         Text("Contact: ")
                             .font(.subheadline)
@@ -223,7 +215,7 @@ struct SettingsAppearanceView: View {
             Toggle("Default List View", isOn: $settings.defaultView.animation(.easeInOut))
                 .font(.subheadline)
             
-            Text("The default list view is the standard interface found in many of Apple's first party apps, including Notes. This setting only applies to the Quran and Tools views.")
+            Text("The default list view is the standard interface found in many of Apple's first party apps, including Notes. This setting applies everywhere in the app except here in Settings.")
                 .font(.caption)
                 .foregroundColor(.secondary)
                 .padding(.vertical, 2)
@@ -251,7 +243,8 @@ struct VersionNumber: View {
                 Text("Version")
             }
             
-            Text("1.4.7")
+            //Text(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0")
+            Text("1.5")
                 .foregroundColor(settings.accentColor.color)
                 .padding(.leading, -4)
         }

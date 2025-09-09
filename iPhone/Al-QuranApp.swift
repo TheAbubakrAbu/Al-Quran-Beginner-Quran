@@ -1,5 +1,4 @@
 import SwiftUI
-import WatchConnectivity
 import StoreKit
 
 @main
@@ -16,10 +15,6 @@ struct AlQuranApp: App {
     @AppStorage("timeSpent") private var timeSpent: Double = 0
     @AppStorage("shouldShowRateAlert") private var shouldShowRateAlert: Bool = true
     @State private var startTime: Date?
-    
-    init() {
-        _ = WatchConnectivityManager.shared
-    }
 
     var body: some Scene {
         WindowGroup {
@@ -42,6 +37,7 @@ struct AlQuranApp: App {
                                 
                                 NowPlayingView(quranView: false)
                                     .padding(.bottom, 9)
+                                    .animation(.easeInOut, value: quranPlayer.isPlaying)
                             }
                             .tabItem {
                                 Image(systemName: "moon.stars")
@@ -53,6 +49,7 @@ struct AlQuranApp: App {
                                 
                                 NowPlayingView(quranView: false)
                                     .padding(.bottom, 9)
+                                    .animation(.easeInOut, value: quranPlayer.isPlaying)
                             }
                             .tabItem {
                                 Image(systemName: "gearshape")
@@ -71,6 +68,7 @@ struct AlQuranApp: App {
             .preferredColorScheme(settings.colorScheme)
             .transition(.opacity)
             .animation(.easeInOut, value: isLaunching)
+            .animation(.easeInOut, value: settings.firstLaunch)
             .onAppear {
                 if shouldShowRateAlert {
                     startTime = Date()
@@ -101,47 +99,8 @@ struct AlQuranApp: App {
                 }
             }
         }
-        .onChange(of: settings.lastReadSurah) { _ in
-            sendMessageToWatch()
-        }
-        .onChange(of: settings.lastReadAyah) { _ in
-            sendMessageToWatch()
-        }
-        .onChange(of: settings.favoriteSurahs) { newSurahs in
-            sendMessageToWatch()
-        }
-        .onChange(of: settings.bookmarkedAyahs) { newBookmarks in
-            sendMessageToWatch()
-        }
-        .onChange(of: settings.favoriteLetters) { _ in
-            sendMessageToWatch()
-        }
-        .onChange(of: settings.accentColor) { _ in
-            sendMessageToWatch()
-        }
         .onChange(of: scenePhase) { _ in
             quranPlayer.saveLastListenedSurah()
-        }
-    }
-    
-    private func sendMessageToWatch() {
-        guard WCSession.default.isPaired else {
-            logger.debug("No Apple Watch is paired")
-            return
-        }
-        
-        let settingsData = settings.dictionaryRepresentation()
-        let message = ["settings": settingsData]
-
-        if WCSession.default.isReachable {
-            logger.debug("Watch is reachable. Sending message to watch: \(message)")
-
-            WCSession.default.sendMessage(message, replyHandler: nil) { error in
-                logger.debug("Error sending message to watch: \(error.localizedDescription)")
-            }
-        } else {
-            logger.debug("Watch is not reachable. Transferring user info to watch: \(message)")
-            WCSession.default.transferUserInfo(message)
         }
     }
 }

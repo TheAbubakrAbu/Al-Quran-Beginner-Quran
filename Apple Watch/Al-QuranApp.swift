@@ -1,5 +1,4 @@
 import SwiftUI
-import WatchConnectivity
 
 @main
 struct AlQuranApp: App {
@@ -9,10 +8,6 @@ struct AlQuranApp: App {
     @StateObject private var namesData = NamesViewModel.shared
     
     @State private var isLaunching = true
-    
-    init() {
-        _ = WatchConnectivityManager.shared
-    }
     
     var body: some Scene {
         WindowGroup {
@@ -38,39 +33,6 @@ struct AlQuranApp: App {
             .preferredColorScheme(settings.colorScheme)
             .transition(.opacity)
             .animation(.easeInOut, value: isLaunching)
-        }
-        .onChange(of: settings.lastReadSurah) { newValue in
-            sendMessageToPhone()
-        }
-        .onChange(of: settings.lastReadAyah) { newValue in
-            sendMessageToPhone()
-        }
-        .onChange(of: settings.favoriteSurahs) { newSurahs in
-            sendMessageToPhone()
-        }
-        .onChange(of: settings.bookmarkedAyahs) { newBookmarks in
-            sendMessageToPhone()
-        }
-        .onChange(of: settings.favoriteLetters) { newValue in
-            sendMessageToPhone()
-        }
-        .onChange(of: settings.accentColor) { _ in
-            sendMessageToPhone()
-        }
-    }
-    
-    func sendMessageToPhone() {
-        let settingsData = settings.dictionaryRepresentation()
-        let message = ["settings": settingsData]
-
-        if WCSession.default.isReachable {
-            logger.debug("Phone is reachable. Sending message to phone: \(message)")
-            WCSession.default.sendMessage(message, replyHandler: nil) { error in
-                logger.debug("Error sending message to phone: \(error.localizedDescription)")
-            }
-        } else {
-            logger.debug("Phone is not reachable. Transferring user info to phone: \(message)")
-            WCSession.default.transferUserInfo(message)
         }
     }
 }

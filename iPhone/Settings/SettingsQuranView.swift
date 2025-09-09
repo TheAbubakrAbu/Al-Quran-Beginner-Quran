@@ -11,164 +11,168 @@ struct SettingsQuranView: View {
     }
     
     var body: some View {
-        Section(header: Text("RECITATION")) {
-            VStack(spacing: 10) {
-                NavigationLink(destination: ReciterListView().environmentObject(settings)) {
-                    Label("Choose Reciter", systemImage: "headphones")
-                }
-                
-                HStack {
-                    Text(settings.reciter)
-                        .foregroundColor(settings.accentColor.color)
+        List {
+            Section(header: Text("RECITATION")) {
+                VStack(spacing: 10) {
+                    NavigationLink(destination: ReciterListView().environmentObject(settings)) {
+                        Label("Choose Reciter", systemImage: "headphones")
+                    }
                     
-                    Spacer()
+                    HStack {
+                        Text(settings.reciter)
+                            .foregroundColor(settings.accentColor.color)
+                        
+                        Spacer()
+                    }
                 }
-            }
-            .accentColor(settings.accentColor.color)
-            
-            Picker("After Surah Recitation Ends", selection: $settings.reciteType.animation(.easeInOut)) {
-                Text("Continue to Next").tag("Continue to Next")
-                Text("Continue to Previous").tag("Continue to Previous")
-                Text("End Recitation").tag("End Recitation")
-            }
-            .font(.subheadline)
-            
-            Text("The Quran recitations are streamed online and not downloaded, which may consume a lot of data if used frequently, especially when using cellular data.")
-                .font(.caption)
-                .foregroundColor(.secondary)
-        }
-        
-        Section(header: Text("ARABIC TEXT")) {
-            Toggle("Show Arabic Quran Text", isOn: $settings.showArabicText.animation(.easeInOut))
+                .accentColor(settings.accentColor.color)
+                
+                Picker("After Surah Recitation Ends", selection: $settings.reciteType.animation(.easeInOut)) {
+                    Text("Continue to Next").tag("Continue to Next")
+                    Text("Continue to Previous").tag("Continue to Previous")
+                    Text("End Recitation").tag("End Recitation")
+                }
                 .font(.subheadline)
-                .disabled(!settings.showTransliteration && !settings.showEnglishTranslation)
-            
-            if settings.showArabicText {
-                VStack(alignment: .leading) {
-                    Toggle("Remove Arabic Tashkeel (Vowel Diacritics) and Signs", isOn: $settings.cleanArabicText.animation(.easeInOut))
-                        .font(.subheadline)
-                        .disabled(!settings.showArabicText)
-                    
-                    #if !os(watchOS)
-                    Text("This option removes Tashkeel, which are vowel diacretic marks such as Fatha, Damma, Kasra, and others, while retaining essential vowels like Alif, Yaa, and Waw. It also adjusts \"Mad\" letters and the \"Hamzatul Wasl,\" and removes baby vowel letters, various textual annotations including stopping signs, chapter markers, and prayer indicators. This option is not recommended.")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .padding(.vertical, 2)
-                    #else
-                    Text("This option removes Tashkeel (vowel diacretics).")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .padding(.vertical, 2)
-                    #endif
-                }
                 
-                Picker("Arabic Font", selection: $settings.fontArabic.animation(.easeInOut)) {
-                    Text("Uthmani").tag("KFGQPCHafsEx1UthmanicScript-Reg")
-                    Text("Indopak").tag("Al_Mushaf")
-                }
-                #if !os(watchOS)
-                .pickerStyle(SegmentedPickerStyle())
-                #endif
-                .disabled(!settings.showArabicText)
-                
-                Stepper(value: $settings.fontArabicSize.animation(.easeInOut), in: 15...50, step: 2) {
-                    Text("Arabic Font Size: \(Int(settings.fontArabicSize))")
-                        .font(.subheadline)
-                }
-                
-                VStack(alignment: .leading) {
-                    Toggle("Enable Arabic Beginner Mode", isOn: $settings.beginnerMode.animation(.easeInOut))
-                        .font(.subheadline)
-                        .disabled(!settings.showArabicText)
-                    
-                    Text("Puts a space between each Arabic letter to make it easier for beginners to read the Quran.")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .padding(.vertical, 2)
-                }
-            }
-        }
-        
-        Section(header: Text("ENGLISH TEXT")) {
-            Toggle("Show Transliteration", isOn: $settings.showTransliteration.animation(.easeInOut))
-                .font(.subheadline)
-                .disabled(!settings.showArabicText && !settings.showEnglishTranslation)
-            
-            VStack(alignment: .leading) {
-                Toggle("Show English Translation", isOn: $settings.showEnglishTranslation.animation(.easeInOut))
-                    .font(.subheadline)
-                    .disabled(!settings.showArabicText && !settings.showTransliteration)
-                
-                Text("English translation by Saheeh International.")
+                Text("The Quran recitations are streamed online and not downloaded, which may consume a lot of data if used frequently, especially when using cellular data.")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
             
-            if settings.showTransliteration || settings.showEnglishTranslation {
-                Stepper(value: $settings.englishFontSize.animation(.easeInOut), in: 13...20, step: 1) {
-                    Text("English Font Size: \(Int(settings.englishFontSize))")
-                        .font(.subheadline)
+            Section(header: Text("ARABIC TEXT")) {
+                Toggle("Show Arabic Quran Text", isOn: $settings.showArabicText.animation(.easeInOut))
+                    .font(.subheadline)
+                    .disabled(!settings.showTransliteration && !settings.showEnglishSaheeh && !settings.showEnglishMustafa)
+                
+                if settings.showArabicText {
+                    VStack(alignment: .leading) {
+                        Toggle("Remove Arabic Tashkeel (Vowel Diacritics) and Signs", isOn: $settings.cleanArabicText.animation(.easeInOut))
+                            .font(.subheadline)
+                            .disabled(!settings.showArabicText)
+                        
+                        #if !os(watchOS)
+                        Text("This option removes Tashkeel, which are vowel diacretic marks such as Fatha, Damma, Kasra, and others, while retaining essential vowels like Alif, Yaa, and Waw. It also adjusts \"Mad\" letters and the \"Hamzatul Wasl,\" and removes baby vowel letters, various textual annotations including stopping signs, chapter markers, and prayer indicators. This option is not recommended.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .padding(.vertical, 2)
+                        #else
+                        Text("This option removes Tashkeel (vowel diacretics).")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .padding(.vertical, 2)
+                        #endif
+                    }
+                    
+                    Picker("Arabic Font", selection: $settings.fontArabic.animation(.easeInOut)) {
+                        Text("Uthmani").tag("KFGQPCHafsEx1UthmanicScript-Reg")
+                        Text("Indopak").tag("Al_Mushaf")
+                    }
+                    #if !os(watchOS)
+                    .pickerStyle(SegmentedPickerStyle())
+                    #endif
+                    .disabled(!settings.showArabicText)
+                    
+                    Stepper(value: $settings.fontArabicSize.animation(.easeInOut), in: 15...50, step: 2) {
+                        Text("Arabic Font Size: \(Int(settings.fontArabicSize))")
+                            .font(.subheadline)
+                    }
+                    
+                    VStack(alignment: .leading) {
+                        Toggle("Enable Arabic Beginner Mode", isOn: $settings.beginnerMode.animation(.easeInOut))
+                            .font(.subheadline)
+                            .disabled(!settings.showArabicText)
+                        
+                        Text("Puts a space between each Arabic letter to make it easier for beginners to read the Quran.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .padding(.vertical, 2)
+                    }
                 }
             }
             
-            Toggle("Use System Font Size", isOn: Binding(
-                get: {
-                    let systemBodySize = Double(UIFont.preferredFont(forTextStyle: .body).pointSize)
-                    var usesSystemSizes = true
-                    
-                    if settings.showArabicText {
-                        usesSystemSizes = usesSystemSizes && (settings.fontArabicSize == systemBodySize + 10)
+            Section(header: Text("ENGLISH TEXT")) {
+                Toggle("Show Transliteration", isOn: $settings.showTransliteration.animation(.easeInOut))
+                    .font(.subheadline)
+                    .disabled(!settings.showArabicText && !settings.showEnglishSaheeh && !settings.showEnglishMustafa)
+                
+                Toggle("Show English Translation\nSaheeh International", isOn: $settings.showEnglishSaheeh.animation(.easeInOut))
+                    .font(.subheadline)
+                    .disabled(!settings.showArabicText && !settings.showTransliteration && !settings.showEnglishMustafa)
+                
+                Toggle("Show English Translation\nClear Quran (Mustafa Khattab)", isOn: $settings.showEnglishMustafa.animation(.easeInOut))
+                    .font(.subheadline)
+                    .disabled(!settings.showArabicText && !settings.showTransliteration && !settings.showEnglishSaheeh)
+                
+                if settings.showTransliteration || settings.showEnglishSaheeh || settings.showEnglishMustafa {
+                    Stepper(value: $settings.englishFontSize.animation(.easeInOut), in: 13...20, step: 1) {
+                        Text("English Font Size: \(Int(settings.englishFontSize))")
+                            .font(.subheadline)
                     }
-                    
-                    if settings.showTransliteration || settings.showEnglishTranslation {
-                        usesSystemSizes = usesSystemSizes && (settings.englishFontSize == systemBodySize)
-                    }
-                    return usesSystemSizes
-                },
-                set: { newValue in
-                    let systemBodySize = Double(UIFont.preferredFont(forTextStyle: .body).pointSize)
-                    withAnimation {
-                        if newValue {
-                            settings.fontArabicSize = systemBodySize + 10
-                            settings.englishFontSize = systemBodySize
-                        } else {
-                            settings.fontArabicSize = systemBodySize + 11
-                            settings.englishFontSize = systemBodySize + 1
+                }
+                
+                Toggle("Use System Font Size", isOn: Binding(
+                    get: {
+                        let systemBodySize = Double(UIFont.preferredFont(forTextStyle: .body).pointSize)
+                        var usesSystemSizes = true
+                        
+                        if settings.showArabicText {
+                            usesSystemSizes = usesSystemSizes && (settings.fontArabicSize == systemBodySize + 10)
+                        }
+                        
+                        if settings.showTransliteration || settings.showEnglishSaheeh || settings.showEnglishMustafa {
+                            usesSystemSizes = usesSystemSizes && (settings.englishFontSize == systemBodySize)
+                        }
+                        return usesSystemSizes
+                    },
+                    set: { newValue in
+                        let systemBodySize = Double(UIFont.preferredFont(forTextStyle: .body).pointSize)
+                        withAnimation {
+                            if newValue {
+                                settings.fontArabicSize = systemBodySize + 10
+                                settings.englishFontSize = systemBodySize
+                            } else {
+                                settings.fontArabicSize = systemBodySize + 11
+                                settings.englishFontSize = systemBodySize + 1
+                            }
                         }
                     }
-                }
-            ))
-            .font(.subheadline)
-        }
-        
-        #if !os(watchOS)
-        if showEdits {
-            Section(header: Text("FAVORITES AND BOOKMARKS")) {
-                NavigationLink(destination: FavoritesView(type: .surah).environmentObject(quranData).accentColor(settings.accentColor.color)) {
-                    Text("Edit Favorite Surahs")
-                        .font(.subheadline)
-                        .foregroundColor(settings.accentColor.color)
-                }
-                
-                NavigationLink(destination: FavoritesView(type: .ayah).environmentObject(quranData).accentColor(settings.accentColor.color)) {
-                    Text("Edit Bookmarked Ayahs")
-                        .font(.subheadline)
-                        .foregroundColor(settings.accentColor.color)
-                }
-                
-                NavigationLink(destination: FavoritesView(type: .letter).environmentObject(quranData).accentColor(settings.accentColor.color)) {
-                    Text("Edit Favorite Letters")
-                        .font(.subheadline)
-                        .foregroundColor(settings.accentColor.color)
+                ))
+                .font(.subheadline)
+            }
+            
+            #if !os(watchOS)
+            if showEdits {
+                Section(header: Text("FAVORITES AND BOOKMARKS")) {
+                    NavigationLink(destination: FavoritesView(type: .surah).environmentObject(quranData).accentColor(settings.accentColor.color)) {
+                        Text("Edit Favorite Surahs")
+                            .font(.subheadline)
+                            .foregroundColor(settings.accentColor.color)
+                    }
+                    
+                    NavigationLink(destination: FavoritesView(type: .ayah).environmentObject(quranData).accentColor(settings.accentColor.color)) {
+                        Text("Edit Bookmarked Ayahs")
+                            .font(.subheadline)
+                            .foregroundColor(settings.accentColor.color)
+                    }
+                    
+                    NavigationLink(destination: FavoritesView(type: .letter).environmentObject(quranData).accentColor(settings.accentColor.color)) {
+                        Text("Edit Favorite Letters")
+                            .font(.subheadline)
+                            .foregroundColor(settings.accentColor.color)
+                    }
                 }
             }
+            #endif
         }
-        #endif
+        .applyConditionalListStyle(defaultView: true)
+        .navigationTitle("Al-Quran Settings")
     }
 }
 
 struct ReciterListView: View {
     @EnvironmentObject var settings: Settings
+    
+    @Environment(\.presentationMode) private var presentationMode
     
     var body: some View {
         List {
@@ -179,6 +183,7 @@ struct ReciterListView: View {
                         
                         withAnimation {
                             settings.reciter = reciter.name
+                            presentationMode.wrappedValue.dismiss()
                         }
                     }) {
                         VStack(alignment: .leading, spacing: 4) {

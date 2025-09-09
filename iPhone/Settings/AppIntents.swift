@@ -53,6 +53,8 @@ struct AppShortcutsRoot: AppShortcutsProvider {
                 "Recite last in \(.applicationName)",
                 "Play last surah in \(.applicationName)",
                 "Recite last surah in \(.applicationName)",
+                "Play where I last left off in \(.applicationName)",
+                "Recite where I last left off in \(.applicationName)",
                 "\(.applicationName), play last listened surah",
                 "\(.applicationName), recite last listened surah",
                 "\(.applicationName), play last listened",
@@ -61,8 +63,10 @@ struct AppShortcutsRoot: AppShortcutsProvider {
                 "\(.applicationName), recite last",
                 "\(.applicationName), play last surah",
                 "\(.applicationName), recite last surah",
+                "\(.applicationName), play where I last left off",
+                "\(.applicationName), recite where I last left off",
                 "شغّل آخر سورة تم الاستماع إليها في \(.applicationName)",
-                "اقرأ آخر سورة تم الاستماع إليها في \(.applicationName)"
+                "اقرأ آخر سورة تم الاستماع إليها في \(.applicationName)",
             ],
             shortTitle: "Last Listened Surah",
             systemImageName: "gobackward"

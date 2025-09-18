@@ -243,8 +243,7 @@ struct VersionNumber: View {
                 Text("Version")
             }
             
-            //Text(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0")
-            Text("1.5")
+            Text(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0")
                 .foregroundColor(settings.accentColor.color)
                 .padding(.leading, -4)
         }

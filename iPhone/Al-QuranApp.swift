@@ -59,7 +59,7 @@ struct AlQuranApp: App {
                     }
                 }
             }
-            .statusBarHidden(true)
+            //.statusBarHidden(true)
             .environmentObject(quranData)
             .environmentObject(quranPlayer)
             .environmentObject(namesData)

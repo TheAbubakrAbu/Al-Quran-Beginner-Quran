@@ -18,7 +18,7 @@ struct SplashScreen: View {
                 Image("Al-Islam")
                     .resizable()
                     .aspectRatio(contentMode: .fit)
-                    .cornerRadius(10)
+                    .cornerRadius(24)
                     .padding()
                 
                 Spacer()
@@ -43,7 +43,7 @@ struct SplashScreen: View {
                             .padding(.horizontal)
                             .background(settings.accentColor.color)
                             .foregroundColor(.primary)
-                            .cornerRadius(10)
+                            .cornerRadius(24)
                     }
                     
                     Button(action: {
@@ -59,7 +59,7 @@ struct SplashScreen: View {
                             .padding(.horizontal)
                             .background(.red)
                             .foregroundColor(.primary)
-                            .cornerRadius(10)
+                            .cornerRadius(24)
                     }
                     
                     Spacer()

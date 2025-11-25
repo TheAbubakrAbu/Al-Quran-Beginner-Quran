@@ -10,59 +10,87 @@ struct OtherView: View {
                     NavigationLink(destination: ArabicView()) {
                         Label(
                             title: { Text("Arabic Alphabet") },
-                            icon: { Image(systemName: "textformat.size.ar") }
+                            icon: {
+                                Image(systemName: "textformat.size.ar")
+                                    .foregroundColor(settings.accentColor.color)
+                            }
                         )
                         .padding(.vertical, 4)
+                        .accentColor(settings.accentColor.color)
                     }
                     
                     NavigationLink(destination: AdhkarView()) {
                         Label(
                             title: { Text("Common Adhkar") },
-                            icon: { Image(systemName: "book.closed") }
+                            icon: {
+                                Image(systemName: "book.closed")
+                                    .foregroundColor(settings.accentColor.color)
+                            }
                         )
                         .padding(.vertical, 4)
+                        .accentColor(settings.accentColor.color)
                     }
-                    
+
                     NavigationLink(destination: DuaView()) {
                         Label(
                             title: { Text("Common Duas") },
-                            icon: { Image(systemName: "text.book.closed") }
+                            icon: {
+                                Image(systemName: "text.book.closed")
+                                    .foregroundColor(settings.accentColor.color)
+                            }
                         )
                         .padding(.vertical, 4)
+                        .accentColor(settings.accentColor.color)
                     }
-                    
+
                     NavigationLink(destination: TasbihView()) {
                         Label(
                             title: { Text("Tasbih Counter") },
-                            icon: { Image(systemName: "circles.hexagonpath.fill") }
+                            icon: {
+                                Image(systemName: "circles.hexagonpath.fill")
+                                    .foregroundColor(settings.accentColor.color)
+                            }
                         )
                         .padding(.vertical, 4)
+                        .accentColor(settings.accentColor.color)
                     }
-                    
+
                     NavigationLink(destination: NamesView()) {
                         Label(
                             title: { Text("99 Names of Allah") },
-                            icon: { Image(systemName: "signature") }
+                            icon: {
+                                Image(systemName: "signature")
+                                    .foregroundColor(settings.accentColor.color)
+                            }
                         )
                         .padding(.vertical, 4)
+                        .accentColor(settings.accentColor.color)
                     }
                     
                     #if !os(watchOS)
                     NavigationLink(destination: DateView()) {
                         Label(
                             title: { Text("Hijri Calendar Converter") },
-                            icon: { Image(systemName: "calendar") }
+                            icon: {
+                                Image(systemName: "calendar")
+                                    .foregroundColor(settings.accentColor.color)
+                            }
                         )
                         .padding(.vertical, 4)
+                        .accentColor(settings.accentColor.color)
                     }
                     #endif
-                    
+
                     NavigationLink(destination: WallpaperView()) {
                         Label(
                             title: { Text("Islamic Wallpapers") },
-                            icon: { Image(systemName: "photo.on.rectangle") }
+                            icon: {
+                                Image(systemName: "photo.on.rectangle")
+                                    .foregroundColor(settings.accentColor.color)
+                            }
                         )
                         .padding(.vertical, 4)
+                        .accentColor(settings.accentColor.color)
                     }
                 }
                 

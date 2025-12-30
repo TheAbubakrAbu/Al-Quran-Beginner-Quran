@@ -71,3 +71,8 @@ struct SplashScreen: View {
         .navigationViewStyle(.stack)
     }
 }
+
+#Preview {
+    SplashScreen()
+        .environmentObject(Settings.shared)
+}

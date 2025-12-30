@@ -74,6 +74,9 @@ final class Settings: ObservableObject {
         
     @AppStorage("showBookmarks") var showBookmarks = true
     @AppStorage("showFavorites") var showFavorites = true
+    
+    @AppStorage("shareShowAyahInformation") var showAyahInformation: Bool = true
+    @AppStorage("shareShowSurahInformation") var showSurahInformation: Bool = false
 
     @AppStorage("favoriteLetterData") private var favoriteLetterData = Data()
     var favoriteLetters: [LetterData] {

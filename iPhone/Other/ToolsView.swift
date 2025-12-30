@@ -3,6 +3,101 @@ import SwiftUI
 import Photos
 #endif
 
+struct ToolsView: View {
+    @EnvironmentObject var settings: Settings
+    @EnvironmentObject var namesData: NamesViewModel
+            
+    var body: some View {
+        Section(header: Text("ISLAMIC RESOURCES")) {
+            NavigationLink(destination: ArabicView()) {
+                Label(
+                    title: { Text("Arabic Alphabet") },
+                    icon: {
+                        Image(systemName: "textformat.size.ar")
+                            .foregroundColor(settings.accentColor.color)
+                    }
+                )
+                .padding(.vertical, 4)
+                .accentColor(settings.accentColor.color)
+            }
+            
+            NavigationLink(destination: AdhkarView()) {
+                Label(
+                    title: { Text("Common Adhkar") },
+                    icon: {
+                        Image(systemName: "book.closed")
+                            .foregroundColor(settings.accentColor.color)
+                    }
+                )
+                .padding(.vertical, 4)
+                .accentColor(settings.accentColor.color)
+            }
+
+            NavigationLink(destination: DuaView()) {
+                Label(
+                    title: { Text("Common Duas") },
+                    icon: {
+                        Image(systemName: "text.book.closed")
+                            .foregroundColor(settings.accentColor.color)
+                    }
+                )
+                .padding(.vertical, 4)
+                .accentColor(settings.accentColor.color)
+            }
+
+            NavigationLink(destination: TasbihView()) {
+                Label(
+                    title: { Text("Tasbih Counter") },
+                    icon: {
+                        Image(systemName: "circles.hexagonpath.fill")
+                            .foregroundColor(settings.accentColor.color)
+                    }
+                )
+                .padding(.vertical, 4)
+                .accentColor(settings.accentColor.color)
+            }
+
+            NavigationLink(destination: NamesView()) {
+                Label(
+                    title: { Text("99 Names of Allah") },
+                    icon: {
+                        Image(systemName: "signature")
+                            .foregroundColor(settings.accentColor.color)
+                    }
+                )
+                .padding(.vertical, 4)
+                .accentColor(settings.accentColor.color)
+            }
+            
+            #if !os(watchOS)
+            NavigationLink(destination: DateView()) {
+                Label(
+                    title: { Text("Hijri Calendar Converter") },
+                    icon: {
+                        Image(systemName: "calendar")
+                            .foregroundColor(settings.accentColor.color)
+                    }
+                )
+                .padding(.vertical, 4)
+                .accentColor(settings.accentColor.color)
+            }
+            #endif
+
+            NavigationLink(destination: WallpaperView()) {
+                Label(
+                    title: { Text("Islamic Wallpapers") },
+                    icon: {
+                        Image(systemName: "photo.on.rectangle")
+                            .foregroundColor(settings.accentColor.color)
+                    }
+                )
+                .padding(.vertical, 4)
+                .accentColor(settings.accentColor.color)
+            }
+        }
+    }
+}
+
 struct AdhkarRow: View {
     @EnvironmentObject var settings: Settings
     
@@ -420,31 +515,49 @@ struct NameTranslation: Codable {
 }
 
 struct NameOfAllah: Codable, Identifiable {
-    var id: String { "\(number)" }
+    let number: Int
+    let id: String
 
     let name: String
     let transliteration: String
-    let number: Int
     let found: String
     let en: NameTranslation
 
-    private static func clean(_ s: String) -> String {
-        let unwanted: Set<Character> = ["[", "]", "(", ")", "-", "'", "\""]
-        let stripped = s.filter { !unwanted.contains($0) }
-        return (stripped.applyingTransform(.stripDiacritics, reverse: false) ?? stripped)
-               .lowercased()
+    let numberArabic: String
+    let searchTokens: [String]
+
+    enum CodingKeys: String, CodingKey {
+        case name, transliteration, number, found, en
     }
 
-    var searchTokens: [String] {
-        [
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+
+        number = try c.decode(Int.self, forKey: .number)
+        name = try c.decode(String.self, forKey: .name)
+        transliteration = try c.decode(String.self, forKey: .transliteration)
+        found = try c.decode(String.self, forKey: .found)
+        en = try c.decode(NameTranslation.self, forKey: .en)
+
+        id = "\(number)"
+        numberArabic = arabicNumberString(from: number)
+
+        searchTokens = [
             Self.clean(name),
             Self.clean(transliteration),
             Self.clean(en.meaning),
             Self.clean(en.desc),
             Self.clean(found),
             "\(number)",
-            arabicNumberString(from: number)
+            numberArabic
         ]
+    }
+
+    private static func clean(_ s: String) -> String {
+        let unwanted: Set<Character> = ["[", "]", "(", ")", "-", "'", "\""]
+        let stripped = s.filter { !unwanted.contains($0) }
+        return (stripped.applyingTransform(.stripDiacritics, reverse: false) ?? stripped)
+            .lowercased()
     }
 }
 
@@ -544,15 +657,17 @@ private struct NameRow: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("First Found: \(String(name.found.prefix(through: name.found.firstIndex(of: ")") ?? name.found.endIndex)))")
                         .font(.subheadline).foregroundColor(.secondary)
+                    
                     Text(name.en.meaning).font(.subheadline)
                 }
                 
                 Spacer()
                 
                 VStack(alignment: .trailing, spacing: 2) {
-                    Text("\(name.name.removeDiacriticsFromLastLetter()) ‑ \(arabicNumberString(from: name.number))")
+                    Text("\(name.name.removeDiacriticsFromLastLetter()) ‑ \(name.numberArabic)")
                         .font(.headline)
                         .foregroundColor(settings.accentColor.color)
+                    
                     Text("\(name.transliteration) ‑ \(name.number)")
                         .font(.subheadline)
                 }
@@ -588,14 +703,6 @@ private struct NameRow: View {
         }
     }
     #endif
-}
-
-extension String {
-    func removeDiacriticsFromLastLetter() -> String {
-        guard let last = last else { return self }
-        let cleaned = String(last).removingArabicDiacriticsAndSigns
-        return cleaned == String(last) ? self : dropLast() + cleaned
-    }
 }
 
 struct DateView: View {
@@ -757,4 +864,11 @@ private struct WallpaperCell: View {
                 #endif
         }
     }
+}
+
+#Preview {
+    ToolsView()
+        .environmentObject(Settings.shared)
+        .environmentObject(QuranData.shared)
+        .environmentObject(QuranPlayer.shared)
 }

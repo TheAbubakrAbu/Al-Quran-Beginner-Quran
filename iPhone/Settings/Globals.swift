@@ -25,14 +25,6 @@ enum AccentColor: String, CaseIterable, Identifiable {
 
 let accentColors: [AccentColor] = AccentColor.allCases
 
-struct ShareSettings: Equatable {
-    var arabic = false
-    var transliteration = false
-    var englishSaheeh = false
-    var englishMustafa = false
-    var showFooter = false
-}
-
 struct CustomColorSchemeKey: EnvironmentKey {
     static let defaultValue: ColorScheme? = nil
 }
@@ -46,15 +38,7 @@ extension EnvironmentValues {
 
 func arabicNumberString(from number: Int) -> String {
     let arabicNumbers = ["٠", "١", "٢", "٣", "٤", "٥", "٦", "٧", "٨", "٩"]
-    let numberString = String(number)
-    
-    var arabicNumberString = ""
-    for character in numberString {
-        if let digit = Int(String(character)) {
-            arabicNumberString += arabicNumbers[digit]
-        }
-    }
-    return arabicNumberString
+    return String(number).map { arabicNumbers[Int(String($0))!] }.joined()
 }
 
 private let quranStripScalars: Set<UnicodeScalar> = {
@@ -89,6 +73,12 @@ extension String {
         }
         return String(out)
     }
+    
+    func removeDiacriticsFromLastLetter() -> String {
+        guard let last = last else { return self }
+        let cleaned = String(last).removingArabicDiacriticsAndSigns
+        return cleaned == String(last) ? self : dropLast() + cleaned
+    }
 
     subscript(_ r: Range<Int>) -> Substring {
         let start = index(startIndex, offsetBy: r.lowerBound)
@@ -96,4 +86,3 @@ extension String {
         return self[start..<end]
     }
 }
-

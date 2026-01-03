@@ -71,6 +71,9 @@ final class Settings: ObservableObject {
             bookmarkedAyahsData = (try? Self.encoder.encode(newValue)) ?? Data()
         }
     }
+    
+    var favoriteSurahSet: Set<Int> { Set(favoriteSurahs) }
+    var bookmarkedAyahSet: Set<String> { Set(bookmarkedAyahs.map(\.id)) }
         
     @AppStorage("showBookmarks") var showBookmarks = true
     @AppStorage("showFavorites") var showFavorites = true

@@ -139,11 +139,27 @@ final class Settings: ObservableObject {
         }
     }
     
+    /// Which qiraah/riwayah to show for Arabic text. Empty or "Hafs" = Hafs an Asim (default). Transliteration and translations only apply to Hafs.
+    @AppStorage("displayQiraah") var displayQiraah: String = ""
+
+    /// When on, AyahsView shows a qiraat picker above the search bar to compare riwayat in that view.
+    @AppStorage("qiraatComparisonMode") var qiraatComparisonMode: Bool = false
+
+    /// Pass to Ayah.displayArabic(qiraah:clean:). Nil means Hafs.
+    var displayQiraahForArabic: String? {
+        (displayQiraah.isEmpty || displayQiraah == "Hafs") ? nil : displayQiraah
+    }
+
+    /// When false, only Arabic is shown (no transliteration or English), since those are for Hafs an Asim only.
+    var isHafsDisplay: Bool {
+        displayQiraah.isEmpty || displayQiraah == "Hafs"
+    }
+
     @AppStorage("showArabicText") var showArabicText: Bool = true
     @AppStorage("cleanArabicText") var cleanArabicText: Bool = false
-    @AppStorage("fontArabic") var fontArabic: String = "KFGQPCHafsEx1UthmanicScript-Reg"
+    @AppStorage("THEfontArabic") var fontArabic: String = "KFGQPCQUMBULUthmanicScript-Regu"
     @AppStorage("fontArabicSize") var fontArabicSize: Double = Double(UIFont.preferredFont(forTextStyle: .body).pointSize) + 10
-    
+
     @AppStorage("useFontArabic") var useFontArabic = true
 
     @AppStorage("showTransliteration") var showTransliteration: Bool = true

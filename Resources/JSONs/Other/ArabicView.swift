@@ -317,7 +317,9 @@ struct ArabicView: View {
                                     .foregroundColor(settings.colorAccent.color)
                             }
                             
-                            Link("View More: Tajweed Rules & Stopping/Pausing Signs", destination: URL(string: "https://studioarabiya.com/blog/tajweed-rules-stopping-pausing-signs/")!)
+                            if let url = URL(string: "https://studioarabiya.com/blog/tajweed-rules-stopping-pausing-signs/") {
+                                Link("View More: Tajweed Rules & Stopping/Pausing Signs", destination: url)
+                            }
                         }
                     } else {
                         Section(header: Text("SEARCH RESULTS")) {

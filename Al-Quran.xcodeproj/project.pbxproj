@@ -12,23 +12,23 @@
 		7202968A2D419D13009BA21E /* ArabicLetterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 720296892D419D13009BA21E /* ArabicLetterView.swift */; };
 		7202968B2D419D13009BA21E /* ArabicLetterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 720296892D419D13009BA21E /* ArabicLetterView.swift */; };
 		720DEC6A2D24581D006EA342 /* CreditsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 720DEC692D24581D006EA342 /* CreditsView.swift */; };
-		723873C02F3991CC00D3A8CD /* QiraahShubah.json in Resources */ = {isa = PBXBuildFile; fileRef = 723873B82F3991CC00D3A8CD /* QiraahShubah.json */; };
-		723873C12F3991CC00D3A8CD /* QiraahBuzzi.json in Resources */ = {isa = PBXBuildFile; fileRef = 723873B92F3991CC00D3A8CD /* QiraahBuzzi.json */; };
-		723873C22F3991CC00D3A8CD /* QiraahQaloon.json in Resources */ = {isa = PBXBuildFile; fileRef = 723873BC2F3991CC00D3A8CD /* QiraahQaloon.json */; };
-		723873C32F3991CC00D3A8CD /* QiraahQunbul.json in Resources */ = {isa = PBXBuildFile; fileRef = 723873BA2F3991CC00D3A8CD /* QiraahQunbul.json */; };
-		723873C42F3991CC00D3A8CD /* QiraahSusi.json in Resources */ = {isa = PBXBuildFile; fileRef = 723873BE2F3991CC00D3A8CD /* QiraahSusi.json */; };
-		723873C52F3991CC00D3A8CD /* QiraahDuri.json in Resources */ = {isa = PBXBuildFile; fileRef = 723873BD2F3991CC00D3A8CD /* QiraahDuri.json */; };
-		723873C62F3991CC00D3A8CD /* QiraahWarsh.json in Resources */ = {isa = PBXBuildFile; fileRef = 723873BB2F3991CC00D3A8CD /* QiraahWarsh.json */; };
-		723873C72F3991CC00D3A8CD /* QiraahShubah.json in Resources */ = {isa = PBXBuildFile; fileRef = 723873B82F3991CC00D3A8CD /* QiraahShubah.json */; };
-		723873C82F3991CC00D3A8CD /* QiraahBuzzi.json in Resources */ = {isa = PBXBuildFile; fileRef = 723873B92F3991CC00D3A8CD /* QiraahBuzzi.json */; };
-		723873C92F3991CC00D3A8CD /* QiraahQaloon.json in Resources */ = {isa = PBXBuildFile; fileRef = 723873BC2F3991CC00D3A8CD /* QiraahQaloon.json */; };
-		723873CA2F3991CC00D3A8CD /* QiraahQunbul.json in Resources */ = {isa = PBXBuildFile; fileRef = 723873BA2F3991CC00D3A8CD /* QiraahQunbul.json */; };
-		723873CB2F3991CC00D3A8CD /* QiraahSusi.json in Resources */ = {isa = PBXBuildFile; fileRef = 723873BE2F3991CC00D3A8CD /* QiraahSusi.json */; };
-		723873CC2F3991CC00D3A8CD /* QiraahDuri.json in Resources */ = {isa = PBXBuildFile; fileRef = 723873BD2F3991CC00D3A8CD /* QiraahDuri.json */; };
-		723873CD2F3991CC00D3A8CD /* QiraahWarsh.json in Resources */ = {isa = PBXBuildFile; fileRef = 723873BB2F3991CC00D3A8CD /* QiraahWarsh.json */; };
 		723873CF2F3991F700D3A8CD /* Uthmani.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 723873CE2F3991F700D3A8CD /* Uthmani.ttf */; };
 		723873D02F3991F700D3A8CD /* Uthmani.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 723873CE2F3991F700D3A8CD /* Uthmani.ttf */; };
 		723873D22F399B9000D3A8CD /* PlayCustomRangeSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 723873D12F399B9000D3A8CD /* PlayCustomRangeSheet.swift */; };
+		723B9E152F3B17CC0042DCDE /* QiraahQunbul.json in Resources */ = {isa = PBXBuildFile; fileRef = 723B9E0F2F3B17CC0042DCDE /* QiraahQunbul.json */; };
+		723B9E162F3B17CC0042DCDE /* QiraahDuri.json in Resources */ = {isa = PBXBuildFile; fileRef = 723B9E122F3B17CC0042DCDE /* QiraahDuri.json */; };
+		723B9E172F3B17CC0042DCDE /* QiraahShubah.json in Resources */ = {isa = PBXBuildFile; fileRef = 723B9E0D2F3B17CC0042DCDE /* QiraahShubah.json */; };
+		723B9E182F3B17CC0042DCDE /* QiraahSusi.json in Resources */ = {isa = PBXBuildFile; fileRef = 723B9E132F3B17CC0042DCDE /* QiraahSusi.json */; };
+		723B9E192F3B17CC0042DCDE /* QiraahWarsh.json in Resources */ = {isa = PBXBuildFile; fileRef = 723B9E102F3B17CC0042DCDE /* QiraahWarsh.json */; };
+		723B9E1A2F3B17CC0042DCDE /* QiraahBuzzi.json in Resources */ = {isa = PBXBuildFile; fileRef = 723B9E0E2F3B17CC0042DCDE /* QiraahBuzzi.json */; };
+		723B9E1B2F3B17CC0042DCDE /* QiraahQaloon.json in Resources */ = {isa = PBXBuildFile; fileRef = 723B9E112F3B17CC0042DCDE /* QiraahQaloon.json */; };
+		723B9E1C2F3B17CC0042DCDE /* QiraahQunbul.json in Resources */ = {isa = PBXBuildFile; fileRef = 723B9E0F2F3B17CC0042DCDE /* QiraahQunbul.json */; };
+		723B9E1D2F3B17CC0042DCDE /* QiraahDuri.json in Resources */ = {isa = PBXBuildFile; fileRef = 723B9E122F3B17CC0042DCDE /* QiraahDuri.json */; };
+		723B9E1E2F3B17CC0042DCDE /* QiraahShubah.json in Resources */ = {isa = PBXBuildFile; fileRef = 723B9E0D2F3B17CC0042DCDE /* QiraahShubah.json */; };
+		723B9E1F2F3B17CC0042DCDE /* QiraahSusi.json in Resources */ = {isa = PBXBuildFile; fileRef = 723B9E132F3B17CC0042DCDE /* QiraahSusi.json */; };
+		723B9E202F3B17CC0042DCDE /* QiraahWarsh.json in Resources */ = {isa = PBXBuildFile; fileRef = 723B9E102F3B17CC0042DCDE /* QiraahWarsh.json */; };
+		723B9E212F3B17CC0042DCDE /* QiraahBuzzi.json in Resources */ = {isa = PBXBuildFile; fileRef = 723B9E0E2F3B17CC0042DCDE /* QiraahBuzzi.json */; };
+		723B9E222F3B17CC0042DCDE /* QiraahQaloon.json in Resources */ = {isa = PBXBuildFile; fileRef = 723B9E112F3B17CC0042DCDE /* QiraahQaloon.json */; };
 		7247DBA92CD4DE92000803F2 /* Indopak.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7247DBA82CD4DE92000803F2 /* Indopak.ttf */; };
 		7247DBAA2CD4DE92000803F2 /* Indopak.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7247DBA82CD4DE92000803F2 /* Indopak.ttf */; };
 		72537C252F04361900829F59 /* AppReview.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72537C242F04361900829F59 /* AppReview.swift */; };
@@ -42,8 +42,8 @@
 		72827EB82E3D71BB00EBA534 /* SettingsQuranView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72827EB62E3D71BB00EBA534 /* SettingsQuranView.swift */; };
 		728E2EF02E6E062500F2C24C /* SettingsQuran.swift in Sources */ = {isa = PBXBuildFile; fileRef = 728E2EEF2E6E062500F2C24C /* SettingsQuran.swift */; };
 		728E2EF12E6E062500F2C24C /* SettingsQuran.swift in Sources */ = {isa = PBXBuildFile; fileRef = 728E2EEF2E6E062500F2C24C /* SettingsQuran.swift */; };
-		728E2F072E6EEA9900F2C24C /* quran.json in Resources */ = {isa = PBXBuildFile; fileRef = 728E2F062E6EEA9900F2C24C /* quran.json */; };
-		728E2F082E6EEA9900F2C24C /* quran.json in Resources */ = {isa = PBXBuildFile; fileRef = 728E2F062E6EEA9900F2C24C /* quran.json */; };
+		728E2F072E6EEA9900F2C24C /* Quran.json in Resources */ = {isa = PBXBuildFile; fileRef = 728E2F062E6EEA9900F2C24C /* Quran.json */; };
+		728E2F082E6EEA9900F2C24C /* Quran.json in Resources */ = {isa = PBXBuildFile; fileRef = 728E2F062E6EEA9900F2C24C /* Quran.json */; };
 		728E2F152E6EEAAF00F2C24C /* ShareAyah.swift in Sources */ = {isa = PBXBuildFile; fileRef = 728E2F122E6EEAAF00F2C24C /* ShareAyah.swift */; };
 		728E2F162E6EEAAF00F2C24C /* QuranData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 728E2F092E6EEAAF00F2C24C /* QuranData.swift */; };
 		728E2F172E6EEAAF00F2C24C /* AyahRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 728E2F0F2E6EEAAF00F2C24C /* AyahRow.swift */; };
@@ -144,22 +144,22 @@
 		720296862D419CFE009BA21E /* Arabic.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Arabic.swift; sourceTree = "<group>"; };
 		720296892D419D13009BA21E /* ArabicLetterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArabicLetterView.swift; sourceTree = "<group>"; };
 		720DEC692D24581D006EA342 /* CreditsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreditsView.swift; sourceTree = "<group>"; };
-		723873B82F3991CC00D3A8CD /* QiraahShubah.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = QiraahShubah.json; sourceTree = "<group>"; };
-		723873B92F3991CC00D3A8CD /* QiraahBuzzi.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = QiraahBuzzi.json; sourceTree = "<group>"; };
-		723873BA2F3991CC00D3A8CD /* QiraahQunbul.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = QiraahQunbul.json; sourceTree = "<group>"; };
-		723873BB2F3991CC00D3A8CD /* QiraahWarsh.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = QiraahWarsh.json; sourceTree = "<group>"; };
-		723873BC2F3991CC00D3A8CD /* QiraahQaloon.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = QiraahQaloon.json; sourceTree = "<group>"; };
-		723873BD2F3991CC00D3A8CD /* QiraahDuri.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = QiraahDuri.json; sourceTree = "<group>"; };
-		723873BE2F3991CC00D3A8CD /* QiraahSusi.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = QiraahSusi.json; sourceTree = "<group>"; };
 		723873CE2F3991F700D3A8CD /* Uthmani.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = Uthmani.ttf; sourceTree = "<group>"; };
 		723873D12F399B9000D3A8CD /* PlayCustomRangeSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayCustomRangeSheet.swift; sourceTree = "<group>"; };
+		723B9E0D2F3B17CC0042DCDE /* QiraahShubah.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = QiraahShubah.json; sourceTree = "<group>"; };
+		723B9E0E2F3B17CC0042DCDE /* QiraahBuzzi.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = QiraahBuzzi.json; sourceTree = "<group>"; };
+		723B9E0F2F3B17CC0042DCDE /* QiraahQunbul.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = QiraahQunbul.json; sourceTree = "<group>"; };
+		723B9E102F3B17CC0042DCDE /* QiraahWarsh.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = QiraahWarsh.json; sourceTree = "<group>"; };
+		723B9E112F3B17CC0042DCDE /* QiraahQaloon.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = QiraahQaloon.json; sourceTree = "<group>"; };
+		723B9E122F3B17CC0042DCDE /* QiraahDuri.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = QiraahDuri.json; sourceTree = "<group>"; };
+		723B9E132F3B17CC0042DCDE /* QiraahSusi.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = QiraahSusi.json; sourceTree = "<group>"; };
 		7247DBA82CD4DE92000803F2 /* Indopak.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = Indopak.ttf; sourceTree = "<group>"; };
 		72537C242F04361900829F59 /* AppReview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppReview.swift; sourceTree = "<group>"; };
 		72537C262F04364F00829F59 /* QuranStructs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuranStructs.swift; sourceTree = "<group>"; };
 		72574CD02E49F33800BFF138 /* AppIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppIntents.swift; sourceTree = "<group>"; };
 		72827EB62E3D71BB00EBA534 /* SettingsQuranView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsQuranView.swift; sourceTree = "<group>"; };
 		728E2EEF2E6E062500F2C24C /* SettingsQuran.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsQuran.swift; sourceTree = "<group>"; };
-		728E2F062E6EEA9900F2C24C /* quran.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = quran.json; sourceTree = "<group>"; };
+		728E2F062E6EEA9900F2C24C /* Quran.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = Quran.json; sourceTree = "<group>"; };
 		728E2F092E6EEAAF00F2C24C /* QuranData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuranData.swift; sourceTree = "<group>"; };
 		728E2F0A2E6EEAAF00F2C24C /* QuranView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuranView.swift; sourceTree = "<group>"; };
 		728E2F0B2E6EEAAF00F2C24C /* SurahRows.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurahRows.swift; sourceTree = "<group>"; };
@@ -224,16 +224,16 @@
 			path = Arabic;
 			sourceTree = "<group>";
 		};
-		723873BF2F3991CC00D3A8CD /* Qiraat */ = {
+		723B9E142F3B17CC0042DCDE /* Qiraat */ = {
 			isa = PBXGroup;
 			children = (
-				723873B82F3991CC00D3A8CD /* QiraahShubah.json */,
-				723873B92F3991CC00D3A8CD /* QiraahBuzzi.json */,
-				723873BA2F3991CC00D3A8CD /* QiraahQunbul.json */,
-				723873BB2F3991CC00D3A8CD /* QiraahWarsh.json */,
-				723873BC2F3991CC00D3A8CD /* QiraahQaloon.json */,
-				723873BD2F3991CC00D3A8CD /* QiraahDuri.json */,
-				723873BE2F3991CC00D3A8CD /* QiraahSusi.json */,
+				723B9E0D2F3B17CC0042DCDE /* QiraahShubah.json */,
+				723B9E0E2F3B17CC0042DCDE /* QiraahBuzzi.json */,
+				723B9E0F2F3B17CC0042DCDE /* QiraahQunbul.json */,
+				723B9E102F3B17CC0042DCDE /* QiraahWarsh.json */,
+				723B9E112F3B17CC0042DCDE /* QiraahQaloon.json */,
+				723B9E122F3B17CC0042DCDE /* QiraahDuri.json */,
+				723B9E132F3B17CC0042DCDE /* QiraahSusi.json */,
 			);
 			path = Qiraat;
 			sourceTree = "<group>";
@@ -322,8 +322,8 @@
 			isa = PBXGroup;
 			children = (
 				72F479C82B36A9A600FCF22C /* 99_Names_Of_Allah.json */,
-				728E2F062E6EEA9900F2C24C /* quran.json */,
-				723873BF2F3991CC00D3A8CD /* Qiraat */,
+				728E2F062E6EEA9900F2C24C /* Quran.json */,
+				723B9E142F3B17CC0042DCDE /* Qiraat */,
 			);
 			path = JSONs;
 			sourceTree = "<group>";
@@ -452,15 +452,15 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				723873C72F3991CC00D3A8CD /* QiraahShubah.json in Resources */,
-				723873C82F3991CC00D3A8CD /* QiraahBuzzi.json in Resources */,
-				723873C92F3991CC00D3A8CD /* QiraahQaloon.json in Resources */,
-				723873CA2F3991CC00D3A8CD /* QiraahQunbul.json in Resources */,
-				723873CB2F3991CC00D3A8CD /* QiraahSusi.json in Resources */,
-				723873CC2F3991CC00D3A8CD /* QiraahDuri.json in Resources */,
-				723873CD2F3991CC00D3A8CD /* QiraahWarsh.json in Resources */,
 				7247DBA92CD4DE92000803F2 /* Indopak.ttf in Resources */,
-				728E2F072E6EEA9900F2C24C /* quran.json in Resources */,
+				728E2F072E6EEA9900F2C24C /* Quran.json in Resources */,
+				723B9E1C2F3B17CC0042DCDE /* QiraahQunbul.json in Resources */,
+				723B9E1D2F3B17CC0042DCDE /* QiraahDuri.json in Resources */,
+				723B9E1E2F3B17CC0042DCDE /* QiraahShubah.json in Resources */,
+				723B9E1F2F3B17CC0042DCDE /* QiraahSusi.json in Resources */,
+				723B9E202F3B17CC0042DCDE /* QiraahWarsh.json in Resources */,
+				723B9E212F3B17CC0042DCDE /* QiraahBuzzi.json in Resources */,
+				723B9E222F3B17CC0042DCDE /* QiraahQaloon.json in Resources */,
 				723873CF2F3991F700D3A8CD /* Uthmani.ttf in Resources */,
 				72F479C92B36A9A600FCF22C /* 99_Names_Of_Allah.json in Resources */,
 				729E23812B367CA800E1E0DA /* Assets.xcassets in Resources */,
@@ -471,17 +471,17 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				723873C02F3991CC00D3A8CD /* QiraahShubah.json in Resources */,
-				723873C12F3991CC00D3A8CD /* QiraahBuzzi.json in Resources */,
-				723873C22F3991CC00D3A8CD /* QiraahQaloon.json in Resources */,
-				723873C32F3991CC00D3A8CD /* QiraahQunbul.json in Resources */,
-				723873C42F3991CC00D3A8CD /* QiraahSusi.json in Resources */,
-				723873C52F3991CC00D3A8CD /* QiraahDuri.json in Resources */,
-				723873C62F3991CC00D3A8CD /* QiraahWarsh.json in Resources */,
 				72F47A0A2B36B99A00FCF22C /* 99_Names_Of_Allah.json in Resources */,
 				72F47A1C2B38E49100FCF22C /* Assets.xcassets in Resources */,
+				723B9E152F3B17CC0042DCDE /* QiraahQunbul.json in Resources */,
+				723B9E162F3B17CC0042DCDE /* QiraahDuri.json in Resources */,
+				723B9E172F3B17CC0042DCDE /* QiraahShubah.json in Resources */,
+				723B9E182F3B17CC0042DCDE /* QiraahSusi.json in Resources */,
+				723B9E192F3B17CC0042DCDE /* QiraahWarsh.json in Resources */,
+				723B9E1A2F3B17CC0042DCDE /* QiraahBuzzi.json in Resources */,
+				723B9E1B2F3B17CC0042DCDE /* QiraahQaloon.json in Resources */,
 				723873D02F3991F700D3A8CD /* Uthmani.ttf in Resources */,
-				728E2F082E6EEA9900F2C24C /* quran.json in Resources */,
+				728E2F082E6EEA9900F2C24C /* Quran.json in Resources */,
 				7247DBAA2CD4DE92000803F2 /* Indopak.ttf in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -728,7 +728,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2.2.0;
+				MARKETING_VERSION = 2.2.1;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.Quran.Elmallah.Beginner-Quran";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -760,7 +760,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2.2.0;
+				MARKETING_VERSION = 2.2.1;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.Quran.Elmallah.Beginner-Quran";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -788,7 +788,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2.2.0;
+				MARKETING_VERSION = 2.2.1;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.Quran.Elmallah.Beginner-Quran.watchkitapp";
 				PRODUCT_NAME = "Beginner Quran";
 				SDKROOT = watchos;
@@ -819,7 +819,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2.2.0;
+				MARKETING_VERSION = 2.2.1;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.Quran.Elmallah.Beginner-Quran.watchkitapp";
 				PRODUCT_NAME = "Beginner Quran";
 				SDKROOT = watchos;

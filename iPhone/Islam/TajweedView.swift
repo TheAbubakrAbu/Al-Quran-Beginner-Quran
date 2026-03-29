@@ -64,7 +64,7 @@ struct TajweedFoundationsView: View {
                 Text("Learn More About Qiraat, Riwayat, and Ahruf")
                     .font(.subheadline.weight(.semibold))
 
-                Text("See below and in Al-Islam View > Islamic Pillars and Basics.")
+                Text("See below and in Tools View > Islamic Pillars and Basics.")
                     .font(.caption)
                     .foregroundColor(.secondary)
 
@@ -317,7 +317,7 @@ private struct TajweedInMushafView: View {
 
     var body: some View {
         List {
-            Section("TAJWEED IN THE MUS HAF") {
+            Section("TAJWEED IN THE MUSHAF") {
                 VStack(alignment: .leading, spacing: 14) {
                     Text("Reading Tajweed Directly from the Mushaf")
                         .font(.headline)

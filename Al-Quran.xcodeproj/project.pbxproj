@@ -99,6 +99,8 @@
 		728D75E02F79CFE800502B8A /* NamesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 728D75C62F79CFE800502B8A /* NamesView.swift */; };
 		728D75E12F79CFE800502B8A /* TajweedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 728D75C22F79CFE800502B8A /* TajweedView.swift */; };
 		728D75E72F79D2FA00502B8A /* SplashScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72F47A1A2B36BF0300FCF22C /* SplashScreen.swift */; };
+		728D764F2F79E9D700502B8A /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 728D764E2F79E9D700502B8A /* AppDelegate.swift */; };
+		728D76502F79E9D700502B8A /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 728D764E2F79E9D700502B8A /* AppDelegate.swift */; };
 		728E2EF02E6E062500F2C24C /* SettingsQuran.swift in Sources */ = {isa = PBXBuildFile; fileRef = 728E2EEF2E6E062500F2C24C /* SettingsQuran.swift */; };
 		728E2EF12E6E062500F2C24C /* SettingsQuran.swift in Sources */ = {isa = PBXBuildFile; fileRef = 728E2EEF2E6E062500F2C24C /* SettingsQuran.swift */; };
 		729E237D2B367CA700E1E0DA /* Al-QuranApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 729E237C2B367CA700E1E0DA /* Al-QuranApp.swift */; };
@@ -209,6 +211,7 @@
 		728D75C82F79CFE800502B8A /* WallpaperView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WallpaperView.swift; sourceTree = "<group>"; };
 		728D75C92F79CFE800502B8A /* DateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DateView.swift; sourceTree = "<group>"; };
 		728D75CA2F79CFE800502B8A /* PillarsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PillarsView.swift; sourceTree = "<group>"; };
+		728D764E2F79E9D700502B8A /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		728E2EEF2E6E062500F2C24C /* SettingsQuran.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsQuran.swift; sourceTree = "<group>"; };
 		729E23792B367CA700E1E0DA /* iPhone.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = iPhone.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		729E237C2B367CA700E1E0DA /* Al-QuranApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Al-QuranApp.swift"; sourceTree = "<group>"; };
@@ -337,6 +340,7 @@
 			isa = PBXGroup;
 			children = (
 				729E237C2B367CA700E1E0DA /* Al-QuranApp.swift */,
+				728D764E2F79E9D700502B8A /* AppDelegate.swift */,
 				72537C242F04361900829F59 /* AppReview.swift */,
 				72F47A1A2B36BF0300FCF22C /* SplashScreen.swift */,
 				72F479A82B367DE200FCF22C /* LaunchScreen.swift */,
@@ -560,6 +564,7 @@
 				728D75AD2F79C54800502B8A /* PreviewSupport.swift in Sources */,
 				728D75AE2F79C54800502B8A /* GlassEffect.swift in Sources */,
 				728D75652F79C34500502B8A /* ShareAyah.swift in Sources */,
+				728D76502F79E9D700502B8A /* AppDelegate.swift in Sources */,
 				728D75662F79C34500502B8A /* QuranShortcuts.swift in Sources */,
 				728D75672F79C34500502B8A /* SurahRows.swift in Sources */,
 				728D75682F79C34500502B8A /* PlayCustomRangeSheet.swift in Sources */,
@@ -609,6 +614,7 @@
 				728D75992F79C47900502B8A /* Highlighted.swift in Sources */,
 				728D759A2F79C47900502B8A /* ContextMenu.swift in Sources */,
 				728D75E72F79D2FA00502B8A /* SplashScreen.swift in Sources */,
+				728D764F2F79E9D700502B8A /* AppDelegate.swift in Sources */,
 				728D759B2F79C47900502B8A /* QuranData.swift in Sources */,
 				728D75B32F79C6EB00502B8A /* PlayCustomRangeSheet.swift in Sources */,
 				728D759C2F79C47900502B8A /* AyahsView.swift in Sources */,
@@ -776,6 +782,7 @@
 				INFOPLIST_FILE = "Resources/Info-Main.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "Al-Quran";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Used to save wallpapers you choose to your Photo Library.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -808,6 +815,7 @@
 				INFOPLIST_FILE = "Resources/Info-Main.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "Al-Quran";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Used to save wallpapers you choose to your Photo Library.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;

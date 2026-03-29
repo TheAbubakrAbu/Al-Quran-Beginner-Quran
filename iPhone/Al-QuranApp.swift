@@ -8,6 +8,7 @@ struct AlQuranApp: App {
     @StateObject private var quranPlayer = QuranPlayer.shared
     @StateObject private var namesData = NamesViewModel.shared
 
+    @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @Environment(\.scenePhase) private var scenePhase
 
     @State private var isLaunching = true

@@ -1,11 +1,11 @@
 import SwiftUI
 import os
 
-let logger = Logger(subsystem: "group.com.BeginnerQuran.AppGroup", category: "Al-Quran")
+let logger = Logger(subsystem: AppIdentifiers.bundleIdentifier, category: "Settings")
 
 final class Settings: ObservableObject {
     static let shared = Settings()
-    private let appGroupUserDefaults = UserDefaults(suiteName: "group.com.BeginnerQuran.AppGroup")
+    private let appGroupUserDefaults = UserDefaults(suiteName: AppIdentifiers.appGroupSuiteName)
 
     static let encoder: JSONEncoder = {
         let enc = JSONEncoder()

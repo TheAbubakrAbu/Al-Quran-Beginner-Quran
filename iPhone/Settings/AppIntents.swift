@@ -7,16 +7,16 @@ struct AppShortcutsRoot: AppShortcutsProvider {
         AppShortcut(
             intent: PlaySurahAppIntent(),
             phrases: [
-              "Play a surah in \(.applicationName)",
-              "Recite a surah in \(.applicationName)",
-              "Play surah in \(.applicationName)",
-              "Recite surah in \(.applicationName)",
-              "\(.applicationName), play a surah",
-              "\(.applicationName), recite a surah",
-              "\(.applicationName), play surah",
-              "\(.applicationName), recite surah",
-              "شغّل سورة في \(.applicationName)",
-              "اقرأ سورة في \(.applicationName)"
+                "Play a surah in \(.applicationName)",
+                "Recite a surah in \(.applicationName)",
+                "Play surah in \(.applicationName)",
+                "Recite surah in \(.applicationName)",
+                "\(.applicationName), play a surah",
+                "\(.applicationName), recite a surah",
+                "\(.applicationName), play surah",
+                "\(.applicationName), recite surah",
+                "شغّل سورة في \(.applicationName)",
+                "اقرأ سورة في \(.applicationName)",
             ],
             shortTitle: "Play Surah",
             systemImageName: "book"
@@ -36,7 +36,7 @@ struct AppShortcutsRoot: AppShortcutsProvider {
                 "\(.applicationName), play random",
                 "\(.applicationName), recite random",
                 "شغّل سورة عشوائية في \(.applicationName)",
-                "اقرأ سورة عشوائية في \(.applicationName)"
+                "اقرأ سورة عشوائية في \(.applicationName)",
             ],
             shortTitle: "Random Surah",
             systemImageName: "shuffle"

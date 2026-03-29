@@ -18,7 +18,7 @@ struct AlQuranApp: App {
                     TabView {
                         QuranView()
                         
-                        OtherView()
+                        IslamView()
                         
                         SettingsView()
                     }

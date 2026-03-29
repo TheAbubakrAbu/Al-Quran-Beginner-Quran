@@ -45,7 +45,7 @@ struct IslamView: View {
             AlIslamAppsSection()
         }
         .applyConditionalListStyle(defaultView: settings.defaultView)
-        .navigationTitle("Al-Islam")
+        .navigationTitle("Tools")
     }
 
     private var resourcesSection: some View {
@@ -77,10 +77,6 @@ struct IslamView: View {
             #if os(iOS)
             resourceLink(title: "Hijri Calendar Converter", systemImage: "calendar") {
                 DateView()
-            }
-
-            resourceLink(title: "Masjid Locator", systemImage: "mappin.and.ellipse") {
-                MasjidLocatorView()
             }
             #endif
 

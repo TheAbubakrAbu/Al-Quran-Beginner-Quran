@@ -15,11 +15,5 @@
 	</array>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Used to save wallpapers you choose to your Photo Library.</string>
-	<key>NSUserActivityTypes</key>
-	<array>
-		<string>com.Quran.Elmallah.Beginner-Quran.playSurah</string>
-		<string>com.Quran.Elmallah.Beginner-Quran.playLast</string>
-		<string>com.Quran.Elmallah.Beginner-Quran.playRandom</string>
-	</array>
 </dict>
 </plist>

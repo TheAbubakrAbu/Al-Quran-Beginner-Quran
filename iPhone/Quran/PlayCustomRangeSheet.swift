@@ -17,10 +17,15 @@ struct PlayCustomRangeSheet: View {
     @State private var repeatSection: Int
     @State private var repeatPerAyahText: String
     @State private var repeatSectionText: String
+    
+    @FocusState private var startAyahFocused: Bool
+    @FocusState private var endAyahFocused: Bool
+    @FocusState private var repeatPerAyahFocused: Bool
+    @FocusState private var repeatSectionFocused: Bool
 
     private static let repeatMin = 1
     private static let repeatMax = 20
-    private static let repeatOptions = [1, 2, 3, 5, 10, 20]
+    private static let repeatOptions = [1, 2, 3, 5, 10, 15, 20]
 
     private var maxAyah: Int { surah.numberOfAyahs(for: settings.displayQiraahForArabic) }
 
@@ -63,6 +68,123 @@ struct PlayCustomRangeSheet: View {
         max(0, endAyah - startAyah + 1)
     }
 
+    @ViewBuilder
+    private var ayahCountLabel: some View {
+        let label = Text("\(ayahCount) ayah\(ayahCount == 1 ? "" : "s") in range")
+            .font(.caption)
+            .foregroundColor(Color(.tertiaryLabel))
+
+        if #available(iOS 16.0, watchOS 9.0, *) {
+            label.contentTransition(.numericText())
+        } else {
+            label
+        }
+    }
+
+    private func sanitizedNumberText(from value: String) -> String {
+        value.filter(\.isNumber)
+    }
+
+    private func syncAyahTextInput(value: Binding<Int>, text: Binding<String>, isFocused: Bool) {
+        let sanitized = sanitizedNumberText(from: text.wrappedValue)
+        
+        if sanitized != text.wrappedValue {
+            text.wrappedValue = sanitized
+        }
+        
+        // While keyboard is active, allow any value (even empty or invalid)
+        if isFocused {
+            if !sanitized.isEmpty, let parsed = Int(sanitized) {
+                value.wrappedValue = parsed
+            }
+            return
+        }
+        
+        // When keyboard is dismissed, validate and clamp
+        guard !sanitized.isEmpty else {
+            text.wrappedValue = "\(value.wrappedValue)"
+            value.wrappedValue = 1
+            return
+        }
+        
+        let parsed = Int(sanitized) ?? 1
+        let clamped = min(Swift.max(1, parsed), maxAyah)
+        value.wrappedValue = clamped
+        text.wrappedValue = "\(clamped)"
+    }
+
+    private func syncRepeatTextInput(value: Binding<Int>, text: Binding<String>, isFocused: Bool) {
+        let sanitized = sanitizedNumberText(from: text.wrappedValue)
+
+        if sanitized != text.wrappedValue {
+            text.wrappedValue = sanitized
+        }
+
+        // While keyboard is active, allow any value (even empty or invalid)
+        if isFocused {
+            if !sanitized.isEmpty, let parsed = Int(sanitized) {
+                value.wrappedValue = parsed
+            }
+            return
+        }
+        
+        // When keyboard is dismissed, validate and clamp
+        guard !sanitized.isEmpty else {
+            text.wrappedValue = "\(value.wrappedValue)"
+            value.wrappedValue = Self.repeatMin
+            return
+        }
+
+        let parsed = Int(sanitized) ?? Self.repeatMin
+        let clamped = min(Swift.max(Self.repeatMin, parsed), Self.repeatMax)
+        value.wrappedValue = clamped
+        text.wrappedValue = "\(clamped)"
+    }
+
+    private func adjustAyahValue(_ value: Binding<Int>, text: Binding<String>, delta: Int, onChange: @escaping (Int) -> Void) {
+        commitBothAyahFields()
+
+        let newValue = min(Swift.max(1, value.wrappedValue + delta), maxAyah)
+        withAnimation(.easeInOut(duration: 0.15)) {
+            value.wrappedValue = newValue
+            text.wrappedValue = "\(newValue)"
+            onChange(newValue)
+        }
+    }
+
+    private func adjustRepeatValue(_ value: Binding<Int>, text: Binding<String>, delta: Int) {
+        commitRepeatInput(value: value, text: text)
+
+        let newValue = min(Swift.max(Self.repeatMin, value.wrappedValue + delta), Self.repeatMax)
+        withAnimation(.easeInOut(duration: 0.15)) {
+            value.wrappedValue = newValue
+            text.wrappedValue = "\(newValue)"
+        }
+    }
+
+    private func syncRepeatTextInput(value: Binding<Int>, text: Binding<String>) {
+        let sanitized = sanitizedNumberText(from: text.wrappedValue)
+
+        if sanitized != text.wrappedValue {
+            text.wrappedValue = sanitized
+        }
+
+        guard !sanitized.isEmpty else { return }
+
+        let parsed = Int(sanitized) ?? value.wrappedValue
+        let clamped = min(Swift.max(Self.repeatMin, parsed), Self.repeatMax)
+
+        if parsed != clamped {
+            text.wrappedValue = "\(clamped)"
+        }
+
+        if value.wrappedValue != clamped {
+            withAnimation(.easeInOut(duration: 0.18)) {
+                value.wrappedValue = clamped
+            }
+        }
+    }
+
     var body: some View {
         NavigationView {
             ScrollView {
@@ -89,7 +211,7 @@ struct PlayCustomRangeSheet: View {
                     .foregroundColor(settings.accentColor.color)
                 }
             }
-            .safeAreaInset(edge: .bottom, spacing: 0) {
+            .safeAreaInset(edge: .bottom) {
                 playButtonBar
             }
         }
@@ -126,14 +248,20 @@ struct PlayCustomRangeSheet: View {
                 .foregroundColor(.secondary)
 
             HStack(spacing: 12) {
-                rangeField(title: "From", value: $startAyah, text: $startAyahText, max: maxAyah) { new in
-                    if new > endAyah { endAyah = new; endAyahText = "\(endAyah)" }
+                rangeField(title: "From", value: $startAyah, text: $startAyahText, isFocused: $startAyahFocused) { new in
+                    if new > endAyah {
+                        startAyah = endAyah
+                        startAyahText = "\(endAyah)"
+                    }
                 }
                 Image(systemName: "arrow.right")
                     .font(.subheadline.weight(.medium))
                     .foregroundColor(Color(.tertiaryLabel))
-                rangeField(title: "To", value: $endAyah, text: $endAyahText, max: maxAyah) { new in
-                    if new < startAyah { startAyah = new; startAyahText = "\(startAyah)" }
+                rangeField(title: "To", value: $endAyah, text: $endAyahText, isFocused: $endAyahFocused) { new in
+                    if new < startAyah {
+                        endAyah = startAyah
+                        endAyahText = "\(startAyah)"
+                    }
                 }
             }
             .onChange(of: startAyah) { ayah in
@@ -165,17 +293,17 @@ struct PlayCustomRangeSheet: View {
             }
             .buttonStyle(.plain)
 
-            Text("\(ayahCount) ayah\(ayahCount == 1 ? "" : "s") in range")
-                .font(.caption)
-                .foregroundColor(Color(.tertiaryLabel))
+            ayahCountLabel
         }
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(UIColor.secondarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .animation(.easeInOut, value: startAyah)
+        .animation(.easeInOut, value: endAyah)
     }
 
-    private func rangeField(title: String, value: Binding<Int>, text: Binding<String>, max: Int, onChange: @escaping (Int) -> Void) -> some View {
+    private func rangeField(title: String, value: Binding<Int>, text: Binding<String>, isFocused: FocusState<Bool>.Binding, onChange: @escaping (Int) -> Void) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title)
                 .font(.caption)
@@ -183,12 +311,7 @@ struct PlayCustomRangeSheet: View {
             HStack(spacing: 0) {
                 Button {
                     settings.hapticFeedback()
-                    withAnimation(.easeInOut(duration: 0.15)) {
-                        let new = value.wrappedValue > 1 ? value.wrappedValue - 1 : 1
-                        value.wrappedValue = new
-                        text.wrappedValue = "\(new)"
-                        onChange(new)
-                    }
+                    adjustAyahValue(value, text: text, delta: -1, onChange: onChange)
                 } label: {
                     Image(systemName: "minus.circle.fill")
                         .font(.title2)
@@ -198,32 +321,37 @@ struct PlayCustomRangeSheet: View {
                 .disabled(value.wrappedValue <= 1)
 
                 Spacer()
+                
                 TextField("", text: text)
                     .font(.title2.monospacedDigit().weight(.semibold))
                     .foregroundColor(.primary)
                     .multilineTextAlignment(.center)
                     .keyboardType(.numberPad)
                     .frame(minWidth: 44, alignment: .center)
+                    .focused(isFocused)
+                    .onChange(of: text.wrappedValue) { _ in
+                        syncAyahTextInput(value: value, text: text, isFocused: isFocused.wrappedValue)
+                    }
+                    .onChange(of: isFocused.wrappedValue) { newValue in
+                        // When keyboard dismisses (newValue = false), validate both fields together
+                        if !newValue {
+                            commitBothAyahFields()
+                        }
+                    }
                     .onSubmit {
-                        commitAyahInput(value: value, text: text, max: max, onChange: onChange)
+                        commitBothAyahFields()
                     }
                 Spacer()
-
                 Button {
                     settings.hapticFeedback()
-                    withAnimation(.easeInOut(duration: 0.15)) {
-                        let new = value.wrappedValue < max ? value.wrappedValue + 1 : max
-                        value.wrappedValue = new
-                        text.wrappedValue = "\(new)"
-                        onChange(new)
-                    }
+                    adjustAyahValue(value, text: text, delta: 1, onChange: onChange)
                 } label: {
                     Image(systemName: "plus.circle.fill")
                         .font(.title2)
-                        .foregroundStyle(value.wrappedValue < max ? settings.accentColor.color : Color(UIColor.tertiaryLabel))
+                        .foregroundStyle(value.wrappedValue < maxAyah ? settings.accentColor.color : Color(UIColor.tertiaryLabel))
                 }
                 .buttonStyle(.plain)
-                .disabled(value.wrappedValue >= max)
+                .disabled(value.wrappedValue >= maxAyah)
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
@@ -242,14 +370,22 @@ struct PlayCustomRangeSheet: View {
     }
 
     private func commitBothAyahFields() {
-        let s = min(Swift.max(1, Int(startAyahText.trimmingCharacters(in: .whitespaces)) ?? startAyah), maxAyah)
-        let e = min(Swift.max(1, Int(endAyahText.trimmingCharacters(in: .whitespaces)) ?? endAyah), maxAyah)
-        let from = min(s, e)
-        let to = Swift.max(s, e)
+        let s = Int(startAyahText.trimmingCharacters(in: .whitespaces)) ?? startAyah
+        let e = Int(endAyahText.trimmingCharacters(in: .whitespaces)) ?? endAyah
+        
+        // Clamp to 1...maxAyah (handles negatives and out-of-range)
+        let clampedStart = min(Swift.max(1, s), maxAyah)
+        let clampedEnd = min(Swift.max(1, e), maxAyah)
+        
+        // Ensure start <= end (if not, swap to make valid range)
+        let from = min(clampedStart, clampedEnd)
+        let to = Swift.max(clampedStart, clampedEnd)
+        
         startAyah = from
         endAyah = to
         startAyahText = "\(from)"
         endAyahText = "\(to)"
+        
         #if canImport(UIKit)
         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
         #endif
@@ -261,8 +397,8 @@ struct PlayCustomRangeSheet: View {
                 .font(.subheadline.weight(.semibold))
                 .foregroundColor(.secondary)
 
-            repeatRow(title: "Each ayah", value: $repeatPerAyah, text: $repeatPerAyahText)
-            repeatRow(title: "Whole section", value: $repeatSection, text: $repeatSectionText)
+            repeatRow(title: "Each ayah", value: $repeatPerAyah, text: $repeatPerAyahText, isFocused: $repeatPerAyahFocused)
+            repeatRow(title: "Whole section", value: $repeatSection, text: $repeatSectionText, isFocused: $repeatSectionFocused)
         }
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -311,11 +447,13 @@ struct PlayCustomRangeSheet: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(Color(UIColor.secondarySystemGroupedBackground))
                 .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .animation(.easeInOut, value: startAyah)
+                .animation(.easeInOut, value: endAyah)
             }
         }
     }
 
-    private func repeatRow(title: String, value: Binding<Int>, text: Binding<String>) -> some View {
+    private func repeatRow(title: String, value: Binding<Int>, text: Binding<String>, isFocused: FocusState<Bool>.Binding) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title)
                 .font(.caption)
@@ -326,7 +464,7 @@ struct PlayCustomRangeSheet: View {
                         ForEach(Self.repeatOptions, id: \.self) { n in
                             Button {
                                 settings.hapticFeedback()
-                                withAnimation(.easeInOut(duration: 0.15)) {
+                                withAnimation {
                                     value.wrappedValue = n
                                     text.wrappedValue = "\(n)"
                                 }
@@ -349,7 +487,7 @@ struct PlayCustomRangeSheet: View {
                 }
                 .frame(maxWidth: .infinity)
 
-                repeatStepper(value: value, text: text)
+                repeatStepper(value: value, text: text, isFocused: isFocused)
             }
         }
         .onChange(of: value.wrappedValue) { newValue in
@@ -357,15 +495,11 @@ struct PlayCustomRangeSheet: View {
         }
     }
 
-    private func repeatStepper(value: Binding<Int>, text: Binding<String>) -> some View {
+    private func repeatStepper(value: Binding<Int>, text: Binding<String>, isFocused: FocusState<Bool>.Binding) -> some View {
         HStack(spacing: 4) {
             Button {
                 settings.hapticFeedback()
-                withAnimation(.easeInOut(duration: 0.15)) {
-                    let new = value.wrappedValue > Self.repeatMin ? value.wrappedValue - 1 : Self.repeatMin
-                    value.wrappedValue = new
-                    text.wrappedValue = "\(new)"
-                }
+                adjustRepeatValue(value, text: text, delta: -1)
             } label: {
                 Image(systemName: "minus.circle.fill")
                     .font(.body)
@@ -380,15 +514,21 @@ struct PlayCustomRangeSheet: View {
                 .multilineTextAlignment(.center)
                 .keyboardType(.numberPad)
                 .frame(width: 32, alignment: .center)
-                .onSubmit { commitRepeatInput(value: value, text: text) }
+                .focused(isFocused)
+                .onChange(of: text.wrappedValue) { _ in
+                    syncRepeatTextInput(value: value, text: text, isFocused: isFocused.wrappedValue)
+                }
+                .onChange(of: isFocused.wrappedValue) { newValue in
+                    // When keyboard dismisses (newValue = false), validate
+                    if !newValue {
+                        commitAllRepeatFields()
+                    }
+                }
+                .onSubmit { commitAllRepeatFields() }
 
             Button {
                 settings.hapticFeedback()
-                withAnimation(.easeInOut(duration: 0.15)) {
-                    let new = value.wrappedValue < Self.repeatMax ? value.wrappedValue + 1 : Self.repeatMax
-                    value.wrappedValue = new
-                    text.wrappedValue = "\(new)"
-                }
+                adjustRepeatValue(value, text: text, delta: 1)
             } label: {
                 Image(systemName: "plus.circle.fill")
                     .font(.body)
@@ -416,8 +556,7 @@ struct PlayCustomRangeSheet: View {
     }
 
     private var playButtonBar: some View {
-        VStack(spacing: 0) {
-            Divider()
+        VStack(spacing: SafeAreaInsetVStackSpacing.standard) {
             Button {
                 settings.hapticFeedback()
                 commitBothAyahFields()
@@ -438,7 +577,7 @@ struct PlayCustomRangeSheet: View {
             }
             .buttonStyle(.plain)
             .disabled(!canPlay)
-            .padding(.horizontal, 20)
+            .padding(.horizontal, 24)
             .padding(.vertical, 12)
             .background(Color(UIColor.systemGroupedBackground))
         }
@@ -446,8 +585,13 @@ struct PlayCustomRangeSheet: View {
 }
 
 #Preview {
-    QuranView()
-        .environmentObject(Settings.shared)
-        .environmentObject(QuranData.shared)
-        .environmentObject(QuranPlayer.shared)
+    AlIslamPreviewContainer(embedInNavigation: false) {
+        PlayCustomRangeSheet(
+            surah: AlIslamPreviewData.surah,
+            initialStartAyah: 1,
+            initialEndAyah: min(5, AlIslamPreviewData.surah.numberOfAyahs(for: AlIslamPreviewData.settings.displayQiraahForArabic)),
+            onPlay: { _, _, _, _ in },
+            onCancel: {}
+        )
+    }
 }

@@ -1,10 +1,5 @@
 import SwiftUI
 
-/// Holds the current image generation request id so completion blocks can check against the latest (avoids applying stale images after many rapid toggles).
-private final class ShareImageGenerationId: ObservableObject {
-    var value: Int = 0
-}
-
 enum ActionMode: String {
     case text
     case image
@@ -32,7 +27,8 @@ struct ShareAyahSheet: View {
     @State private var activityItems: [Any] = []
     @State private var showingActivityView = false
     @State private var includeNote: Bool = false
-    @StateObject private var imageGenerationIdHolder = ShareImageGenerationId()
+    @State private var isGeneratingImage = false
+    @State private var isSharing = false
     private static let shareImageQueue = DispatchQueue(label: "app.shareAyah.imageGeneration", qos: .userInitiated)
     
     private func fetchNote() -> String? {
@@ -161,14 +157,14 @@ struct ShareAyahSheet: View {
     private static func qiraahLabels(displayQiraah: String) -> (english: String, arabic: String) {
         let key = displayQiraah.isEmpty ? "" : displayQiraah
         let map: [(tag: String, en: String, ar: String)] = [
-            ("", "Hafs an Asim (default)", "حَفْص عَنْ عَاصِم"),
-            ("Warsh an Nafi", "Warsh an Nafi", "وَرْش عَنْ نَافِع"),
-            ("Qaloon an Nafi", "Qaloon an Nafi", "قَالُون عَنْ نَافِع"),
-            ("Ad-Duri an Abi Amr", "Ad-Duri an Abi Amr", "الدُّورِي عَنْ أَبِي عَمْرٍو"),
-            ("Al-Buzzi an Ibn Kathir", "Al-Buzzi an Ibn Kathir", "البَزِّي عَنْ ابْنِ كَثِيرٍ"),
-            ("Qunbul an Ibn Kathir", "Qunbul an Ibn Kathir", "قُنْبُل عَنْ ابْنِ كَثِيرٍ"),
-            ("Shu'bah an Asim", "Shu'bah an Asim", "شُعْبَة عَنْ عَاصِم"),
-            ("As-Susi an Abi Amr", "As-Susi an Abi Amr", "السُّوسِي عَنْ أَبِي عَمْرٍو")
+            ("", "Hafs an Asim (default)", "حَفص عَن عَاصِم"),
+            ("Warsh an Nafi", "Warsh an Nafi", "وَرش عَن نَافِع"),
+            ("Qaloon an Nafi", "Qaloon an Nafi", "قَالُون عَن نَافِع"),
+            ("Ad-Duri an Abi Amr", "Ad-Duri an Abi Amr", "الدُّورِي عَن أَبِي عَمرٍو"),
+            ("Al-Buzzi an Ibn Kathir", "Al-Buzzi an Ibn Kathir", "البَزِّي عَن ابنِ كَثِيرٍ"),
+            ("Qunbul an Ibn Kathir", "Qunbul an Ibn Kathir", "قُنبُل عَن ابنِ كَثِيرٍ"),
+            ("Shu'bah an Asim", "Shu'bah an Asim", "شُعبَة عَن عَاصِم"),
+            ("As-Susi an Abi Amr", "As-Susi an Abi Amr", "السُّوسِي عَن أَبِي عَمرٍو")
         ]
         
         return map.first(where: { $0.tag == key }).map { ($0.en, $0.ar) } ?? (map[0].en, map[0].ar)
@@ -179,7 +175,7 @@ struct ShareAyahSheet: View {
             VStack {
                 Spacer()
                 
-                Group {
+                ZStack {
                     if actionMode == .image {
                         if let img = generatedImage {
                             Image(uiImage: img)
@@ -188,6 +184,12 @@ struct ShareAyahSheet: View {
                                 .cornerRadius(24)
                                 .padding(.horizontal, 16)
                                 .contextMenu { copyMenu(image: img) }
+                                .transition(.opacity.combined(with: .scale(scale: 0.98)))
+                        } else {
+                            ProgressView("Preparing image…")
+                                .foregroundColor(settings.accentColor.color)
+                                .padding(.vertical, 40)
+                                .transition(.opacity)
                         }
                     } else {
                         Text(shareText)
@@ -200,8 +202,14 @@ struct ShareAyahSheet: View {
                             .contextMenu { copyMenu(image: generatedImage) }
                             .lineLimit(nil)
                             .minimumScaleFactor(0.1)
+                            .transition(.opacity.combined(with: .scale(scale: 0.98)))
                     }
                 }
+                .scaleEffect(isSharing ? 0.98 : 1)
+                .opacity(isGeneratingImage && actionMode == .image ? 0.72 : 1)
+                .animation(.easeInOut, value: actionMode)
+                .animation(.easeInOut, value: isGeneratingImage)
+                .animation(.easeInOut, value: isSharing)
                 
                 Spacer()
 
@@ -227,7 +235,7 @@ struct ShareAyahSheet: View {
                                 .padding(.vertical, 2)
                         }
                         
-                        if shareSettings.arabic {
+                        if shareSettings.arabic && actionMode == .image {
                             Picker("Arabic Font", selection: Binding(
                                 get: { shareSettings.shareArabicFont.isEmpty ? (settings.fontArabic) : shareSettings.shareArabicFont },
                                 set: { val in
@@ -272,11 +280,12 @@ struct ShareAyahSheet: View {
                         Toggle("Include Riwayah/Qiraah type", isOn: Binding(
                             get: { shareSettings.includeQiraah },
                             set: { shareIncludeRiwayah = $0; shareSettings = ShareSettings(arabic: shareSettings.arabic, transliteration: shareSettings.transliteration, englishSaheeh: shareSettings.englishSaheeh, englishMustafa: shareSettings.englishMustafa, includeQiraah: $0, shareArabicFont: shareSettings.shareArabicFont, cleanArabic: shareSettings.cleanArabic) }
-                        ).animation(.easeInOut))
-                            .tint(settings.accentColor.color)
-                            .scaleEffect(0.8)
-                            .padding(.horizontal, -24)
-                            .padding(.vertical, 2)
+                        )
+                        .animation(.easeInOut))
+                        .tint(settings.accentColor.color)
+                        .scaleEffect(0.8)
+                        .padding(.horizontal, -24)
+                        .padding(.vertical, 2)
                     }
                 }
                 .frame(maxHeight: 200)
@@ -290,8 +299,13 @@ struct ShareAyahSheet: View {
                 .padding(.vertical, 4)
                 
                 HStack(spacing: 12) {
-                    actionButton("Copy")   { performCopyOrGenerate() }
-                    actionButton("Share")  { performShareOrGenerate() }
+                    actionButton("Copy") {
+                        performCopyOrGenerate()
+                    }
+                    
+                    actionButton("Share", isAnimating: isSharing)  {
+                        performShareOrGenerate()
+                    }
                 }
                 .padding(.horizontal, 16)
                 .padding(.bottom)
@@ -331,6 +345,7 @@ struct ShareAyahSheet: View {
 
         .onChange(of: actionMode) { newValue in
             storedActionModeRaw = newValue.rawValue
+            isGeneratingImage = false
             if newValue == .image && generatedImage == nil {
                 generatePreviewImage()
             }
@@ -354,27 +369,53 @@ struct ShareAyahSheet: View {
         .padding(.vertical, 4)
     }
     
-    private func actionButton(_ title: String, action: @escaping () -> Void) -> some View {
+    private func actionButton(_ title: String, isAnimating: Bool = false, action: @escaping () -> Void) -> some View {
         Button(action: {
-            settings.hapticFeedback(); action()
+            settings.hapticFeedback()
+            action()
         }) {
             Text(title)
                 .frame(maxWidth: .infinity)
                 .padding()
-                .background(settings.accentColor.color)
-                .cornerRadius(24)
                 .foregroundColor(.primary)
+                .scaleEffect(isAnimating ? 0.96 : 1)
         }
+        .conditionalGlassEffect(useColor: 0.25)
     }
     
     private func copyMenu(image: UIImage?) -> some View {
         Group {
             Button { UIPasteboard.general.string = shareText }  label: { Label("Copy Text", systemImage: "doc.on.doc") }
-            Button {
-                if let img = image { UIPasteboard.general.image = img }
-            } label: { Label("Copy Image", systemImage: "doc.on.doc.fill") }
+            if let image {
+                Button {
+                    UIPasteboard.general.image = image
+                } label: { Label("Copy Image", systemImage: "doc.on.doc.fill") }
+            }
         }
     }
+
+    private func animateShare(completion: @escaping () -> Void) {
+        withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+            isSharing = true
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+            completion()
+
+            withAnimation(.easeOut(duration: 0.18)) {
+                isSharing = false
+            }
+        }
+    }
+
+    private func presentShareSheet(with items: [Any]) {
+        animateShare {
+            activityItems = items
+            showingActivityView = true
+        }
+    }
+
+
     
     private func performCopyOrGenerate() {
         switch actionMode {
@@ -386,7 +427,10 @@ struct ShareAyahSheet: View {
                 UIPasteboard.general.image = img
                 presentationMode.wrappedValue.dismiss()
             } else {
-                generatePreviewImage()
+                generatePreviewImage { img in
+                    UIPasteboard.general.image = img
+                    presentationMode.wrappedValue.dismiss()
+                }
             }
         }
     }
@@ -394,30 +438,31 @@ struct ShareAyahSheet: View {
     private func performShareOrGenerate() {
         switch actionMode {
         case .text:
-            activityItems = [shareText]; showingActivityView = true
+            presentShareSheet(with: [shareText])
         case .image:
             if let img = generatedImage {
-                activityItems = [img]; showingActivityView = true
+                presentShareSheet(with: [img])
             } else {
-                generatePreviewImage()
+                generatePreviewImage { img in
+                    presentShareSheet(with: [img])
+                }
             }
         }
     }
     
-    private func generatePreviewImage() {
-        imageGenerationIdHolder.value += 1
-        let requestId = imageGenerationIdHolder.value
-        let idHolder = imageGenerationIdHolder
+    private func generatePreviewImage(completion: @escaping (UIImage) -> Void = { _ in }) {
+        DispatchQueue.main.async {
+            self.isGeneratingImage = true
+        }
         Self.shareImageQueue.async { [self] in
             let img: UIImage = autoreleasepool { self.drawImage() }
             DispatchQueue.main.async {
-                guard idHolder.value == requestId else { return }
-                withAnimation(.easeInOut) {
-                    self.generatedImage = img
-                    if self.actionMode == .image {
-                        self.activityItems = [img]
-                    }
+                self.generatedImage = img
+                self.isGeneratingImage = false
+                if self.actionMode == .image {
+                    self.activityItems = [img]
                 }
+                completion(img)
             }
         }
     }
@@ -539,9 +584,9 @@ struct ShareAyahSheet: View {
             append("\(surah.numberOfAyahs) Ayahs – \(surah.type.capitalized) \(surah.type == "meccan" ? "🕋" : "🕌")", captionCentAttr)
         }
         // --- Watermark
-        let wmString = "Al-Quran | Beginner Quran"
+        let wmString = "Al-Islam | Islamic Pillars"
         let wmText = NSAttributedString(string: wmString, attributes: centAccent)
-        var logo = UIImage(named: "Al-Quran")
+        var logo = UIImage(named: "Al-Islam")
         
         var wmTextSize = wmText.size()
         var logoSize = CGSize(width: wmTextSize.height, height: wmTextSize.height)
@@ -746,9 +791,9 @@ extension ShareAyahSheet {
             if shareSettings.includeQiraah { append("\n", bodyAttr) } else { sepIfNeeded() }
             append("\(surah.numberOfAyahs) Ayahs – \(surah.type.capitalized) \(surah.type == "meccan" ? "🕋" : "🕌")", captionCentAttr)
         }
-        let wmString = "Al-Quran | Islamic Pillars"
+        let wmString = "Al-Islam | Islamic Pillars"
         let wmText = NSAttributedString(string: wmString, attributes: centAccent)
-        var logo = UIImage(named: "Al-Quran")
+        var logo = UIImage(named: "Al-Islam")
         var wmTextSize = wmText.size()
         var logoSize = CGSize(width: wmTextSize.height, height: wmTextSize.height)
         let availWidth = maxWidth - 2 * padding
@@ -801,8 +846,7 @@ struct ActivityView: UIViewControllerRepresentable {
 extension Color { var uiColor: UIColor { UIColor(self) } }
 
 #Preview {
-    ShareAyahSheet(surahNumber: 2, ayahNumber: 5)
-        .environmentObject(Settings.shared)
-        .environmentObject(QuranData.shared)
-        .environmentObject(QuranPlayer.shared)
+    AlIslamPreviewContainer(embedInNavigation: false) {
+        ShareAyahSheet(surahNumber: 2, ayahNumber: 5)
+    }
 }

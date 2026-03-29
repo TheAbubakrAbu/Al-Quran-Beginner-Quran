@@ -9,6 +9,7 @@ struct AyahRow: View {
     
     #if !os(watchOS)
     @State private var showingAyahSheet = false
+    @State private var showTafsirSheet = false
     
     @State private var showingNoteSheet = false
     @State private var draftNote: String = ""
@@ -74,7 +75,55 @@ struct AyahRow: View {
     private func spacedArabic(_ text: String) -> String {
         (settings.beginnerMode || ayahBeginnerMode) ? text.map { "\($0) " }.joined() : text
     }
-    
+
+    private func arabicDisplayText() -> String {
+        let baseText = ayah.displayArabicText(surahId: surah.id, clean: settings.cleanArabicText, qiraahOverride: comparisonQiraahOverride)
+        return spacedArabic(baseText)
+    }
+
+    private var shouldShowTajweedColors: Bool {
+        let usingHafs: Bool = if let override = comparisonQiraahOverride {
+            override.isEmpty || override == "Hafs"
+        } else {
+            settings.isHafsDisplay
+        }
+
+        return settings.showTajweedColors
+            && settings.showArabicText
+            && usingHafs
+            && !settings.cleanArabicText
+            && !(settings.beginnerMode || ayahBeginnerMode)
+    }
+
+    private func arabicTajweedText() -> AttributedString? {
+        guard shouldShowTajweedColors else { return nil }
+        let text = ayah.displayArabicText(surahId: surah.id, clean: false, qiraahOverride: comparisonQiraahOverride)
+        return TajweedStore.shared.attributedText(surah: surah.id, ayah: ayah.id, text: text)
+    }
+
+    private var tajweedAnimationKey: String {
+        let categorySignature = TajweedLegendCategory.allCases
+            .map { settings.isTajweedCategoryVisible($0) ? "1" : "0" }
+            .joined()
+        let qiraahKey = comparisonQiraahOverride ?? settings.displayQiraah
+        return [
+            settings.showTajweedColors ? "1" : "0",
+            settings.cleanArabicText ? "1" : "0",
+            (settings.beginnerMode || ayahBeginnerMode) ? "1" : "0",
+            qiraahKey,
+            categorySignature
+        ].joined(separator: "|")
+    }
+
+    #if !os(watchOS)
+    private var ayahHighlightBackgroundVerticalPadding: CGFloat {
+        if #available(iOS 26.0, *) {
+            return -11
+        }
+        return -2
+    }
+    #endif
+
     var body: some View {
         let isBookmarked = isBookmarkedHere
         let showArabic = settings.showArabicText
@@ -94,60 +143,97 @@ struct AyahRow: View {
                     .fill(
                         currentAyah == ayah.id
                         ? settings.accentColor.color.opacity(settings.defaultView ? 0.15 : 0.25)
-                        : .white.opacity(0.0001)
+                        : .white.opacity(0.00001)
                     )
                     .padding(.horizontal, -12)
                     #if !os(watchOS)
-                    .padding(.vertical, -11)
+                    .padding(.vertical, ayahHighlightBackgroundVerticalPadding)
                     #endif
-                    .transition(.opacity)
-                    .animation(.easeInOut, value: currentAyah == ayah.id)
             }
             
             VStack(alignment: .leading, spacing: 0) {
-                HStack {
-                    Text(ayah.idArabic)
+                HStack(spacing: 4) {
+                    Text("\(surah.id):\(ayah.id)")
+                        .font(.subheadline.monospacedDigit().weight(.semibold))
                         .foregroundColor(settings.accentColor.color)
+                        .padding(5)
+                        .frame(width: 60, height: 28)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.5)
+                        .conditionalGlassEffect(useColor: 0.1)
                         #if !os(watchOS)
-                        .font(.custom(settings.fontArabic, size: UIFont.preferredFont(forTextStyle: .largeTitle).pointSize))
-                        #else
-                        .font(.custom(settings.fontArabic, size: UIFont.preferredFont(forTextStyle: .title2).pointSize))
+                        .onTapGesture {
+                            settings.hapticFeedback()
+                            showingAyahSheet = true
+                        }
                         #endif
                     
                     Spacer()
                     
                     #if os(watchOS)
                     Image(systemName: isBookmarked ? "bookmark.fill" : "bookmark")
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 22, height: 22)
                         .foregroundColor(settings.accentColor.color)
-                        .font(.system(size: UIFont.preferredFont(forTextStyle: .title3).pointSize))
-                        .onTapGesture {
-                            settings.hapticFeedback()
-                            settings.toggleBookmark(surah: surah.id, ayah: ayah.id)
-                        }
+                        
                     #else
                     if isBookmarked {
                         Image(systemName: "bookmark.fill")
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: 22, height: 22)
                             .foregroundColor(settings.accentColor.color)
-                            .font(.system(size: UIFont.preferredFont(forTextStyle: .title3).pointSize))
                             .transition(.opacity)
+                    }
+
+                    if settings.isHafsDisplay {
+                        Menu {
+                            playbackMenuBlock()
+                        } label: {
+                            Image(systemName: "play.circle")
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .frame(width: 25, height: 25)
+                                .foregroundColor(settings.accentColor.color)
+                                .conditionalGlassEffect()
+                                .frame(width: 28, height: 28)
+                        }
                     }
                     
                     Menu {
-                        menuBlock(isBookmarked: isBookmarked)
+                        menuBlock(isBookmarked: isBookmarked, includePlaybackOptions: false)
                     } label: {
-                        ZStack(alignment: .trailing) {
-                            Rectangle().fill(.clear).frame(width: 32, height: 32)
-                            Image(systemName: "ellipsis.circle")
-                                .font(.system(size: UIFont.preferredFont(forTextStyle: .title2).pointSize))
-                                .foregroundColor(settings.accentColor.color)
-                                .padding(.trailing, -2)
-                        }
+                        Image(systemName: "ellipsis.circle")
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: 25, height: 25)
+                            .foregroundColor(settings.accentColor.color)
+                            .conditionalGlassEffect()
+                            .frame(width: 28, height: 28)
                     }
                     .sheet(isPresented: $showingAyahSheet) {
                         ShareAyahSheet(
                             surahNumber: surah.id,
                             ayahNumber: ayah.id
                         )
+                    }
+                    .sheet(isPresented: $showTafsirSheet) {
+                        if #available(iOS 16.0, *) {
+                            AyahTafsirSheet(
+                                surahName: surah.nameTransliteration,
+                                surahNumber: surah.id,
+                                ayahNumber: ayah.id
+                            )
+                            .presentationDetents([.medium, .large])
+                            .presentationDragIndicator(.visible)
+                        } else {
+                            AyahTafsirSheet(
+                                surahName: surah.nameTransliteration,
+                                surahNumber: surah.id,
+                                ayahNumber: ayah.id
+                            )
+                        }
                     }
                     .sheet(isPresented: $showingNoteSheet) {
                         NoteEditorSheet(
@@ -168,8 +254,8 @@ struct AyahRow: View {
                     }
                     #endif
                 }
-                .padding(.top, -8)
-                .padding(.bottom, settings.showArabicText ? -7 : 0)
+                .padding(.bottom, settings.showArabicText ? 8 : 2)
+                .padding(.trailing, 1)
                 
                 Group {
                     #if !os(watchOS)
@@ -205,10 +291,9 @@ struct AyahRow: View {
         .lineLimit(nil)
         #if !os(watchOS)
         .contextMenu {
-            menuBlock(isBookmarked: isBookmarked)
+            menuBlock(isBookmarked: isBookmarked, includePlaybackOptions: true)
         }
         #endif
-        .animation(.easeInOut, value: quranPlayer.currentAyahNumber)
         .confirmationDialog("Note not saved", isPresented: $showRespectAlert, titleVisibility: .visible) {
             Button("OK", role: .cancel) { }
         } message: {
@@ -259,7 +344,7 @@ struct AyahRow: View {
         let prefixOnSaheeh    = groupHasEnglishOrTranslit && !showTranslit && showEnglishSaheeh
         let prefixOnMustafa   = groupHasEnglishOrTranslit && !showTranslit && !showEnglishSaheeh && showEnglishMustafa
 
-        VStack(alignment: .leading, spacing: 18) {
+        VStack(alignment: .leading, spacing: 14) {
             if !currentNote.isEmpty {
                 HStack(alignment: .top, spacing: 8) {
                     Image(systemName: "note.text")
@@ -293,13 +378,18 @@ struct AyahRow: View {
 
             if showArabic {
                 HighlightedSnippet(
-                    source: spacedArabic(ayah.displayArabicText(surahId: surah.id, clean: settings.cleanArabicText, qiraahOverride: comparisonQiraahOverride)),
+                    source: arabicDisplayText(),
                     term: searchText,
                     font: .custom(settings.fontArabic, size: settings.fontArabicSize),
                     accent: settings.accentColor.color,
                     fg: .primary,
-                    beginnerMode: (settings.beginnerMode || ayahBeginnerMode)
+                    preStyledSource: arabicTajweedText(),
+                    beginnerMode: (settings.beginnerMode || ayahBeginnerMode),
+                    trailingSuffix: " \(ayah.idArabic)",
+                    trailingSuffixFont: .custom("KFGQPCQUMBULUthmanicScript-Regu", size: settings.fontArabicSize),
+                    trailingSuffixColor: settings.accentColor.color
                 )
+                .animation(.easeInOut, value: tajweedAnimationKey)
                 .multilineTextAlignment(.trailing)
                 .frame(maxWidth: .infinity, alignment: .trailing)
                 .lineLimit(nil)
@@ -374,10 +464,115 @@ struct AyahRow: View {
         }
     }
 
+    #if !os(watchOS)
     @ViewBuilder
-    private func menuBlock(isBookmarked: Bool) -> some View {
+    private func playbackMenuBlock() -> some View {
+        let repeatOptions = [2, 3, 5, 10, 15, 20]
+
+        Group {
+            Menu {
+                ForEach(repeatOptions, id: \.self) { count in
+                    Button {
+                        settings.hapticFeedback()
+                        quranPlayer.playAyah(surahNumber: surah.id, ayahNumber: ayah.id, repeatCount: count)
+                    } label: {
+                        Label("Repeat \(count)×", systemImage: "\(count).circle")
+                    }
+                }
+
+                Button {
+                    settings.hapticFeedback()
+                    showCustomRangeSheet = true
+                } label: {
+                    Label("Play Custom Range", systemImage: "slider.horizontal.3")
+                }
+            } label: {
+                Label("Repeat Ayah", systemImage: "repeat")
+            }
+            
+            Button {
+                settings.hapticFeedback()
+                showCustomRangeSheet = true
+            } label: {
+                Label("Play Custom Range", systemImage: "slider.horizontal.3")
+            }
+
+            Button {
+                settings.hapticFeedback()
+                quranPlayer.playAyah(surahNumber: surah.id, ayahNumber: ayah.id, continueRecitation: true)
+            } label: {
+                Label("Play From Ayah", systemImage: "play.circle.fill")
+            }
+            
+            Button {
+                settings.hapticFeedback()
+                quranPlayer.playAyah(surahNumber: surah.id, ayahNumber: ayah.id)
+            } label: {
+                Label("Play This Ayah", systemImage: "play.circle")
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func contextPlaybackMenuBlock() -> some View {
+        let repeatOptions = [2, 3, 5, 10, 15, 20]
+
+        Menu {
+            ForEach(repeatOptions, id: \.self) { count in
+                Button {
+                    settings.hapticFeedback()
+                    quranPlayer.playAyah(surahNumber: surah.id, ayahNumber: ayah.id, repeatCount: count)
+                } label: {
+                    Label("Repeat \(count)×", systemImage: "\(count).circle")
+                }
+            }
+
+            Button {
+                settings.hapticFeedback()
+                showCustomRangeSheet = true
+            } label: {
+                Label("Play Custom Range", systemImage: "slider.horizontal.3")
+            }
+        } label: {
+            Label("Repeat Ayah", systemImage: "repeat")
+        }
+
+        Menu {
+            Button {
+                settings.hapticFeedback()
+                showCustomRangeSheet = true
+            } label: {
+                Label("Play Custom Range", systemImage: "slider.horizontal.3")
+            }
+
+            Button {
+                settings.hapticFeedback()
+                quranPlayer.playAyah(surahNumber: surah.id, ayahNumber: ayah.id, continueRecitation: true)
+            } label: {
+                Label("Play From Ayah", systemImage: "play.circle.fill")
+            }
+            
+            Button {
+                settings.hapticFeedback()
+                quranPlayer.playAyah(surahNumber: surah.id, ayahNumber: ayah.id)
+            } label: {
+                Label("Play This Ayah", systemImage: "play.circle")
+            }
+        } label: {
+            Label("Play Ayah", systemImage: "play.circle")
+        }
+    }
+    #endif
+
+    @ViewBuilder
+    private func menuBlock(isBookmarked: Bool, includePlaybackOptions: Bool) -> some View {
         #if !os(watchOS)
-        let repeatOptions = [2, 3, 5, 10, 15]
+        let canShowTafsir: Bool = {
+            if let override = comparisonQiraahOverride {
+                return override.isEmpty || override == "Hafs"
+            }
+            return settings.isHafsDisplay
+        }()
 
         VStack(alignment: .leading) {
             Button(role: isBookmarked ? .destructive : nil) {
@@ -390,64 +585,6 @@ struct AyahRow: View {
                 )
             }
             
-            if settings.showArabicText && !settings.beginnerMode {
-                Button {
-                    settings.hapticFeedback()
-                    withAnimation {
-                        ayahBeginnerMode.toggle()
-                    }
-                } label: {
-                    Label("Beginner Mode",
-                          systemImage: ayahBeginnerMode
-                          ? "textformat.size.larger.ar"
-                          : "textformat.size.ar")
-                }
-            }
-            
-            if settings.isHafsDisplay {
-                Divider()
-                
-                Menu {
-                    ForEach(repeatOptions, id: \.self) { count in
-                        Button {
-                            settings.hapticFeedback()
-                            quranPlayer.playAyah(surahNumber: surah.id, ayahNumber: ayah.id, repeatCount: count)
-                        } label: {
-                            Label("Repeat \(count)×", systemImage: "repeat")
-                        }
-                    }
-                } label: {
-                    Label("Repeat Ayah", systemImage: "repeat")
-                }
-                
-                Menu {
-                    Button {
-                        settings.hapticFeedback()
-                        quranPlayer.playAyah(surahNumber: surah.id, ayahNumber: ayah.id)
-                    } label: {
-                        Label("Play This Ayah", systemImage: "play.circle")
-                    }
-                    
-                    Button {
-                        settings.hapticFeedback()
-                        quranPlayer.playAyah(surahNumber: surah.id, ayahNumber: ayah.id, continueRecitation: true)
-                    } label: {
-                        Label("Play From Ayah", systemImage: "play.circle.fill")
-                    }
-                    
-                    Button {
-                        settings.hapticFeedback()
-                        showCustomRangeSheet = true
-                    } label: {
-                        Label("Play Custom Range", systemImage: "slider.horizontal.3")
-                    }
-                } label: {
-                    Label("Play Ayah", systemImage: "play.circle")
-                }
-                
-                Divider()
-            }
-                        
             Button {
                 settings.hapticFeedback()
                 if !isBookmarked {
@@ -467,8 +604,36 @@ struct AyahRow: View {
                     Label("Remove Note", systemImage: "trash")
                 }
             }
+
+            if canShowTafsir {
+                Button {
+                    settings.hapticFeedback()
+                    showTafsirSheet = true
+                } label: {
+                    Label("See Tafsir", systemImage: "text.book.closed")
+                }
+            }
+            
+            if settings.showArabicText && !settings.beginnerMode {
+                Button {
+                    settings.hapticFeedback()
+                    withAnimation {
+                        ayahBeginnerMode.toggle()
+                    }
+                } label: {
+                    Label("Beginner Mode",
+                          systemImage: ayahBeginnerMode
+                          ? "textformat.size.larger.ar"
+                          : "textformat.size.ar")
+                }
+            }
             
             Divider()
+            
+            if includePlaybackOptions && settings.isHafsDisplay {
+                contextPlaybackMenuBlock()
+                Divider()
+            }
 
             Button {
                 settings.hapticFeedback()
@@ -492,9 +657,24 @@ struct AyahRow: View {
     }
 }
 
+private struct AyahRowPreviewContent: View {
+    @State private var scrollDown: Int? = nil
+    @State private var searchText = ""
+
+    var body: some View {
+        List {
+            AyahRow(
+                surah: AlIslamPreviewData.surah,
+                ayah: AlIslamPreviewData.ayah,
+                scrollDown: $scrollDown,
+                searchText: $searchText
+            )
+        }
+    }
+}
+
 #Preview {
-    QuranView()
-        .environmentObject(Settings.shared)
-        .environmentObject(QuranData.shared)
-        .environmentObject(QuranPlayer.shared)
+    AlIslamPreviewContainer(embedInNavigation: false) {
+        AyahRowPreviewContent()
+    }
 }

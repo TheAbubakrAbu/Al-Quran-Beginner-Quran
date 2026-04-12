@@ -601,9 +601,9 @@ struct ShareAyahSheet: View {
             append("\(surah.ayahCountLabel()) – \(surah.pageCountLabel) – \(surah.type.capitalized) \(surah.type == "makkan" ? "🕋" : "🕌")", captionCentAttr)
         }
         // --- Watermark
-        let wmString = "Al-Islam | Islamic Pillars"
+        let wmString = "Al-Quran | Beginner Quran"
         let wmText = NSAttributedString(string: wmString, attributes: centAccent)
-        var logo = UIImage(named: "Al-Islam")
+        var logo = UIImage(named: "Al-Quran")
         
         var wmTextSize = wmText.size()
         var logoSize = CGSize(width: wmTextSize.height, height: wmTextSize.height)
@@ -808,9 +808,9 @@ extension ShareAyahSheet {
             if shareSettings.includeQiraah { append("\n", bodyAttr) } else { sepIfNeeded() }
             append("\(surah.ayahCountLabel()) – \(surah.pageCountLabel) – \(surah.type.capitalized) \(surah.type == "makkan" ? "🕋" : "🕌")", captionCentAttr)
         }
-        let wmString = "Al-Islam | Islamic Pillars"
+        let wmString = "Al-Quran | Beginner Quran"
         let wmText = NSAttributedString(string: wmString, attributes: centAccent)
-        var logo = UIImage(named: "Al-Islam")
+        var logo = UIImage(named: "Al-Quran")
         var wmTextSize = wmText.size()
         var logoSize = CGSize(width: wmTextSize.height, height: wmTextSize.height)
         let availWidth = maxWidth - 2 * padding

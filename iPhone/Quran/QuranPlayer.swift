@@ -1062,7 +1062,7 @@ final class QuranPlayer: ObservableObject {
         }
         info[MPNowPlayingInfoPropertyElapsedPlaybackTime] = CMTimeGetSeconds(player?.currentTime() ?? .zero)
         info[MPNowPlayingInfoPropertyPlaybackRate] = player?.rate
-        if let img = UIImage(named: "Al-Islam") {
+        if let img = UIImage(named: "Al-Quran") {
             info[MPMediaItemPropertyArtwork] = MPMediaItemArtwork(boundsSize: img.size) { _ in img }
         }
         MPNowPlayingInfoCenter.default().nowPlayingInfo = info

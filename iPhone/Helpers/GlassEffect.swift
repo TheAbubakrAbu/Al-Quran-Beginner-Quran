@@ -5,9 +5,11 @@ struct ConditionalGlassEffect: ViewModifier {
 
     var clear: Bool = false
     var rectangle: Bool = false
+    var circle: Bool = false
     var useColor: Double? = nil
     /// When set, tints glass with this color (opacity from `useColor`, default 0.35) instead of the app accent.
     var customTint: Color? = nil
+    var interactive: Bool = true
 
     func body(content: Content) -> some View {
         if #available(iOS 26.0, watchOS 26.0, *) {
@@ -20,47 +22,38 @@ struct ConditionalGlassEffect: ViewModifier {
     @available(iOS 26.0, watchOS 26.0, *)
     private func modernGlass(content: Content) -> some View {
         Group {
-            if rectangle {
-                if clear {
-                    if let tintColor {
-                        content.glassEffect(
-                            .clear.tint(tintColor).interactive(),
-                            in: RoundedRectangle(cornerRadius: 24, style: .continuous)
-                        )
-                    } else {
-                        content.glassEffect(
-                            .clear.interactive(),
-                            in: RoundedRectangle(cornerRadius: 24, style: .continuous)
-                        )
-                    }
-                } else if let tintColor {
-                    content.glassEffect(
-                        .regular.tint(tintColor).interactive(),
-                        in: RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    )
-                } else {
-                    content.glassEffect(
-                        .regular.interactive(),
-                        in: RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    )
-                }
-            } else if clear {
+            let regularStyle: Glass = {
                 if let tintColor {
-                    content.glassEffect(.clear.tint(tintColor).interactive())
-                } else {
-                    content.glassEffect(.clear.interactive())
+                    return interactive ? .regular.tint(tintColor).interactive() : .regular.tint(tintColor)
                 }
-            } else if let tintColor {
-                content.glassEffect(.regular.tint(tintColor).interactive())
+                return interactive ? .regular.interactive() : .regular
+            }()
+
+            let clearStyle: Glass = {
+                if let tintColor {
+                    return interactive ? .clear.tint(tintColor).interactive() : .clear.tint(tintColor)
+                }
+                return interactive ? .clear.interactive() : .clear
+            }()
+            
+            if circle {
+                content.glassEffect(clear ? clearStyle : regularStyle, in: Circle())
+            } else if rectangle {
+                content.glassEffect(clear ? clearStyle : regularStyle, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            } else if clear {
+                content.glassEffect(clearStyle)
             } else {
-                content.glassEffect(.regular.interactive())
+                content.glassEffect(regularStyle)
             }
         }
+        .contentShape(Rectangle())
     }
 
     @ViewBuilder
     private func fallbackGlass(content: Content) -> some View {
-        if rectangle {
+        if circle {
+            fallbackGlassShape(content: content, shape: Circle())
+        } else if rectangle {
             fallbackGlassShape(content: content, shape: RoundedRectangle(cornerRadius: 24, style: .continuous))
         } else {
             fallbackGlassShape(content: content, shape: Capsule())
@@ -99,13 +92,51 @@ struct ConditionalGlassEffect: ViewModifier {
     }
 }
 
+#if os(iOS)
+struct SmallMediumSheetPresentationModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(iOS 16.0, *) {
+            content
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+        } else {
+            content
+        }
+    }
+}
+
+struct FullScreenSheetPresentationModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(iOS 16.0, *) {
+            content
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+        } else {
+            content
+        }
+    }
+}
+#endif
+
 extension View {
     func conditionalGlassEffect(
         clear: Bool = false,
         rectangle: Bool = false,
+        circle: Bool = false,
         useColor: Double? = nil,
-        customTint: Color? = nil
+        customTint: Color? = nil,
+        interactive: Bool = true
     ) -> some View {
-        modifier(ConditionalGlassEffect(clear: clear, rectangle: rectangle, useColor: useColor, customTint: customTint))
+        modifier(ConditionalGlassEffect(clear: clear, rectangle: rectangle, circle: circle, useColor: useColor, customTint: customTint, interactive: interactive))
     }
+
+    #if os(iOS)
+    func smallMediumSheetPresentation() -> some View {
+        modifier(SmallMediumSheetPresentationModifier())
+    }
+
+    func fullScreenSheetPresentation() -> some View {
+        modifier(FullScreenSheetPresentationModifier())
+    }
+    #endif
 }

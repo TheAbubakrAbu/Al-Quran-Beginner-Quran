@@ -28,6 +28,12 @@ struct PlayCustomRangeSheet: View {
     private static let repeatMax = 20
     private static let repeatOptions = [1, 2, 3, 5, 10, 15, 20]
 
+    /// End ayah defaults to the ayah after `startAyah` (one-ayah range when possible); if `startAyah` is the last ayah, end matches start.
+    static func defaultEndAyah(startAyah: Int, surah: Surah, displayQiraah: String?) -> Int {
+        let maxA = surah.numberOfAyahs(for: displayQiraah)
+        return min(max(startAyah + 1, 1), maxA)
+    }
+
     private var maxAyah: Int { surah.numberOfAyahs(for: settings.displayQiraahForArabic) }
 
     init(
@@ -199,7 +205,6 @@ struct PlayCustomRangeSheet: View {
                 .padding(.top, 8)
                 .padding(.bottom, 100)
             }
-            .dismissKeyboardOnScroll()
             .background(Color(UIColor.systemGroupedBackground))
             .navigationTitle("Custom Range")
             .navigationBarTitleDisplayMode(.inline)
@@ -212,7 +217,7 @@ struct PlayCustomRangeSheet: View {
                     .foregroundColor(settings.accentColor.color)
                 }
             }
-            .safeAreaInset(edge: .bottom) {
+            .adaptiveSafeArea(edge: .bottom) {
                 playButtonBar
             }
         }
@@ -226,6 +231,7 @@ struct PlayCustomRangeSheet: View {
             Image(systemName: "book.closed.fill")
                 .font(.title2)
                 .foregroundStyle(settings.accentColor.color)
+            
             VStack(alignment: .leading, spacing: 2) {
                 Text(surah.nameTransliteration)
                     .font(.title3.weight(.semibold))
@@ -234,12 +240,12 @@ struct PlayCustomRangeSheet: View {
                     .font(.subheadline)
                     .foregroundColor(.secondary)
             }
-            Spacer()
         }
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(UIColor.secondarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .contentShape(Rectangle())
     }
 
     private var rangeCard: some View {
@@ -247,6 +253,42 @@ struct PlayCustomRangeSheet: View {
             Label("Ayah range", systemImage: "number")
                 .font(.subheadline.weight(.semibold))
                 .foregroundColor(.secondary)
+
+            HStack(spacing: 10) {
+                Button {
+                    settings.hapticFeedback()
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        startAyah = 1
+                        startAyahText = "1"
+                    }
+                } label: {
+                    Label("Go to start", systemImage: "arrow.left.to.line")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundColor(settings.accentColor.color)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(settings.accentColor.color.opacity(0.12))
+                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .contentShape(Rectangle())
+                }
+
+                Button {
+                    settings.hapticFeedback()
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        endAyah = maxAyah
+                        endAyahText = "\(maxAyah)"
+                    }
+                } label: {
+                    Label("Go to end", systemImage: "arrow.right.to.line")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundColor(settings.accentColor.color)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(settings.accentColor.color.opacity(0.12))
+                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .contentShape(Rectangle())
+                }
+            }
 
             HStack(spacing: 12) {
                 rangeField(title: "From", value: $startAyah, text: $startAyahText, isFocused: $startAyahFocused) { new in
@@ -290,9 +332,9 @@ struct PlayCustomRangeSheet: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 12)
                 .background(settings.accentColor.color.opacity(0.12))
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
 
             ayahCountLabel
         }
@@ -300,6 +342,7 @@ struct PlayCustomRangeSheet: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(UIColor.secondarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .contentShape(Rectangle())
         .animation(.easeInOut, value: startAyah)
         .animation(.easeInOut, value: endAyah)
     }
@@ -318,7 +361,6 @@ struct PlayCustomRangeSheet: View {
                         .font(.title2)
                         .foregroundStyle(value.wrappedValue > 1 ? settings.accentColor.color : Color(UIColor.tertiaryLabel))
                 }
-                .buttonStyle(.plain)
                 .disabled(value.wrappedValue <= 1)
 
                 Spacer()
@@ -342,7 +384,9 @@ struct PlayCustomRangeSheet: View {
                     .onSubmit {
                         commitBothAyahFields()
                     }
+                
                 Spacer()
+                
                 Button {
                     settings.hapticFeedback()
                     adjustAyahValue(value, text: text, delta: 1, onChange: onChange)
@@ -351,13 +395,13 @@ struct PlayCustomRangeSheet: View {
                         .font(.title2)
                         .foregroundStyle(value.wrappedValue < maxAyah ? settings.accentColor.color : Color(UIColor.tertiaryLabel))
                 }
-                .buttonStyle(.plain)
                 .disabled(value.wrappedValue >= maxAyah)
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
             .background(Color(UIColor.tertiarySystemFill))
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .contentShape(Rectangle())
         }
         .frame(maxWidth: .infinity)
     }
@@ -405,6 +449,7 @@ struct PlayCustomRangeSheet: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(UIColor.secondarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .contentShape(Rectangle())
     }
 
     private var arabicVersesCard: some View {
@@ -448,6 +493,7 @@ struct PlayCustomRangeSheet: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(Color(UIColor.secondarySystemGroupedBackground))
                 .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .contentShape(Rectangle())
                 .animation(.easeInOut, value: startAyah)
                 .animation(.easeInOut, value: endAyah)
             }
@@ -480,8 +526,8 @@ struct PlayCustomRangeSheet: View {
                                             : Color(UIColor.tertiarySystemFill)
                                     )
                                     .clipShape(Capsule())
+                                    .contentShape(Capsule())
                             }
-                            .buttonStyle(.plain)
                         }
                     }
                     .padding(.vertical, 2)
@@ -506,7 +552,6 @@ struct PlayCustomRangeSheet: View {
                     .font(.body)
                     .foregroundStyle(value.wrappedValue > Self.repeatMin ? settings.accentColor.color : Color(UIColor.tertiaryLabel))
             }
-            .buttonStyle(.plain)
             .disabled(value.wrappedValue <= Self.repeatMin)
 
             TextField("", text: text)
@@ -535,13 +580,13 @@ struct PlayCustomRangeSheet: View {
                     .font(.body)
                     .foregroundStyle(value.wrappedValue < Self.repeatMax ? settings.accentColor.color : Color(UIColor.tertiaryLabel))
             }
-            .buttonStyle(.plain)
             .disabled(value.wrappedValue >= Self.repeatMax)
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
         .background(Color(UIColor.tertiarySystemFill))
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .contentShape(Rectangle())
     }
 
     private func commitRepeatInput(value: Binding<Int>, text: Binding<String>) {
@@ -574,9 +619,9 @@ struct PlayCustomRangeSheet: View {
                 .padding(.vertical, 16)
                 .foregroundColor(.white)
                 .background(canPlay ? settings.accentColor.color : Color(UIColor.tertiaryLabel))
-                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
             .disabled(!canPlay)
             .padding(.horizontal, 24)
             .padding(.vertical, 12)
@@ -590,7 +635,11 @@ struct PlayCustomRangeSheet: View {
         PlayCustomRangeSheet(
             surah: AlIslamPreviewData.surah,
             initialStartAyah: 1,
-            initialEndAyah: min(5, AlIslamPreviewData.surah.numberOfAyahs(for: AlIslamPreviewData.settings.displayQiraahForArabic)),
+            initialEndAyah: PlayCustomRangeSheet.defaultEndAyah(
+                startAyah: 1,
+                surah: AlIslamPreviewData.surah,
+                displayQiraah: AlIslamPreviewData.settings.displayQiraahForArabic
+            ),
             onPlay: { _, _, _, _ in },
             onCancel: {}
         )

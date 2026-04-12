@@ -3,7 +3,6 @@ import SwiftUI
 enum AlIslamPreviewData {
     static let settings: Settings = {
         let settings = Settings.shared
-        configure(settings)
         return settings
     }()
 
@@ -23,10 +22,6 @@ enum AlIslamPreviewData {
 
     static var juz: Juz {
         QuranData.juzList.first ?? fallbackJuz
-    }
-
-    private static func configure(_ settings: Settings) {
-        
     }
 
     private static var fallbackAyah: Ayah {
@@ -56,7 +51,7 @@ enum AlIslamPreviewData {
             nameArabic: "الفاتحة",
             nameTransliteration: "Al-Fatihah",
             nameEnglish: "The Opening",
-            type: "meccan",
+            type: "makkan",
             numberOfAyahs: 7,
             ayahs: [fallbackAyah]
         )

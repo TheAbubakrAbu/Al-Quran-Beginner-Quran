@@ -5,6 +5,12 @@ struct SettingsView: View {
     @EnvironmentObject var quranData: QuranData
     
     @State private var showingCredits = false
+    @State private var selectedDestination: SettingsDestination? = .quranSettings
+    @State private var hasSetDefaultSelection = false
+
+    private enum SettingsDestination: Hashable {
+        case quranSettings
+    }
 
     var body: some View {
         navigationContainer
@@ -16,9 +22,16 @@ struct SettingsView: View {
             if #available(iOS 16.0, *) {
                 if UIDevice.current.userInterfaceIdiom == .pad {
                     NavigationSplitView {
-                        settingsList
+                        settingsSplitList
+                            .onAppear {
+                                if !hasSetDefaultSelection {
+                                    selectedDestination = .quranSettings
+                                    hasSetDefaultSelection = true
+                                }
+                            }
                     } detail: {
-                        SettingsQuranView(showEdits: true)
+                        settingsSplitDetail
+                            .animation(.easeInOut(duration: 0.25), value: selectedDestination)
                     }
                 } else {
                     NavigationStack {
@@ -45,18 +58,84 @@ struct SettingsView: View {
             quranSection
             appearanceSection
             creditsSection
+            
             AlIslamAppsSection()
         }
         .navigationTitle("Settings")
         .applyConditionalListStyle(defaultView: true)
     }
 
+    #if os(iOS)
+    @available(iOS 16.0, *)
+    private var settingsSplitList: some View {
+        List(selection: $selectedDestination) {
+            quranSectionSplit
+            appearanceSection
+            creditsSection
+            AlIslamAppsSection()
+        }
+        .navigationTitle("Settings")
+        .applyConditionalListStyle(defaultView: true)
+    }
+
+    @ViewBuilder
+    private var settingsSplitDetail: some View {
+        switch selectedDestination ?? .quranSettings {
+        case .quranSettings:
+            SettingsQuranView(showEdits: true)
+        }
+    }
+    #endif
+
+    private func resourceLink<Destination: View>(
+        title: String,
+        systemImage: String,
+        @ViewBuilder destination: () -> Destination
+    ) -> some View {
+        NavigationLink(destination: destination()) {
+            toolLabel(title, systemImage: systemImage)
+        }
+        .tint(settings.accentColor.color)
+    }
+
+    private func toolLabel(_ title: String, systemImage: String) -> some View {
+        Label(
+            title: {
+                Text(title)
+                    .foregroundColor(.primary)
+            },
+            icon: {
+                Image(systemName: systemImage)
+                    .foregroundColor(settings.accentColor.color)
+            }
+        )
+        .padding(.vertical, 4)
+    }
+
+    @available(iOS 16.0, *)
+    private func splitResourceLink(
+        title: String,
+        systemImage: String,
+        value: SettingsDestination
+    ) -> some View {
+        NavigationLink(value: value) {
+            toolLabel(title, systemImage: systemImage)
+        }
+        .tint(settings.accentColor.color)
+    }
+
     private var quranSection: some View {
         Section(header: Text("AL-QURAN")) {
-            NavigationLink(destination: SettingsQuranView(showEdits: true)) {
-                Label("Quran Settings", systemImage: "character.book.closed.ar")
+            resourceLink(title: "Quran Settings", systemImage: "character.book.closed.ar") {
+                SettingsQuranView(showEdits: true)
             }
-            .accentColor(settings.accentColor.color)
+        }
+    }
+
+    @available(iOS 16.0, *)
+    private var quranSectionSplit: some View {
+        Section(header: Text("AL-QURAN")) {
+            splitResourceLink(title: "Quran Settings", systemImage: "character.book.closed.ar", value: .quranSettings)
         }
     }
 
@@ -219,7 +298,7 @@ struct SettingsView: View {
         }
     }
     #endif
-    
+
     private func columnWidth(for textStyle: UIFont.TextStyle, extra: CGFloat = 4, sample: String? = nil, fontName: String? = nil) -> CGFloat {
         let sampleString = (sample ?? "M") as NSString
         let font: UIFont

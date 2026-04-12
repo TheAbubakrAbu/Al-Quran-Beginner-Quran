@@ -1,16 +1,5 @@
 import SwiftUI
 
-struct Root: Decodable {
-    let code: Int
-    let status: String
-    let data: [NameOfAllah]
-}
-
-struct NameTranslation: Decodable {
-    let meaning: String
-    let desc: String
-}
-
 struct NameOfAllah: Decodable, Identifiable {
     let number: Int
     let id: String
@@ -18,12 +7,15 @@ struct NameOfAllah: Decodable, Identifiable {
     let transliteration: String
     let found: String
     let meaning: String
+    let otherNames: [String]
     let desc: String
     let numberArabic: String
     let searchTokens: [String]
+    let firstFoundSurah: Int?
+    let firstFoundAyah: Int?
 
     enum CodingKeys: String, CodingKey {
-        case name, transliteration, number, found, meaning, desc, en
+        case name, transliteration, number, found, meaning, otherNames, desc
     }
 
     init(from decoder: Decoder) throws {
@@ -33,24 +25,21 @@ struct NameOfAllah: Decodable, Identifiable {
         name = try c.decode(String.self, forKey: .name)
         transliteration = try c.decode(String.self, forKey: .transliteration)
         found = try c.decode(String.self, forKey: .found)
-
-        if let topLevelMeaning = try c.decodeIfPresent(String.self, forKey: .meaning),
-           let topLevelDesc = try c.decodeIfPresent(String.self, forKey: .desc) {
-            meaning = topLevelMeaning
-            desc = topLevelDesc
-        } else {
-            let en = try c.decode(NameTranslation.self, forKey: .en)
-            meaning = en.meaning
-            desc = en.desc
-        }
+        meaning = try c.decode(String.self, forKey: .meaning)
+        otherNames = try c.decodeIfPresent([String].self, forKey: .otherNames) ?? []
+        desc = try c.decode(String.self, forKey: .desc)
 
         id = "\(number)"
         numberArabic = arabicNumberString(from: number)
+        let firstFound = Self.parseFirstFound(found)
+        firstFoundSurah = firstFound?.surah
+        firstFoundAyah = firstFound?.ayah
 
         searchTokens = [
             Self.clean(name),
             Self.clean(transliteration),
             Self.clean(meaning),
+            otherNames.map(Self.clean).joined(separator: " "),
             Self.clean(desc),
             Self.clean(found),
             "\(number)",
@@ -66,6 +55,20 @@ struct NameOfAllah: Decodable, Identifiable {
         return (stripped.applyingTransform(.stripDiacritics, reverse: false) ?? stripped).lowercased()
     }
 
+    private static func parseFirstFound(_ found: String) -> (surah: Int, ayah: Int)? {
+        let pattern = #"\((\d+)\s*:\s*(\d+)\)"#
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return nil }
+        let fullRange = NSRange(found.startIndex..<found.endIndex, in: found)
+        guard let match = regex.firstMatch(in: found, range: fullRange), match.numberOfRanges >= 3,
+              let surahRange = Range(match.range(at: 1), in: found),
+              let ayahRange = Range(match.range(at: 2), in: found),
+              let surah = Int(found[surahRange]),
+              let ayah = Int(found[ayahRange]) else {
+            return nil
+        }
+        return (surah, ayah)
+    }
+
     var firstFoundShort: String {
         guard let closingParen = found.firstIndex(of: ")") else { return found }
         return String(found[...closingParen])
@@ -76,6 +79,8 @@ final class NamesViewModel: ObservableObject {
     static let shared = NamesViewModel()
 
     @Published var namesOfAllah: [NameOfAllah] = []
+    @Published private(set) var firstFoundTargetsByNameNumber: [Int: (surahID: Int, ayahID: Int)] = [:]
+    private var filterCache = [String: [NameOfAllah]]()
 
     private init() { loadJSON() }
 
@@ -87,23 +92,46 @@ final class NamesViewModel: ObservableObject {
             do {
                 let data = try Data(contentsOf: url, options: .mappedIfSafe)
                 let decoder = JSONDecoder()
-
-                if let names = try? decoder.decode([NameOfAllah].self, from: data) {
-                    DispatchQueue.main.async { self.namesOfAllah = names }
-                    return
+                let names = (try? decoder.decode([NameOfAllah].self, from: data)) ?? []
+                var targets = [Int: (surahID: Int, ayahID: Int)]()
+                targets.reserveCapacity(names.count)
+                for name in names {
+                    guard let surah = name.firstFoundSurah,
+                          let ayah = name.firstFoundAyah else { continue }
+                    targets[name.number] = (surahID: surah, ayahID: ayah)
                 }
-
-                let root = try decoder.decode(Root.self, from: data)
-                DispatchQueue.main.async { self.namesOfAllah = root.data }
+                DispatchQueue.main.async {
+                    self.namesOfAllah = names
+                    self.firstFoundTargetsByNameNumber = targets
+                    self.filterCache.removeAll()
+                }
             } catch {
                 logger.debug("❌ JSON decode error: \(error)")
             }
         }
     }
+
+    func filteredNames(cleanedQuery: String) -> [NameOfAllah] {
+        guard !cleanedQuery.isEmpty else { return namesOfAllah }
+
+        if let cached = filterCache[cleanedQuery] {
+            return cached
+        }
+
+        let matches = namesOfAllah.filter { name in
+            if cleanedQuery.allSatisfy(\.isNumber), let n = Int(cleanedQuery) {
+                return name.number == n
+            }
+            return name.searchTokens.contains { $0.contains(cleanedQuery) } || Int(cleanedQuery) == name.number
+        }
+        filterCache[cleanedQuery] = matches
+        return matches
+    }
 }
 
 struct NamesView: View {
     @EnvironmentObject var settings: Settings
+    @EnvironmentObject var quranData: QuranData
     @EnvironmentObject var namesData: NamesViewModel
 
     @State private var searchText = ""
@@ -119,84 +147,136 @@ struct NamesView: View {
         return (stripped.applyingTransform(.stripDiacritics, reverse: false) ?? stripped).lowercased()
     }
 
-    private func matches(_ name: NameOfAllah) -> Bool {
-        guard !cleanedSearch.isEmpty else { return true }
-        if cleanedSearch.allSatisfy(\.isNumber), let n = Int(cleanedSearch) {
-            return name.number == n
-        }
-        return name.searchTokens.contains { $0.contains(cleanedSearch) } || Int(cleanedSearch) == name.number
+    private var filteredNames: [NameOfAllah] {
+        namesData.filteredNames(cleanedQuery: cleanedSearch)
+    }
+
+    private var favoriteNameNumberSet: Set<Int> {
+        Set(settings.favoriteNameNumbers)
+    }
+
+    private var favoriteNames: [NameOfAllah] {
+        namesData.namesOfAllah
+            .filter { favoriteNameNumberSet.contains($0.number) }
+            .sorted { $0.number < $1.number }
     }
 
     var body: some View {
-        let filteredNames = namesData.namesOfAllah.filter(matches)
         let hasActiveSearch = !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
 
         ScrollViewReader { proxy in
             List {
-                descriptionSection(resultCount: filteredNames.count, hasActiveSearch: hasActiveSearch)
+                descriptionSection
+                favoriteNamesSection(hasActiveSearch: hasActiveSearch, proxy: proxy)
+                namesHeaderSection(resultCount: filteredNames.count, hasActiveSearch: hasActiveSearch)
                 namesSections(filteredNames: filteredNames, hasActiveSearch: hasActiveSearch, proxy: proxy)
+                finalInvocationSection
             }
         }
         #if os(watchOS)
         .searchable(text: $searchText)
         #else
-        .safeAreaInset(edge: .bottom) {
-            SearchBar(text: $searchText.animation(.easeInOut))
-                .padding(.horizontal, 24)
-                .padding(.bottom, 8)
+        .adaptiveSafeArea(edge: .bottom) {
+            VStack(spacing: SafeAreaInsetVStackSpacing.standard) {
+                Picker("Arabic Font", selection: $settings.useFontArabic.animation(.easeInOut)) {
+                    Text("Quranic Font").tag(true)
+                    Text("Basic Font").tag(false)
+                }
+                .pickerStyle(.segmented)
+                .conditionalGlassEffect()
+                
+                SearchBar(text: $searchText.animation(.easeInOut))
+                    .padding([.horizontal, .top], -8)
+            }
+            .padding(.horizontal, 24)
+            .padding(.bottom, 8)
+            .background(Color.white.opacity(0.00001))
         }
         #endif
         .applyConditionalListStyle(defaultView: settings.defaultView)
         .compactListSectionSpacing()
-        .dismissKeyboardOnScroll()
         .navigationTitle("99 Names of Allah")
     }
 
-    private func descriptionSection(resultCount: Int, hasActiveSearch: Bool) -> some View {
-        Section(header: descriptionHeader(resultCount: resultCount, hasActiveSearch: hasActiveSearch)) {
+    private var descriptionSection: some View {
+        Section(header: Text("DESCRIPTION")) {
             Text("Prophet Muhammad ﷺ said, “Allah has 99 names, and whoever believes in their meanings and acts accordingly, will enter Paradise” (Bukhari 6410).")
-                .font(.body)
+                .font(.caption)
+                .foregroundColor(.secondary)
 
-            Toggle("Show Description", isOn: $settings.showDescription.animation(.easeInOut))
-                .font(.subheadline)
+            Toggle("Show All Descriptions", isOn: $settings.showDescription.animation(.easeInOut))
+                .font(.caption)
                 .tint(settings.accentColor.color)
         }
     }
 
-    private func descriptionHeader(resultCount: Int, hasActiveSearch: Bool) -> some View {
+    private func namesHeaderSection(resultCount: Int, hasActiveSearch: Bool) -> some View {
+        Section(header: namesHeader(resultCount: resultCount, hasActiveSearch: hasActiveSearch)) { }
+        .padding(.bottom, -12)
+    }
+
+    private func namesHeader(resultCount: Int, hasActiveSearch: Bool) -> some View {
         HStack {
-            Text("DESCRIPTION")
+            Text(hasActiveSearch ? "NAME SEARCH RESULTS" : "NAMES OF ALLAH")
 
             Spacer()
 
-            Text(String(resultCount))
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(settings.accentColor.color)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                #if os(iOS)
-                .background(.ultraThinMaterial)
-                #endif
-                .clipShape(Capsule())
-                .conditionalGlassEffect()
-                .opacity(hasActiveSearch ? 1 : 0)
+            if hasActiveSearch {
+                Text(String(resultCount))
+                    .font(.caption.weight(.semibold))
+                    .monospacedDigit()
+                    .foregroundStyle(settings.accentColor.color)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .conditionalGlassEffect()
+            }
         }
-        .padding(.vertical, 4)
+    }
+
+    @ViewBuilder
+    private func favoriteNamesSection(hasActiveSearch: Bool, proxy: ScrollViewProxy) -> some View {
+        if !hasActiveSearch && !favoriteNames.isEmpty {
+            Section(header: Text("FAVORITE NAMES")) {
+                ForEach(favoriteNames, id: \.id) { name in
+                    NameRow(
+                        name: name,
+                        firstFoundTarget: namesData.firstFoundTargetsByNameNumber[name.number],
+                        showDescription: settings.showDescription,
+                        isExpanded: expandedNameNumbers.contains(name.number),
+                        isFavorite: true
+                    ) {
+                        handleNameTap(name: name, hasActiveSearch: hasActiveSearch, proxy: proxy)
+                    }
+                    .id("favorite_name_\(name.number)")
+                }
+            }
+        }
     }
 
     @ViewBuilder
     private func namesSections(filteredNames: [NameOfAllah], hasActiveSearch: Bool, proxy: ScrollViewProxy) -> some View {
-        ForEach(Array(filteredNames.enumerated()), id: \.element.id) { _, name in
+        ForEach(filteredNames, id: \.id) { name in
             Section {
                 NameRow(
                     name: name,
+                    firstFoundTarget: namesData.firstFoundTargetsByNameNumber[name.number],
                     showDescription: settings.showDescription,
-                    isExpanded: expandedNameNumbers.contains(name.number)
+                    isExpanded: expandedNameNumbers.contains(name.number),
+                    isFavorite: favoriteNameNumberSet.contains(name.number)
                 ) {
                     handleNameTap(name: name, hasActiveSearch: hasActiveSearch, proxy: proxy)
                 }
             }
             .id("name_\(name.number)")
+        }
+    }
+
+    @ViewBuilder
+    private func ayahsDestination(for target: (surahID: Int, ayahID: Int)) -> some View {
+        if let surah = quranData.surah(target.surahID) {
+            AyahsView(surah: surah, ayah: target.ayahID)
+        } else {
+            Text("Reference not found")
         }
     }
 
@@ -221,6 +301,40 @@ struct NamesView: View {
             }
         }
     }
+
+    private var finalInvocationSection: some View {
+        Section(header: Text("MOST BEAUTIFUL NAMES")) {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Call upon Allah or call upon Ar-Rahman (The Entirely Merciful). Whichever Name you call, to Him belong the Most Beautiful Names.")
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+                
+                Text("Surah Al-Isra 17:110")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            VerseReflectionCard(
+                title: "Surah Al-Hashr 59:21",
+                contentText: "If this Quran were sent upon a mountain, it would humble and break from awe of Allah. These examples are given so people reflect."
+            )
+
+            VerseReflectionCard(
+                title: "Surah Al-Hashr 59:22",
+                contentText: "He is Allah, none is worthy of worship except Him. Knower of the seen and unseen, the Most Compassionate, the Most Merciful."
+            )
+
+            VerseReflectionCard(
+                title: "Surah Al-Hashr 59:23",
+                contentText: "He is Allah: the King, the Most Holy, the Source of Peace, the Guardian, the Almighty, the Compeller, the Supreme. Exalted is He above all partners."
+            )
+
+            VerseReflectionCard(
+                title: "Surah Al-Hashr 59:24",
+                contentText: "He is Allah, the Creator, the Originator, the Fashioner. To Him belong the Most Beautiful Names; all in the heavens and earth glorify Him."
+            )
+        }
+    }
 }
 
 #Preview {
@@ -232,13 +346,38 @@ struct NamesView: View {
 private struct NameRow: View {
     @EnvironmentObject var settings: Settings
     let name: NameOfAllah
+    let firstFoundTarget: (surahID: Int, ayahID: Int)?
     let showDescription: Bool
     let isExpanded: Bool
+    let isFavorite: Bool
     let onTap: () -> Void
 
     var body: some View {
         #if os(iOS)
-        content.contextMenu { copyMenu }
+        content
+            .contextMenu {
+                favoriteMenuItem
+                Divider()
+                copyMenu
+            }
+            .swipeActions(edge: .leading) {
+                Button {
+                    settings.hapticFeedback()
+                    settings.toggleNameFavorite(number: name.number)
+                } label: {
+                    Image(systemName: isFavorite ? "star.fill" : "star")
+                }
+                .tint(settings.accentColor.color)
+            }
+            .swipeActions(edge: .trailing) {
+                Button {
+                    settings.hapticFeedback()
+                    settings.toggleNameFavorite(number: name.number)
+                } label: {
+                    Image(systemName: isFavorite ? "star.fill" : "star")
+                }
+                .tint(settings.accentColor.color)
+            }
         #else
         content
         #endif
@@ -246,46 +385,96 @@ private struct NameRow: View {
 
     private var content: some View {
         Group {
-            VStack(alignment: .leading, spacing: 4) {
-                HStack {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("First Found: \(name.firstFoundShort)")
-                            .font(.subheadline)
+            HStack(alignment: .center, spacing: 12) {
+                numberPill
+
+                HStack(alignment: .center, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(name.transliteration)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundColor(.primary)
+                            .lineLimit(1)
+
+                        Text(name.meaning)
+                            .font(.caption)
                             .foregroundColor(.secondary)
-                        
-                        Text(name.meaning).font(.subheadline)
+                            .lineLimit(1)
+
+                        Text("First Found: \(name.firstFoundShort)")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                            .lineLimit(1)
                     }
-                    
-                    Spacer()
-                    
-                    VStack(alignment: .trailing, spacing: 2) {
-                        Text("\(name.name.removeDiacriticsFromLastLetter()) - \(name.numberArabic)")
-                            .font(.headline)
+
+                    Spacer(minLength: 8)
+
+                    HStack {
+                        Text(name.name.removeDiacriticsFromLastLetter())
+                            .font(settings.useFontArabic ? .custom(settings.fontArabic, size: 24) : .title2)
+                            .foregroundColor(.primary)
+                            .lineLimit(1)
+
+                        Text(name.numberArabic)
+                            .font(.custom("KFGQPCQUMBULUthmanicScript-Regu", size: 28))
                             .foregroundColor(settings.accentColor.color)
-                        
-                        Text("\(name.transliteration) - \(name.number)")
-                            .font(.subheadline)
+                            .lineLimit(1)
                     }
                 }
-                .lineLimit(1)
-                .minimumScaleFactor(0.5)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    if !showDescription {
+                        settings.hapticFeedback()
+                        onTap()
+                    }
+                }
             }
+            .padding(.vertical, 6)
             
             if showDescription || isExpanded {
-                Text(name.desc)
-                    .font(.footnote)
-                    .foregroundColor(.secondary)
-                    .transition(.opacity)
-                    .padding(.top, 2)
+                NameRowDetails(
+                    name: name,
+                    firstFoundTarget: firstFoundTarget,
+                    showDescription: showDescription,
+                    isExpanded: isExpanded
+                )
             }
         }
-        .padding(.vertical, 4)
-        .contentShape(Rectangle())
-        .onTapGesture {
-            if !showDescription {
-                settings.hapticFeedback()
-                onTap()
+    }
+
+    @ViewBuilder
+    private var favoriteMenuItem: some View {
+        Button(role: isFavorite ? .destructive : nil) {
+            settings.hapticFeedback()
+            settings.toggleNameFavorite(number: name.number)
+        } label: {
+            Label(isFavorite ? "Unfavorite" : "Favorite", systemImage: isFavorite ? "star.fill" : "star")
+        }
+    }
+
+    @ViewBuilder
+    private var numberPill: some View {
+        ZStack(alignment: .topTrailing) {
+            Text("\(name.number)")
+                .font(.subheadline.weight(.bold))
+                .foregroundColor(settings.accentColor.color)
+                .frame(minWidth: 40)
+                .frame(maxHeight: .infinity)
+                .conditionalGlassEffect(
+                    useColor: isFavorite ? 0.3 : nil,
+                    customTint: isFavorite ? settings.accentColor.color : nil
+                )
+
+            if isFavorite {
+                Image(systemName: "star.fill")
+                    .font(.caption2)
+                    .foregroundStyle(settings.accentColor.color)
+                    .padding(4)
+                    .offset(x: 8, y: -6)
             }
+        }
+        .onTapGesture {
+            settings.hapticFeedback()
+            settings.toggleNameFavorite(number: name.number)
         }
     }
 
@@ -316,4 +505,91 @@ private struct NameRow: View {
         }
     }
     #endif
+}
+
+private struct NameRowDetails: View {
+    @EnvironmentObject var settings: Settings
+    @EnvironmentObject var quranData: QuranData
+    let name: NameOfAllah
+    let firstFoundTarget: (surahID: Int, ayahID: Int)?
+    let showDescription: Bool
+    let isExpanded: Bool
+
+    var body: some View {
+        VStack(alignment: .leading) {
+            if showDescription || isExpanded {
+                if !name.otherNames.isEmpty {
+                    HStack {
+                        Text("Other Names:")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundColor(settings.accentColor.color)
+
+                        Text(name.otherNames.joined(separator: ", "))
+                            .font(.subheadline)
+                            .foregroundColor(.primary)
+                    }
+                    .transition(.opacity)
+                }
+
+                Text(name.desc)
+                    .font(.footnote)
+                    .foregroundColor(.secondary)
+                    .transition(.opacity)
+                    .padding(.top, 2)
+
+                if showDescription || isExpanded, let target = firstFoundTarget {
+                    Text("View First Found")
+                        .font(.caption.weight(.semibold))
+                        .foregroundColor(settings.accentColor.color)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                        .contentShape(Rectangle())
+                        .conditionalGlassEffect(useColor: 0.2)
+                        .padding(.top, 6)
+                        .background(
+                            NavigationLink("", destination: ayahsDestination(for: target))
+                                .opacity(0)
+                        )
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func ayahsDestination(for target: (surahID: Int, ayahID: Int)) -> some View {
+        if let surah = quranData.surah(target.surahID) {
+            AyahsView(surah: surah, ayah: target.ayahID)
+        } else {
+            Text("Reference not found")
+        }
+    }
+}
+
+private struct VerseReflectionCard: View {
+    let title: String
+    let contentText: String
+
+    var body: some View {
+        content
+    }
+    
+    var content: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.primary)
+
+            Text(contentText)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(10)
+        .background(
+            RoundedRectangle(cornerRadius: 14)
+                .fill(Color.secondary.opacity(0.1))
+        )
+        .padding(-4)
+    }
 }

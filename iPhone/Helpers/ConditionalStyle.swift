@@ -11,6 +11,25 @@ enum SafeAreaInsetVStackSpacing {
 }
 
 extension View {
+    @ViewBuilder
+    func adaptiveSafeArea<InsetContent: View>(edge: VerticalEdge, @ViewBuilder content: () -> InsetContent) -> some View {
+        #if os(iOS)
+        if #available(iOS 26.0, *) {
+            self.safeAreaBar(edge: edge) {
+                content()
+            }
+        } else {
+            self.safeAreaInset(edge: edge) {
+                content()
+            }
+        }
+        #else
+        self.safeAreaInset(edge: edge) {
+            content()
+        }
+        #endif
+    }
+
     func applyConditionalListStyle(defaultView: Bool) -> some View {
         modifier(ConditionalListStyle(defaultView: defaultView))
     }
@@ -65,6 +84,7 @@ struct ConditionalListStyle: ViewModifier {
         }
         .accentColor(settings.accentColor.color)
         .tint(settings.accentColor.color)
+        .dismissKeyboardOnScroll()
     }
 
     @ViewBuilder

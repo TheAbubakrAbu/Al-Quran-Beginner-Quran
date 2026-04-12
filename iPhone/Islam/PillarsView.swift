@@ -54,13 +54,6 @@ struct PillarsView: View {
                         .font(.headline)
                 }
                 .padding(.vertical, 4)
-
-                NavigationLink(destination: QiraatView()) {
-                    Text("What are the 10 Qiraat?")
-                        .foregroundColor(settings.accentColor.color)
-                        .font(.headline)
-                }
-                .padding(.vertical, 4)
             }
 
             IslamicPillarsView()
@@ -117,7 +110,7 @@ struct GodPillarView: View {
                     Text("Islam, on the other hand:")
                         .font(.body)
                     Group {
-                        Text("• Affirms absolute monotheism (tawḥīd), with no partners, no intermediaries, and no confusion.")
+                        Text("• Affirms absolute monotheism (tawhid), with no partners, no intermediaries, and no confusion.")
                         Text("• Preserves the Qur’an exactly as it was revealed—verbatim, letter for letter, sound for sound, in its original Arabic.")
                         Text("• Welcomes all of humanity, regardless of ethnicity, race, gender, or background.")
                         Text("• Is the only universal, unambiguous, monotheistic religion with an intellectually sound and preserved foundation.")
@@ -153,7 +146,7 @@ struct GodPillarView: View {
             }
 
             Section(header: Text("HUMAN INTELLIGENCE – BEYOND EVOLUTION")) {
-                Text("Human beings are orders of magnitude more intelligent than any other creature. Humans build cities, fly planes, write poetry, and explore the universe. They possess self-awareness, language, morality, free will, and the capacity for worship. If evolution alone explains the human brain, why don't other species come close? Why the quantum leap in ability? Human exceptionalism points to a Creator who endowed humanity with reason, or ʿaql—a faculty Allah (Glorified and Exalted be He) gave only to humans.")
+                Text("Human beings are orders of magnitude more intelligent than any other creature. Humans build cities, fly planes, write poetry, and explore the universe. They possess self-awareness, language, morality, free will, and the capacity for worship. If evolution alone explains the human brain, why don't other species come close? Why the quantum leap in ability? Human exceptionalism points to a Creator who endowed humanity with reason, or aql, a faculty Allah (Glorified and Exalted be He) gave only to humans.")
                     .font(.body)
                 Text("“Indeed, We have certainly created man in the best of stature” (Qur’an 95:4).")
                     .foregroundColor(settings.accentColor.color)
@@ -209,7 +202,7 @@ struct GodPillarView: View {
                         .font(.body)
                     Group {
                         Text("• The Qur’an criticizes blind following of ancestors without knowledge (Qur’an 43:23).")
-                        Text("• Instead, use the God-given faculty of reason (ʿaql) and return to the fitrah.")
+                        Text("• Instead, use the God-given faculty of reason (aql) and return to the fitrah.")
                         Text("• Islam stands as the only worldview that fully harmonizes with reason, morality, and objective reality.")
                     }
                 }
@@ -255,7 +248,7 @@ struct IslamPillarView: View {
                 Text("2. **Salah**: Praying five times a day at prescribed times, a direct link between the believer and Allah.")
                 Text("3. **Zakah**: Giving a portion of wealth to the needy (typically 2.5% of savings), purifying wealth and fostering social justice.")
                 Text("4. **Sawm**: Fasting during the month of Ramadan, abstaining from food, drink, and sinful behavior from dawn to sunset as a means of spiritual reflection and self-discipline.")
-                Text("5. **Hajj**: Pilgrimage to Mecca, a once-in-a-lifetime obligation for those who are physically and financially able, symbolizing unity and submission to Allah.")
+                Text("5. **Hajj**: Pilgrimage to Makkah, a once-in-a-lifetime obligation for those who are physically and financially able, symbolizing unity and submission to Allah.")
             }
 
             Section(header: Text("THE SIX PILLARS OF IMAN")) {
@@ -521,7 +514,7 @@ struct ProphetPillarView: View {
     var body: some View {
         List {
             Section(header: Text("BIOGRAPHY")) {
-                Text("Prophet Muhammad (peace and blessings be upon him), whose name in Arabic is “مُحَمَّد“ (Muhammad), meaning “The Praised One,“ was born in Mecca (in present-day Saudi Arabia) around 570 CE into the noble tribe of Quraysh. Orphaned at a young age, he became known as “Al-Amin“ (The Trustworthy) due to his honesty and upright character.")
+                Text("Prophet Muhammad (peace and blessings be upon him), whose name in Arabic is “مُحَمَّد“ (Muhammad), meaning “The Praised One,“ was born in Makkah (in present-day Saudi Arabia) around 570 CE into the noble tribe of Quraysh. Orphaned at a young age, he became known as “Al-Amin“ (The Trustworthy) due to his honesty and upright character.")
                     .font(.body)
                 
                 Text("At the age of 40, while meditating in the cave of Hira, he received his first revelation from Allah (Glorified and Exalted be He) through the angel Jibreel (Gabriel). This marked the beginning of his prophethood and the revelation of the Quran, the final divine guidance for humanity.")
@@ -594,7 +587,7 @@ struct ProphetPillarView: View {
             }
 
             Section(header: Text("HIS LEGACY")) {
-                Text("Prophet Muhammad (peace and blessings be upon him) passed away at the age of 63 in Medina, leaving behind the Quran and Sunnah as guidance for humanity. In his Farewell Sermon, he emphasized the equality of all people, adherence to the Quran and Sunnah, and the importance of justice and righteousness.")
+                Text("Prophet Muhammad (peace and blessings be upon him) passed away at the age of 63 in Madinah, leaving behind the Quran and Sunnah as guidance for humanity. In his Farewell Sermon, he emphasized the equality of all people, adherence to the Quran and Sunnah, and the importance of justice and righteousness.")
                     .font(.body)
                 
                 Text("He said:").font(.body)
@@ -799,7 +792,7 @@ struct IslamicPillarsView: View {
             .padding(.vertical, 4)
             
             NavigationLink(destination: HajjView()) {
-                Text("Hajj (Pilgrimate to Mecca)")
+                Text("Hajj (Pilgrimate to Makkah)")
                     .font(.subheadline)
             }
             .padding(.vertical, 4)
@@ -830,14 +823,12 @@ struct ShahaadahView: View {
             
             Section(header: Text("FIRST VERSION")) {
                 VStack(alignment: .leading) {
-                    HStack {
-                        Spacer()
-                        Text("أَشهَدُ أَن لَا إِلٰهَ إِلَّا ٱللّٰهُ وَأَشهَدُ أَنَّ مُحَمَّدًا رَسُولُ ٱللّٰهِ")
-                            .font(.body)
-                            .foregroundColor(settings.accentColor.color)
-                            .multilineTextAlignment(.trailing)
-                            .padding(.vertical, 2)
-                    }
+                    Text("أَشهَدُ أَن لَا إِلٰهَ إِلَّا ٱللّٰهُ وَأَشهَدُ أَنَّ مُحَمَّدًا رَسُولُ ٱللّٰهِ")
+                        .font(.body)
+                        .foregroundColor(settings.accentColor.color)
+                        .multilineTextAlignment(.trailing)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.vertical, 2)
                     
                     Text("Ashhadu an la ilaha illa Allah, wa ashhadu anna Muhammad rasul Allah.")
                         .font(.body)
@@ -851,14 +842,12 @@ struct ShahaadahView: View {
             
             Section(header: Text("SECOND VERSION")) {
                 VStack(alignment: .leading) {
-                    HStack {
-                        Spacer()
-                        Text("أَشهَدُ أَن لَا إِلٰهَ إِلَّا ٱللّٰهُ وَأَشهَدُ أَنَّ مُحَمَّدًا عَبدُهُ وَرَسُولُهُ")
-                            .font(.body)
-                            .foregroundColor(settings.accentColor.color)
-                            .multilineTextAlignment(.trailing)
-                            .padding(.vertical, 2)
-                    }
+                    Text("أَشهَدُ أَن لَا إِلٰهَ إِلَّا ٱللّٰهُ وَأَشهَدُ أَنَّ مُحَمَّدًا عَبدُهُ وَرَسُولُهُ")
+                        .font(.body)
+                        .foregroundColor(settings.accentColor.color)
+                        .multilineTextAlignment(.trailing)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.vertical, 2)
                     
                     Text("Ashhadu an la ilaha illa Allah, wa ashhadu anna Muhammad abduhu wa rasuluhu.")
                         .font(.body)
@@ -1085,7 +1074,7 @@ struct HajjView: View {
     var body: some View {
         List {
             Section(header: Text("OVERVIEW")) {
-                Text("Hajj, derived from the Arabic word “حَجّ“ (Hajj), meaning “to intend a journey“ or to “to make a pilgrimage,“ is the fifth and final pillar of Islam. It is an obligatory pilgrimage to the Kaaba in Mecca, the Qibla (direction of prayer) for Muslims worldwide. Hajj takes place annually in the last and twelfth Islamic month of Dhul-Hijjah and serves as a profound act of worship and submission to Allah (Glorified and Exalted be He).")
+                Text("Hajj, derived from the Arabic word “حَجّ“ (Hajj), meaning “to intend a journey“ or to “to make a pilgrimage,“ is the fifth and final pillar of Islam. It is an obligatory pilgrimage to the Kaaba in Makkah, the Qibla (direction of prayer) for Muslims worldwide. Hajj takes place annually in the last and twelfth Islamic month of Dhul-Hijjah and serves as a profound act of worship and submission to Allah (Glorified and Exalted be He).")
                     .font(.body)
                 
                 Text("Hajj is a journey of spiritual renewal, forgiveness, and unity among Muslims, symbolizing submission to Allah and the equality of all believers.")
@@ -1148,7 +1137,7 @@ struct HajjView: View {
                 Text("Learn how to perform Hajj here: https://www.islamic-relief.ie/hajj-guide/")
                     .font(.caption)
                 
-                Text("Malcolm X's letter about Hajj: https://www.icit-digital.org/articles/malcolm-x-s-letter-from-mecca-april-20-1964")
+                Text("Malcolm X's letter about Hajj: https://www.icit-digital.org/articles/malcolm-x-s-letter-from-makkah-april-20-1964")
                     .font(.caption)
             }
         }
@@ -1704,7 +1693,7 @@ struct HaramView: View {
     var body: some View {
         List {
             Section(header: Text("OVERVIEW")) {
-                Text("Masjid Al-Haram (ٱلمَسجِدُ ٱلحَرَام), or “The Sacred Mosque,“ is located in **Mecca**, Saudi Arabia. It is the largest mosque in the world and surrounds the **Ka'bah** (ٱلكَعبَة), the holiest site in Islam. The Ka'bah is also known as “The House of Allah“ (بَيتُ ٱللَّه).")
+                Text("Masjid Al-Haram (ٱلمَسجِدُ ٱلحَرَام), or “The Sacred Mosque,“ is located in **Makkah**, Saudi Arabia. It is the largest mosque in the world and surrounds the **Ka'bah** (ٱلكَعبَة), the holiest site in Islam. The Ka'bah is also known as “The House of Allah“ (بَيتُ ٱللَّه).")
                     .font(.body)
                 
                 Text("Allah (Glorified and Exalted be He) says in the Quran:").font(.body)
@@ -1748,9 +1737,9 @@ struct HaramView: View {
                     .font(.body)
             }
             
-            Section(header: Text("QURANIC VERSES ABOUT MECCA")) {
-                Text("Allah mentions the sanctity of Mecca and Masjid Al-Haram in several verses:").font(.body)
-                Text("“Indeed, the first House [of worship] established for mankind was that at Mecca—blessed and a guidance for the worlds” (Quran 3:96).").font(.body).foregroundColor(settings.accentColor.color)
+            Section(header: Text("QURANIC VERSES ABOUT MAKKAH")) {
+                Text("Allah mentions the sanctity of Makkah and Masjid Al-Haram in several verses:").font(.body)
+                Text("“Indeed, the first House [of worship] established for mankind was that at Makkah—blessed and a guidance for the worlds” (Quran 3:96).").font(.body).foregroundColor(settings.accentColor.color)
                 Text("“And [mention] when We made the House (the Ka'bah) a place of return for the people and [a place of] security” (Quran 2:125).").font(.body).foregroundColor(settings.accentColor.color)
             }
             
@@ -1783,7 +1772,7 @@ struct NabawiView: View {
     var body: some View {
         List {
             Section(header: Text("OVERVIEW")) {
-                Text("Masjid An-Nabawi (ٱلمَسجِد ٱلنَّبَوِي), or “The Prophet’s Mosque,“ is located in Medina, Saudi Arabia. Originally known as Yathrib, the city was later renamed **Medina Al-Nabi (مَدِينَة ٱلنَّبِي)**, meaning “The City of the Prophet,“ or **Medina Al-Munawwara (ٱلمَدِينَة ٱلمُنَوَّرَة)**, “The Enlightened City,“ after the migration (Hijrah) of Prophet Muhammad (peace and blessings be upon him).")
+                Text("Masjid An-Nabawi (ٱلمَسجِد ٱلنَّبَوِي), or “The Prophet’s Mosque,“ is located in Madinah, Saudi Arabia. Originally known as Yathrib, the city was later renamed **Madinah Al-Nabi (مَدِينَة ٱلنَّبِي)**, meaning “The City of the Prophet,“ or **Madinah Al-Munawwara (ٱلمَدِينَة ٱلمُنَوَّرَة)**, “The Enlightened City,“ after the migration (Hijrah) of Prophet Muhammad (peace and blessings be upon him).")
                     .font(.body)
 
                 Text("This mosque, built by the Prophet (peace and blessings be upon him) in 622 CE, is the second holiest site in Islam after Masjid Al-Haram. The Prophet (peace and blessings be upon him) made it a center of worship, governance, and community life.")
@@ -1802,7 +1791,7 @@ struct NabawiView: View {
                     .font(.body)
                     .foregroundColor(settings.accentColor.color)
 
-                Text("The mosque also contains the tomb of the Prophet Muhammad (peace and blessings be upon him) and his companions Abu Bakr As-Siddiq and Umar ibn Al-Khattab (may Allah be pleased with them). Visiting the Prophet’s grave is a recommended act of devotion when in Medina.")
+                Text("The mosque also contains the tomb of the Prophet Muhammad (peace and blessings be upon him) and his companions Abu Bakr As-Siddiq and Umar ibn Al-Khattab (may Allah be pleased with them). Visiting the Prophet’s grave is a recommended act of devotion when in Madinah.")
                     .font(.body)
             }
 
@@ -1852,7 +1841,7 @@ struct AqsaView: View {
     var body: some View {
         List {
             Section(header: Text("OVERVIEW")) {
-                Text("Masjid Al-Aqsa (ٱلمَسجِد ٱلأَقصَىٰ), meaning “The Farthest Mosque,“ is located in Jerusalem, Palestine, within a compound known as **Al-Haram Ash-Sharif (ٱلحَرَم ٱلشَّرِيف)**, or “The Noble Sanctuary.“ It is the third holiest mosque in Islam after Masjid Al-Haram in Mecca and Masjid An-Nabawi in Medina.")
+                Text("Masjid Al-Aqsa (ٱلمَسجِد ٱلأَقصَىٰ), meaning “The Farthest Mosque,“ is located in Jerusalem, Palestine, within a compound known as **Al-Haram Ash-Sharif (ٱلحَرَم ٱلشَّرِيف)**, or “The Noble Sanctuary.“ It is the third holiest mosque in Islam after Masjid Al-Haram in Makkah and Masjid An-Nabawi in Madinah.")
                     .font(.body)
                 
                 Text("Masjid Al-Aqsa holds immense historical and spiritual significance in Islam. Allah (Glorified and Exalted be He) mentions it in the Quran:").font(.body)
@@ -1860,7 +1849,7 @@ struct AqsaView: View {
                     .font(.body)
                     .foregroundColor(settings.accentColor.color)
                 
-                Text("It was the first Qiblah (direction of prayer) for Muslims before it was changed to the Ka'bah in Mecca, and it was the destination of the Prophet Muhammad’s (peace and blessings be upon him) Night Journey (Isra) before his Ascension (Mi'raj).")
+                Text("It was the first Qiblah (direction of prayer) for Muslims before it was changed to the Ka'bah in Makkah, and it was the destination of the Prophet Muhammad’s (peace and blessings be upon him) Night Journey (Isra) before his Ascension (Mi'raj).")
                     .font(.body)
             }
 
@@ -2181,7 +2170,7 @@ struct AdhanOtherView: View {
                 Text("It is recited in Arabic to announce the time for each of the five daily prayers.")
                     .font(.body)
 
-                Text("The Adhan originated during the time of Prophet Muhammad (peace and blessings be upon him) in Medina.")
+                Text("The Adhan originated during the time of Prophet Muhammad (peace and blessings be upon him) in Madinah.")
                     .font(.body)
 
                 Text("The method of calling to prayer was revealed through the dream of Abdullah ibn Zaid (may Allah be pleased with him), and the Prophet (peace and blessings be upon him) chose Bilal ibn Rabah (may Allah be pleased with him) to deliver it because of his melodious and powerful voice.")
@@ -2189,28 +2178,26 @@ struct AdhanOtherView: View {
             }
 
             Section(header: Text("WORDS OF THE ADHAN")) {
-                HStack {
-                    Spacer()
-                    Text("""
-                    اللَّهُ أَكبَرُ، اللَّهُ أَكبَرُ
-                    اللَّهُ أَكبَرُ، اللَّهُ أَكبَرُ
+                Text("""
+                اللَّهُ أَكبَرُ، اللَّهُ أَكبَرُ
+                اللَّهُ أَكبَرُ، اللَّهُ أَكبَرُ
 
-                    أَشهَدُ أَن لَا إِلَٰهَ إِلَّا اللَّهُ
-                    أَشهَدُ أَن لَا إِلَٰهَ إِلَّا اللَّهُ
+                أَشهَدُ أَن لَا إِلَٰهَ إِلَّا اللَّهُ
+                أَشهَدُ أَن لَا إِلَٰهَ إِلَّا اللَّهُ
 
-                    أَشهَدُ أَنَّ مُحَمَّدًا رَسُولُ اللَّهِ
-                    أَشهَدُ أَنَّ مُحَمَّدًا رَسُولُ اللَّهِ
+                أَشهَدُ أَنَّ مُحَمَّدًا رَسُولُ اللَّهِ
+                أَشهَدُ أَنَّ مُحَمَّدًا رَسُولُ اللَّهِ
 
-                    حَيَّ عَلَى الصَّلَاةِ، حَيَّ عَلَى الصَّلَاةِ
-                    حَيَّ عَلَى الفَلَاحِ، حَيَّ عَلَى الفَلَاحِ
+                حَيَّ عَلَى الصَّلَاةِ، حَيَّ عَلَى الصَّلَاةِ
+                حَيَّ عَلَى الفَلَاحِ، حَيَّ عَلَى الفَلَاحِ
 
-                    اللَّهُ أَكبَرُ، اللَّهُ أَكبَرُ
-                    لَا إِلَٰهَ إِلَّا اللَّهُ
-                    """)
-                    .font(.body)
-                    .multilineTextAlignment(.trailing)
-                    .foregroundColor(settings.accentColor.color)
-                }
+                اللَّهُ أَكبَرُ، اللَّهُ أَكبَرُ
+                لَا إِلَٰهَ إِلَّا اللَّهُ
+                """)
+                .font(.body)
+                .multilineTextAlignment(.trailing)
+                .foregroundColor(settings.accentColor.color)
+                .frame(maxWidth: .infinity, alignment: .trailing)
 
                 Text("""
                 Allahu Akbar, Allahu Akbar
@@ -2287,28 +2274,26 @@ struct IqamahView: View {
             }
 
             Section(header: Text("WORDS OF THE IQAMAH")) {
-                HStack {
-                    Spacer()
-                    Text("""
-                    اللَّهُ أَكبَرُ، اللَّهُ أَكبَرُ
+                Text("""
+                اللَّهُ أَكبَرُ، اللَّهُ أَكبَرُ
 
-                    أَشهَدُ أَن لَا إِلَٰهَ إِلَّا اللَّهُ
+                أَشهَدُ أَن لَا إِلَٰهَ إِلَّا اللَّهُ
 
-                    أَشهَدُ أَنَّ مُحَمَّدًا رَسُولُ اللَّهِ
+                أَشهَدُ أَنَّ مُحَمَّدًا رَسُولُ اللَّهِ
 
-                    حَيَّ عَلَى الصَّلَاةِ، حَيَّ عَلَى الفَلَاحِ
+                حَيَّ عَلَى الصَّلَاةِ، حَيَّ عَلَى الفَلَاحِ
 
-                    قَد قَامَتِ الصَّلَاةُ
-                    قَد قَامَتِ الصَّلَاةُ
+                قَد قَامَتِ الصَّلَاةُ
+                قَد قَامَتِ الصَّلَاةُ
 
-                    اللَّهُ أَكبَرُ، اللَّهُ أَكبَرُ
+                اللَّهُ أَكبَرُ، اللَّهُ أَكبَرُ
 
-                    لَا إِلَٰهَ إِلَّا اللَّهُ
-                    """)
-                    .font(.body)
-                    .multilineTextAlignment(.trailing)
-                    .foregroundColor(settings.accentColor.color)
-                }
+                لَا إِلَٰهَ إِلَّا اللَّهُ
+                """)
+                .font(.body)
+                .multilineTextAlignment(.trailing)
+                .foregroundColor(settings.accentColor.color)
+                .frame(maxWidth: .infinity, alignment: .trailing)
 
                 Text("""
                 Allahu Akbar, Allahu Akbar
@@ -2364,7 +2349,7 @@ struct TakbiratView: View {
                 Text("1. **Eid al-Fitr (عيد الفطر):** Celebrated at the end of Ramadan (the month of fasting). It is a time of joy, gratitude to Allah (Glorified and Exalted be He), and giving to the needy (Zakat al-Fitr).")
                     .font(.body)
                 
-                Text("2. **Eid al-Adha (عيد الأضحى):** Celebrated on the 10th day of Dhu al-Hijjah. It commemorates the willingness of Prophet Ibrahim (peace be upon him) to sacrifice his son Isma'il (peace be upon him). Muslims who are able to do so perform the sacrifice (Qurbani) and distribute the meat to the poor. This Eid coincides with Hajj, the annual pilgrimage to Mecca.")
+                Text("2. **Eid al-Adha (عيد الأضحى):** Celebrated on the 10th day of Dhu al-Hijjah. It commemorates the willingness of Prophet Ibrahim (peace be upon him) to sacrifice his son Isma'il (peace be upon him). Muslims who are able to do so perform the sacrifice (Qurbani) and distribute the meat to the poor. This Eid coincides with Hajj, the annual pilgrimage to Makkah.")
                     .font(.body)
             }
 
@@ -2387,13 +2372,11 @@ struct TakbiratView: View {
                 Text("This is the short version of the Takbir:")
                     .font(.body)
 
-                HStack {
-                    Spacer()
-                    Text("الله أكبر الله أكبر لا إله إلا الله، والله أكبر الله أكبر ولله الحمد")
-                        .font(.body)
-                        .foregroundColor(settings.accentColor.color)
-                        .multilineTextAlignment(.trailing)
-                }
+                Text("الله أكبر الله أكبر لا إله إلا الله، والله أكبر الله أكبر ولله الحمد")
+                    .font(.body)
+                    .foregroundColor(settings.accentColor.color)
+                    .multilineTextAlignment(.trailing)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
 
                 Text("Allahu Akbar, Allahu Akbar, La Ilaha Illa Allah, Allahu Akbar, Allahu Akbar, wa lillahil hamd")
                     .font(.body)
@@ -2403,25 +2386,23 @@ struct TakbiratView: View {
             }
 
             Section(header: Text("LONGER TAKBIRAT")) {
-                HStack {
-                    Spacer()
-                    Text("""
-                    اللَّهُ أَكبَرُ، اللَّهُ أَكبَرُ، اللَّهُ أَكبَرُ، لَا إِلَهَ إِلَّا اللَّهُ
+                Text("""
+                اللَّهُ أَكبَرُ، اللَّهُ أَكبَرُ، اللَّهُ أَكبَرُ، لَا إِلَهَ إِلَّا اللَّهُ
 
-                    اللَّهُ أَكبَرُ، اللَّهُ أَكبَرُ، وَلِلَّهِ الحَمدُ
+                اللَّهُ أَكبَرُ، اللَّهُ أَكبَرُ، وَلِلَّهِ الحَمدُ
 
-                    اللَّهُ أَكبَرُ كَبِيرًا، وَالحَمدُ لِلَّهِ كَثِيرًا، وَسُبحَانَ اللَّهِ بُكرَةً وَأَصِيلًا
+                اللَّهُ أَكبَرُ كَبِيرًا، وَالحَمدُ لِلَّهِ كَثِيرًا، وَسُبحَانَ اللَّهِ بُكرَةً وَأَصِيلًا
 
-                    لَا إِلَهَ إِلَّا اللَّهُ وَحدَهُ، صَدَقَ وَعدَهُ، وَنَصَرَ عَبدَهُ، وَأَعَزَّ جُندَهُ، وَهَزَمَ الأَحزَابَ وَحدَهُ
+                لَا إِلَهَ إِلَّا اللَّهُ وَحدَهُ، صَدَقَ وَعدَهُ، وَنَصَرَ عَبدَهُ، وَأَعَزَّ جُندَهُ، وَهَزَمَ الأَحزَابَ وَحدَهُ
 
-                    لَا إِلَهَ إِلَّا اللَّهُ، وَلَا نَعبُدُ إِلَّا إِيَّاهُ، مُخلِصِينَ لَهُ الدِّينَ وَلَو كَرِهَ الكَافِرُونَ
+                لَا إِلَهَ إِلَّا اللَّهُ، وَلَا نَعبُدُ إِلَّا إِيَّاهُ، مُخلِصِينَ لَهُ الدِّينَ وَلَو كَرِهَ الكَافِرُونَ
 
-                    اللَّهُمَّ صَلِّ عَلَى سَيِّدِنَا مُحَمَّدٍ، وَعَلَى آلِ سَيِّدِنَا مُحَمَّدٍ، وَعَلَى أَصحَابِ سَيِّدِنَا مُحَمَّدٍ، وَعَلَى أَنصَارِ سَيِّدِنَا مُحَمَّدٍ، وَعَلَى أَزوَاجِ سَيِّدِنَا مُحَمَّدٍ، وَعَلَى ذُرِّيَّةِ سَيِّدِنَا مُحَمَّدٍ، وَسَلِّم تَسلِيمًا كَثِيرًا
-                    """)
-                    .font(.body)
-                    .foregroundColor(settings.accentColor.color)
-                    .multilineTextAlignment(.trailing)
-                }
+                اللَّهُمَّ صَلِّ عَلَى سَيِّدِنَا مُحَمَّدٍ، وَعَلَى آلِ سَيِّدِنَا مُحَمَّدٍ، وَعَلَى أَصحَابِ سَيِّدِنَا مُحَمَّدٍ، وَعَلَى أَنصَارِ سَيِّدِنَا مُحَمَّدٍ، وَعَلَى أَزوَاجِ سَيِّدِنَا مُحَمَّدٍ، وَعَلَى ذُرِّيَّةِ سَيِّدِنَا مُحَمَّدٍ، وَسَلِّم تَسلِيمًا كَثِيرًا
+                """)
+                .font(.body)
+                .foregroundColor(settings.accentColor.color)
+                .multilineTextAlignment(.trailing)
+                .frame(maxWidth: .infinity, alignment: .trailing)
 
                 Text("""
                 Allahu Akbar, Allahu Akbar, Allahu Akbar, La ilaha illa Allah
@@ -2468,7 +2449,7 @@ struct CalendarView: View {
                 Text("The Hijri calendar, also known as the Islamic or Lunar Hijri calendar, consists of 12 lunar months in a year of 354 or 355 days.")
                     .font(.body)
                 
-                Text("It is used to determine key Islamic dates such as Ramadan, Hajj, and the two Eid festivals. The reference point (epoch) of the calendar is the Hijrah—the migration of Prophet Muhammad (peace and blessings be upon him) from Mecca to Medina in 622 CE.")
+                Text("It is used to determine key Islamic dates such as Ramadan, Hajj, and the two Eid festivals. The reference point (epoch) of the calendar is the Hijrah—the migration of Prophet Muhammad (peace and blessings be upon him) from Makkah to Madinah in 622 CE.")
                     .font(.body)
                 
                 Text("Allah (Glorified and Exalted be He) says in the Quran:")
@@ -2563,7 +2544,7 @@ struct CompileView: View {
             }
 
             Section(header: Text("FIRST COMPILATION UNDER ABU BAKR")) {
-                Text("After the Battle of Yamamah, many memorizers were martyred. At the counsel of Umar ibn al-Khattab, Caliph Abu Bakr commissioned Zayd ibn Thabit to collect the Quran into one compiled manuscript.")
+                Text("After the Battle of Yamamah, many memorizers were martyred. About one year after the Prophet’s death (12 AH), at the counsel of Umar ibn al-Khattab, Caliph Abu Bakr commissioned Zayd ibn Thabit to collect the Quran into one compiled manuscript.")
                     .font(.body)
 
                 Text("Zayd gathered the Quran from written materials and from those who had memorized it, accepting verses only when corroborated by multiple reliable witnesses and his own memorization, all according to what had been reviewed with Prophet Muhammad (peace and blessings be upon him).")
@@ -2602,7 +2583,7 @@ struct CompileView: View {
             }
 
             Section(header: Text("AHRUF, QIRAAT, AND THE UTHMANIC RASM")) {
-                Text("Prophet Muhammad (peace and blessings be upon him) taught that the Quran was revealed in seven Ahruf (modes) for ease. The Uthmanic rasm allowed what remained of those modes to be read and transmitted through canonical Qiraat verified by chains. The Ten Qiraat (with their twenty riwayaat) are mutawatir and reflect how the prophetic recitation was preserved in writing and oral teaching.")
+                Text("Prophet Muhammad (peace and blessings be upon him) taught that the Quran was revealed in seven Ahruf (modes) for ease. The Quran was first compiled into one manuscript under Abu Bakr (may Allah be pleased with him), around one year after the Prophet’s death. Later, the Uthmanic rasm allowed what remained of those modes to be read and transmitted through canonical Qiraat verified by chains. The 10 Qiraat (with their 20 Riwayaat) are mutawatir and reflect how the prophetic recitation was preserved in writing and oral teaching.")
                     .font(.body)
 
                 Text("Thus, standardization did not limit revelation; it safeguarded it — preventing private notes and unverified materials from being mistaken for the Quran — while preserving the legitimate readings taught by Prophet Muhammad (peace and blessings be upon him).")
@@ -2610,7 +2591,7 @@ struct CompileView: View {
             }
 
             Section(header: Text("KEY REPORTS (BRIEF)")) {
-                Text("• Seven Ahruf: “The Quran was revealed in seven Ahruf, so recite whichever is easiest for you.” (Sahih al-Bukhari; Sahih Muslim)")
+                Text("• 7 Ahruf: “The Quran was revealed in seven Ahruf, so recite whichever is easiest for you.” (Sahih al-Bukhari; Sahih Muslim)")
                     .font(.body)
                 Text("• Double review in final Ramadan (al-Ardah al-Akhirah): reported in authentic narrations.")
                     .font(.body)
@@ -2673,9 +2654,29 @@ struct CompileView: View {
 
 struct TajweedView: View {
     @EnvironmentObject var settings: Settings
+    @State private var showTajweedLegend = false
 
     var body: some View {
         List {
+            Section(header: Text("TAJWEED LEGEND")) {
+                #if os(iOS)
+                Button {
+                    settings.hapticFeedback()
+                    showTajweedLegend = true
+                } label: {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Quick Reference Guide")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundColor(settings.accentColor.color)
+                        Text("Simple way to view basic Hafs An Assim Tajweed rules with colors")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                #endif
+            }
+
             Section(header: Text("DEFINITION")) {
                 Text("Tajweed (تَجوِيد) means “to beautify or improve.” In the context of the Quran, it refers to the set of rules for proper pronunciation during Quran recitation, ensuring each letter is articulated with precision.")
                     .font(.body)
@@ -2689,34 +2690,71 @@ struct TajweedView: View {
             }
 
             Section(header: Text("IMPORTANCE")) {
-                Text("Tajweed is an essential science in Islam. It preserves the authenticity of Allah's words as revealed to Prophet Muhammad (peace and blessings be upon him).")
+                Text("Tajweed ensures the Quran is recited in the most accurate and beautiful way possible, exactly as it was revealed to the Prophet ﷺ. Reciting with Tajweed is not just about making recitation sound pleasant—it is about preserving the integrity of the Quran itself.")
                     .font(.body)
 
-                Text("By learning Tajweed, Muslims can recite the Quran accurately, reflecting its divine beauty and following the Sunnah of the Prophet (peace and blessings be upon him).")
-                    .font(.body)
-            }
-
-            Section(header: Text("BENEFITS")) {
-                Text("• Ensures proper articulation and pronunciation of Arabic letters.")
+                Text("The Quran was revealed in Arabic, and every word, letter, and sound has a specific meaning and weight. A slight mispronunciation could change the meaning of a verse. Tajweed helps safeguard against these errors and honors the sacred text with the care and precision it deserves.")
                     .font(.body)
 
-                Text("• Enhances the spiritual experience of reciting the Quran.")
-                    .font(.body)
-
-                Text("• Avoids errors that might change the meaning of the text.")
-                    .font(.body)
-
-                Text("• Fulfills the prophetic tradition of reciting the Quran as it was revealed.")
+                Text("Many Muslims find that reciting the Quran with Tajweed enhances their spiritual experience. The attention to detail required for proper recitation encourages mindfulness and deeper reflection on the meaning of the verses, making the recitation feel more immersive and meaningful.")
                     .font(.body)
             }
 
-            Section(header: Text("USEFUL LINKS")) {
+            Section(header: Text("WHY LEARN TAJWEED?")) {
+                Text("Honoring the Quran: The Quran is the final revelation from Allah. Reciting it with care and precision is a form of respect and reverence for the sacred text.")
+                    .font(.body)
+
+                Text("Preventing Misunderstandings: By applying Tajweed rules, you avoid mistakes that may alter the meaning of verses. Even changing a single sound can result in an entirely different meaning.")
+                    .font(.body)
+
+                Text("Enhancing Spiritual Connection: Proper recitation encourages mindfulness and deeper reflection on the meaning of the verses, making your connection with the Quran more meaningful.")
+                    .font(.body)
+
+                Text("Following the Sunnah: The Prophet Muhammad ﷺ emphasized the importance of reciting the Quran correctly. By learning Tajweed, you follow his example and teachings.")
+                    .font(.body)
+            }
+
+            Section(header: Text("GETTING STARTED")) {
+                Text("Learning Tajweed might seem intimidating at first, but understanding its importance can make the journey more meaningful. The best way to start is with a qualified teacher who can guide you through the articulation points and characteristics of each letter. Today, there are also online platforms, videos, and books that provide step-by-step lessons.")
+                    .font(.body)
+
+                Text("Focus on mastering the basic rules first, then gradually build your skills over time. Practicing consistently and recording your recitation can help you catch mistakes and improve pronunciation.")
+                    .font(.body)
+            }
+
+            Section(header: Text("FOR MORE DETAILS")) {
+                NavigationLink(destination: TajweedFoundationsView()) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Tajweed Foundations")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundColor(settings.accentColor.color)
+                        Text("Comprehensive guide with rules, topics, and detailed explanations")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
+
+            Section(header: Text("RESOURCES")) {
                 Text("Watch Learn Arabic 101: https://www.youtube.com/@Arabic101")
                     .font(.caption)
+            }
+
+            Section(header: Text("NOTE")) {
+                Text("This covers Tajweed rules for Hafs An Assim recitation, the most widely used qiraah. Other qiraat may apply these rules slightly differently.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
         }
         .navigationTitle("Tajweed")
         .applyConditionalListStyle(defaultView: settings.defaultView)
+        #if os(iOS)
+        .sheet(isPresented: $showTajweedLegend) {
+            NavigationView {
+                TajweedLegendView()
+            }
+        }
+        #endif
     }
 }
 
@@ -2834,15 +2872,15 @@ struct AhrufView: View {
                 Text("• Prophet Muhammad (peace and blessings be upon him) taught the Companions each harf personally.\n• Jibril reviewed the Quran with Prophet Muhammad (peace and blessings be upon him) every year in Ramadan.\n• In the year Prophet Muhammad (peace and blessings be upon him) passed away, Jibril reviewed it twice (al-Ardah al-Akhirah).")
                     .font(.body)
 
-                Text("During the caliphate of Uthman (may Allah be pleased with him), the Ummah was unified upon the written Uthmanic mushaf, which preserved what the Ummah recited — containing what remained from the seven Ahruf in the Uthmanic rasm.")
+                Text("About one year after the Prophet’s passing, Abu Bakr (may Allah be pleased with him) commissioned the first complete compilation of the Quran into one manuscript. During the caliphate of Uthman (may Allah be pleased with him), the Ummah was then unified upon official copies from that preserved compilation, written in the Uthmanic rasm, which preserved what the Ummah recited — containing what remained from the seven Ahruf in the rasm.")
                     .font(.body)
 
                 Text("The Ahruf are preserved through oral transmission, ijazahs, and chains of narration (isnad).")
                     .font(.body)
             }
 
-            Section(header: Text("WHAT ABOUT THE TEN QIRAAT?")) {
-                Text("The Ten Qiraat are the mass-transmitted (mutawatir) methods that show how the Ahruf were preserved through the Uthmanic mushaf and teaching traditions.")
+            Section(header: Text("WHAT ABOUT THE 10 QIRAAT?")) {
+                Text("The 10 Qiraat are the mass-transmitted (mutawatir) methods that show how the Ahruf were preserved through the Uthmanic mushaf and teaching traditions.")
                     .font(.body)
 
                 Text("Each Qiraah has an unbroken chain (isnad) from the reciter → to his teacher → back to Prophet Muhammad (peace and blessings be upon him).")
@@ -2859,7 +2897,7 @@ struct AhrufView: View {
             }
 
         }
-        .navigationTitle("Seven Ahruf (Modes)")
+        .navigationTitle("7 Ahruf (Modes)")
         .applyConditionalListStyle(defaultView: settings.defaultView)
     }
 }
@@ -2870,10 +2908,10 @@ struct QiraatView: View {
     var body: some View {
         List {
             Section(header: Text("OVERVIEW")) {
-                Text("The Ten Qiraat (قِرَاءَات) — from the root q–r–a (قرأ) meaning “to read/recite” — literally means “readings/recitations.” Islamically and Quranically, a Qiraah (قِرَاءَة) is a specific, verified method of reciting the Quran. The Ten Qiraat are the preserved, mass-transmitted (mutawatir - مُتَوَاتِر) recitations of the Quran — each a precise method taught by Prophet Muhammad (peace and blessings be upon him) and transmitted through authentic chains of narrators (isnad إِسنَاد). They do not represent different Qurans, but different prophetic ways of reciting the same revelation.")
+                Text("The 10 Qiraat (قِرَاءَات) — from the root q–r–a (قرأ) meaning “to read/recite” — literally means “readings/recitations.” Islamically and Quranically, a Qiraah (قِرَاءَة) is a specific, verified method of reciting the Quran. The 10 Qiraat are the preserved, mass-transmitted (mutawatir - مُتَوَاتِر) recitations of the Quran — each a precise method taught by Prophet Muhammad (peace and blessings be upon him) and transmitted through authentic chains of narrators (isnad إِسنَاد). They do not represent different Qurans, but different prophetic ways of reciting the same revelation.")
                     .font(.body)
 
-                Text("As covered in the previous section, the Quran was revealed by Allah (Glorified and Exalted be He) in seven Ahruf (أَحرُف) — modes of recitation for ease. Jibril (Gabriel) brought these modes to Prophet Muhammad (peace and blessings be upon him), who taught them to the Ummah. The Qiraat show how those Ahruf were preserved in practice through the Uthmanic rasm (الرَّسم العُثمَانِي) — the consonantal skeleton of the mushaf (مُصحَف).")
+                Text("As covered in the previous section, the Quran was revealed by Allah (Glorified and Exalted be He) in seven Ahruf (أَحرُف) — modes of recitation for ease. Jibril (Gabriel) brought these modes to Prophet Muhammad (peace and blessings be upon him), who taught them to the Ummah. Around one year after the Prophet’s passing, Abu Bakr (may Allah be pleased with him) commissioned the first complete compilation of the Quran into one manuscript, and later Uthman (may Allah be pleased with him) unified public recitation upon official copies from that preserved text. The Qiraat show how those Ahruf were preserved in practice through the Uthmanic rasm (الرَّسم العُثمَانِي) — the consonantal skeleton of the mushaf (مُصحَف).")
                     .font(.body)
             }
 
@@ -2881,7 +2919,7 @@ struct QiraatView: View {
                 Text("A Qiraah (قراءة) is a canonical, authenticated way of reciting the Quran that meets three criteria: (1) agreement with the Uthmanic rasm (الرسم العثماني), (2) sound Arabic language, and (3) authentic, widespread transmission (tawatur تواتر).")
                     .font(.body)
 
-                Text("All Ten Qiraat return to Prophet Muhammad (peace and blessings be upon him). Every reciter has an unbroken chain of students → teachers → Companions → Prophet Muhammad (peace and blessings be upon him).")
+                Text("All 10 Qiraat return to Prophet Muhammad (peace and blessings be upon him). Every reciter has an unbroken chain of students → teachers → Companions → Prophet Muhammad (peace and blessings be upon him).")
                     .font(.body)
                     .foregroundColor(settings.accentColor.color)
 
@@ -2898,10 +2936,10 @@ struct QiraatView: View {
                 Text("• Riwayah: the narration/transmission of that Qiraah by a primary rawi (narrator). Each Qiraah has two principal riwayaat (plural of riwayah).")
                     .font(.body)
 
-                Text("Example: “Hafs ‘an Asim” means the riwayah (narration) of Hafs (حفص) from the Qiraah (recitation) of Asim (عاصم). “Warsh ‘an Nafi” means the riwayah of Warsh (ورش) from the Qiraah of Nafi (نافع).")
+                Text("Example: “Hafs an Asim” means the riwayah (narration) of Hafs (حفص) from the Qiraah (recitation) of Asim (عاصم). “Warsh an Nafi” means the riwayah of Warsh (ورش) from the Qiraah of Nafi (نافع).")
                     .font(.body)
 
-                Text("Hafs ‘an Asim is the most widespread globally today; that does not mean it is the only right one. All Ten Qiraat (and their Twenty Riwayaat) are valid, mutawatir, and from Prophet Muhammad (peace and blessings be upon him).")
+                Text("Hafs an Asim is the most widespread globally today; that does not mean it is the only right one. All 10 Qiraat (and their 20 Riwayaat) are valid, mutawatir, and from Prophet Muhammad (peace and blessings be upon him).")
                     .font(.body)
                     .foregroundColor(settings.accentColor.color)
             }
@@ -2910,19 +2948,19 @@ struct QiraatView: View {
                 Text("Many people hear about 7 and 10 together. Both references are used by scholars: the famous seven canonical recitations (al-Sab'ah) and the full ten canonical Qiraat (7 + 3), all preserved through reliable transmission.")
                     .font(.body)
 
-                Text("The original seven were famously codified by Imam Abu Bakr Ibn Mujahid. Their Imams are: Nafi' (Madinah), Ibn Kathir (Makkah), Abu 'Amr (Basra), Ibn 'Amir (Damascus), 'Asim (Kufa), Hamzah (Kufa), and Al-Kisa'i (Kufa).")
+                Text("The original seven were famously codified by Imam Abu Bakr Ibn Mujahid. Their Imams are: Nafi (Madinah), Ibn Kathir (Makkah), Abi Amr (Basra), Ibn Amir (Damascus), Asim (Kufa), Hamzah (Kufa), and al-Kisai (Kufa).")
                     .font(.body)
 
-                Text("Hafs is a riwayah from 'Asim, and Warsh is a riwayah from Nafi'. So when people say Hafs or Warsh, they are naming a narration path within the canonical recitation tradition.")
+                Text("Hafs is a riwayah from Asim, and Warsh is a riwayah from Nafi. So when people say Hafs or Warsh, they are naming a narration path within the canonical recitation tradition.")
                     .font(.body)
 
-                Text("Today, Hafs 'an 'Asim is the most widely recited globally (often estimated around 90%+), while other canonical recitations such as Warsh remain authentic and practiced.")
+                Text("Today, Hafs an Asim is the most widely recited globally (often estimated around 90%+), while other canonical recitations such as Warsh an Nafi remain authentic and practiced.")
                     .font(.body)
                     .foregroundColor(settings.accentColor.color)
             }
 
             Section(header: Text("AUTHENTICITY & PRESERVATION")) {
-                Text("The Ten Qiraat are mutawatir — mass attested by many independent chains. They are part of the precise preservation Allah (Glorified and Exalted be He) promised for His Book.")
+                Text("The 10 Qiraat are mutawatir — mass attested by many independent chains. They are part of the precise preservation Allah (Glorified and Exalted be He) promised for His Book.")
                     .font(.body)
 
                 Text("“Indeed, We have sent down the Reminder, and indeed, We will be its Guardian.” (Quran 15:9)")
@@ -2943,19 +2981,19 @@ struct QiraatView: View {
             }
 
             Section(header: Text("THE 10 QIRAAT (القراءات)")) {
-                Text("The Ten Qiraat are the canonical recitation methods of the Quran. Each is named after its primary teacher (the Imam of that recitation).")
+                Text("The 10 Qiraat are the canonical recitation methods of the Quran. Each is named after its primary teacher (the Imam of that recitation).")
                     .font(.body)
 
                 Group {
                     Text("• Nafi (نَافِع)").font(.body)
                     Text("• Ibn Kathir (ابنِ كَثِير)").font(.body)
-                    Text("• Abu Amr (أَبُو عَمرٍو)").font(.body)
+                    Text("• Abi Amr (أَبُو عَمرٍو)").font(.body)
                     Text("• Ibn Amir (ابنُ عَامِر)").font(.body)
                     Text("• Asim (عَاصِم)").font(.body)
                     Text("• Hamzah (حَمزَة)").font(.body)
-                    Text("• Al-Kisai (الكِسَائِي)").font(.body)
-                    Text("• Abu Ja'far (أَبُو جَعفَر)").font(.body)
-                    Text("• Ya'qub (يَعقُوب)").font(.body)
+                    Text("• al-Kisai (الكِسَائِي)").font(.body)
+                    Text("• Abi Jafar (أَبُو جَعفَر)").font(.body)
+                    Text("• Yaqoub (يَعقُوب)").font(.body)
                     Text("• Khalaf al-Ashir (خَلَف العَاشِر)").font(.body)
                 }
             }
@@ -2968,31 +3006,31 @@ struct QiraatView: View {
                     Text("• Warsh an Nafi (وَرش عَن نَافِع)").font(.body)
                     Text("• Qalun an Nafi (قَالُون عَن نَافِع)").font(.body)
 
-                    Text("• Al-Bazzi an Ibn Kathir (البَزِّي عَن ابنِ كَثِير)").font(.body)
+                    Text("• al-Bazzi an Ibn Kathir (البَزِّي عَن ابنِ كَثِير)").font(.body)
                     Text("• Qunbul an Ibn Kathir (قُنبُل عَن ابنِ كَثِير)").font(.body)
 
-                    Text("• Ad-Duri an Abi Amr (الدُّورِي عَن أَبِي عَمرٍو)").font(.body)
-                    Text("• As-Susi an Abi Amr (السُّوسِي عَن أَبِي عَمرٍو)").font(.body)
+                    Text("• ad-Duri an Abi Amr (الدُّورِي عَن أَبِي عَمرٍو)").font(.body)
+                    Text("• as-Susi an Abi Amr (السُّوسِي عَن أَبِي عَمرٍو)").font(.body)
 
                     Text("• Hisham an Ibn Amir (هِشَام عَن ابنِ عَامِر)").font(.body)
                     Text("• Ibn Dhakwan an Ibn Amir (ابنُ ذَكوَان عَن ابنِ عَامِر)").font(.body)
 
+                    Text("• Shubah an Asim (شُعبَة عَن عَاصِم)").font(.body)
                     Text("• Hafs an Asim (حَفص عَن عَاصِم)").font(.body)
-                    Text("• Shu'bah an Asim (شُعبَة عَن عَاصِم)").font(.body)
                 }
 
                 Group {
                     Text("• Khalaf an Hamzah (خَلَف عَن حَمزَة)").font(.body)
                     Text("• Khallad an Hamzah (خَلَّاد عَن حَمزَة)").font(.body)
 
-                    Text("• Abu al-Harith an Al-Kisai (أَبُو الحَارِث عَن الكِسَائِي)").font(.body)
-                    Text("• Ad-Duri an Al-Kisai (الدُّورِي عَن الكِسَائِي)").font(.body)
+                    Text("• Abu al-Harith an al-Kisai (أَبُو الحَارِث عَن الكِسَائِي)").font(.body)
+                    Text("• ad-Duri an al-Kisai (الدُّورِي عَن الكِسَائِي)").font(.body)
 
-                    Text("• Ibn Wardān an Abu Ja'far (ابنُ وَردَان عَن أَبِي جَعفَر)").font(.body)
-                    Text("• Ibn Jammaz an Abu Ja'far (ابنُ جَمَّاز عَن أَبِي جَعفَر)").font(.body)
+                    Text("• Ibn Wardan an Abi Jafar (ابنُ وَردَان عَن أَبِي جَعفَر)").font(.body)
+                    Text("• Ibn Jammaz an Abi Jafar (ابنُ جَمَّاز عَن أَبِي جَعفَر)").font(.body)
 
-                    Text("• Ruways an Ya'qub (رُوَيس عَن يَعقُوب)").font(.body)
-                    Text("• Rawh an Ya'qub (رَوح عَن يَعقُوب)").font(.body)
+                    Text("• Ruways an Yaqoub (رُوَيس عَن يَعقُوب)").font(.body)
+                    Text("• Rawh an Yaqoub (رَوح عَن يَعقُوب)").font(.body)
 
                     Text("• Ishaq an Khalaf al-Ashir (إِسحَاق عَن خَلَف العَاشِر)").font(.body)
                     Text("• Idris an Khalaf al-Ashir (إِدرِيس عَن خَلَف العَاشِر)").font(.body)
@@ -3000,17 +3038,17 @@ struct QiraatView: View {
             }
 
             Section(header: Text("OTHER REPORTED QIRAAT")) {
-                Text("There are other reported qiraat besides these Ten. Unlike the Ten Qiraat, which are mutawatir and mass attested, those others do not reach mutawatir status. That does not automatically make them inauthentic — some have isnad to Prophet Muhammad (peace and blessings be upon him) — but because they are not mass attested, we avoid them in public recitation and worship.")
+                Text("There are other reported qiraat besides these Ten. Unlike the 10 Qiraat, which are mutawatir and mass attested, those others do not reach mutawatir status. That does not automatically make them inauthentic — some have isnad to Prophet Muhammad (peace and blessings be upon him) — but because they are not mass attested, we avoid them in public recitation and worship.")
                     .font(.body)
 
-                Text("We recite what is known with certainty (yaqin يقين) to be from Prophet Muhammad (peace and blessings be upon him) — the Ten Qiraat and their 20 riwayaat. This unites the Ummah upon what is rigorously established.")
+                Text("We recite what is known with certainty (yaqin يقين) to be from Prophet Muhammad (peace and blessings be upon him) — the 10 Qiraat and their 20 Riwayaat. This unites the Ummah upon what is rigorously established.")
                     .font(.body)
             }
 
             Section(header: Text("PRACTICAL STUDY & ADVICE")) {
                 Text("• Learn with a qualified teacher who has ijazah (إجازة) and isnad (إسناد). Do not self-invent pronunciations or rely only on apps without verification.")
                     .font(.body)
-                Text("• Begin with one riwayah (commonly Hafs ‘an Asim), then explore others (e.g., Warsh ‘an Nafi) as you progress.")
+                Text("• Begin with one riwayah (commonly Hafs an Asim), then explore others (e.g., Warsh an Nafi) as you progress.")
                     .font(.body)
                 Text("• Remember: differences are a mercy, not a contradiction. They illuminate the Quran’s depth and precision.")
                     .font(.body)
@@ -3022,7 +3060,7 @@ struct QiraatView: View {
             }
 
             Section(header: Text("RECAP")) {
-                Text("“The Ten Qiraat are the preserved, mass-transmitted (mutawatir) recitations taught by Prophet Muhammad (peace and blessings be upon him), passed down through authentic chains. Each Qiraah is a specific, verified method of reciting the Quran — not a different text. They reflect how the Ahruf were preserved in writing and oral transmission. All Ten Qiraat (and their Twenty Riwayaat) return to Prophet Muhammad (peace and blessings be upon him).”")
+                Text("“The 10 Qiraat are the preserved, mass-transmitted (mutawatir) recitations taught by Prophet Muhammad (peace and blessings be upon him), passed down through authentic chains. Each Qiraah is a specific, verified method of reciting the Quran — not a different text. They reflect how the Ahruf were preserved in writing and oral transmission. All 10 Qiraat (and their 20 Riwayaat) return to Prophet Muhammad (peace and blessings be upon him).”")
                     .font(.body)
                     .foregroundColor(settings.accentColor.color)
             }
@@ -3035,7 +3073,7 @@ struct QiraatView: View {
                     .font(.caption)
             }
         }
-        .navigationTitle("Ten Qiraat (Recitations)")
+        .navigationTitle("10 Qiraat (Recitations)")
         .applyConditionalListStyle(defaultView: settings.defaultView)
     }
 }
@@ -3129,6 +3167,9 @@ struct SahabahView: View {
 
                 Text("He was known as As-Siddiq (the Truthful) for immediately affirming the Prophet’s Night Journey (Isra’ and Mi’raj). He was chosen as the first Caliph after the Prophet’s death and led the Muslim Ummah with wisdom and justice.")
                     .font(.body)
+
+                Text("About one year after the Prophet’s passing, he commissioned Zayd ibn Thabit to compile the Quran into a single manuscript, preserving the revelation in written form alongside mass memorization.")
+                    .font(.body)
             }
 
             Section(header: Text("UMAR IBN AL-KHATTAB")) {
@@ -3144,7 +3185,7 @@ struct SahabahView: View {
             }
 
             Section(header: Text("UTHMAN IBN AFFAN")) {
-                Text("Uthman (may Allah be pleased with him) was known for his generosity, modesty, and devotion. He compiled the Quran into a single standardized text.")
+                Text("Uthman (may Allah be pleased with him) was known for his generosity, modesty, and devotion. He unified the Ummah upon official copies of the already compiled Quran, based on the manuscript first compiled under Abu Bakr.")
                     .font(.body)
 
                 Text("The Prophet (peace be upon him) said: “Every Prophet has a companion in Paradise, and my companion in Paradise is Uthman” (Sunan al-Tirmidhi 3707).")
@@ -3350,7 +3391,7 @@ struct CaliphatesView: View {
                 Text("Abu Bakr (may Allah be pleased with him), the Prophet’s closest companion and the first adult male to accept Islam, was chosen as the **first caliph** immediately after the Prophet’s passing. He was selected through consensus at Saqifah.")
                     .font(.body)
 
-                Text("He led decisively during a time of crisis, launching the **Riddah Wars** to bring back apostate tribes and false prophets. He initiated the first compilation of the Qur’an into a single manuscript.")
+                Text("He led decisively during a time of crisis, launching the **Riddah Wars** to bring back apostate tribes and false prophets. About one year after the Prophet’s death (12 AH), he initiated the first complete compilation of the Qur’an into a single manuscript.")
                     .font(.body)
 
                 Text("The Prophet (peace be upon him) said: “There is no one who has helped me more with his wealth and companionship than Abu Bakr” (Sahih al-Bukhari 3661).")
@@ -3380,7 +3421,7 @@ struct CaliphatesView: View {
                 Text("Uthman (may Allah be pleased with him) was chosen through a **council of six** appointed by Umar. Known for his generosity and modesty, he married two daughters of the Prophet Muhammad (peace be upon him) and was called **Dhu al-Nurayn** (ذُو ٱلنُّورَين – the Possessor of Two Lights).")
                     .font(.body)
 
-                Text("He **standardized the Qur’an** to preserve it in one dialect, avoiding future disputes. He sent official copies to major cities and burned differing versions.")
+                Text("He **standardized official copies of the Qur’an** from the already compiled manuscript preserved from Abu Bakr’s time, unifying public recitation and preventing disputes over unverified personal materials. He sent official copies to major cities and retired non-verified personal codices used outside official transmission.")
                     .font(.body)
 
                 Text("The Prophet (peace be upon him) said: “Should I not feel shy of the one whom the angels are shy of?” (Sahih Muslim 2401).")

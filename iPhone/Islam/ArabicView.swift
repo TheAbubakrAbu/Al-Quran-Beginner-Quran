@@ -65,9 +65,9 @@ struct ArabicView: View {
         if let weight = letter.weight {
             switch weight {
             case .heavy:
-                parts += ["heavy", "tafkhim", "tafkhīm", "isti'la", "istila", "isti‘la"]
+                parts += ["heavy", "tafkhim", "istila", "isti'la"]
             case .light:
-                parts += ["light", "tarqiq", "tarqīq"]
+                parts += ["light", "tarqiq"]
             case .conditional:
                 parts += ["conditional"]
             case .followsPrevious:
@@ -93,6 +93,9 @@ struct ArabicView: View {
 
     var body: some View {
         List {
+            #if os(watchOS)
+            fontPickerSection
+            #endif
             favoriteLettersSection
             mainLetterSections
             searchResultsSection
@@ -100,7 +103,7 @@ struct ArabicView: View {
         #if os(watchOS)
         .searchable(text: $searchText)
         #else
-        .safeAreaInset(edge: .bottom) {
+        .adaptiveSafeArea(edge: .bottom) {
             VStack(spacing: SafeAreaInsetVStackSpacing.standard) {
                 Picker("Arabic Font", selection: $settings.useFontArabic.animation(.easeInOut)) {
                     Text("Quranic Font").tag(true)
@@ -125,9 +128,10 @@ struct ArabicView: View {
                             .foregroundColor(settings.accentColor.color)
                             .transition(.opacity)
                     }
-                    .frame(width: 26, height: 26)
+                    .frame(width: 27, height: 27)
                     .padding()
                     .conditionalGlassEffect()
+                    .padding(.bottom, 2)
                 }
                 .padding([.leading, .top], -8)
             }
@@ -137,7 +141,6 @@ struct ArabicView: View {
         }
         #endif
         .applyConditionalListStyle(defaultView: settings.defaultView)
-        .dismissKeyboardOnScroll()
         .navigationTitle("Arabic Alphabet")
     }
 
@@ -149,6 +152,18 @@ struct ArabicView: View {
                     ArabicLetterRow(letterData: $0)
                 }
             }
+        }
+    }
+
+    @ViewBuilder
+    private var fontPickerSection: some View {
+        Section {
+            Picker("Arabic Font", selection: $settings.useFontArabic.animation(.easeInOut)) {
+                Text("Quranic Font").tag(true)
+                Text("Basic Font").tag(false)
+            }
+        } header: {
+            Text("ARABIC FONT")
         }
     }
 
@@ -189,7 +204,7 @@ struct ArabicView: View {
         case .similarity:
             ForEach(similarityGroups.indices, id: \.self) { idx in
                 let group = similarityGroups[idx]
-                let header = idx == 0 ? "VOWEL LETTERS" : group.joined(separator: " AND")
+                let header = idx == 0 ? "VOWEL LETTERS" : group.joined(separator: " - ")
                 Section(header) {
                     ForEach(group, id: \.self) { ch in
                         letterData(for: ch).map(ArabicLetterRow.init)
@@ -249,13 +264,9 @@ struct ArabicView: View {
                         .foregroundStyle(settings.accentColor.color)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
-                        #if os(iOS)
-                        .background(.ultraThinMaterial)
-                        #endif
-                        .clipShape(Capsule())
                         .conditionalGlassEffect()
+                        .opacity(searchText.isEmpty ? 0 : 1)
                 }
-                .padding(.vertical, 4)
             }
         }
     }
@@ -269,20 +280,7 @@ struct ArabicView: View {
     @ViewBuilder
     private var tajweedSection: some View {
         Section("QURAN SIGNS") {
-            StopInfoRow(title: "Make Sujood (Prostration)", symbol: "۩", color: settings.accentColor.color)
-            StopInfoRow(title: "The Mandatory Stop", symbol: "مـ", color: settings.accentColor.color)
-            StopInfoRow(title: "The Preferred Stop", symbol: "قلى", color: settings.accentColor.color)
-            StopInfoRow(title: "The Permissible Stop", symbol: "ج", color: settings.accentColor.color)
-            StopInfoRow(title: "The Short Pause", symbol: "س", color: settings.accentColor.color)
-            StopInfoRow(title: "Stop at One", symbol: "∴ ∴", color: settings.accentColor.color)
-            StopInfoRow(title: "The Preferred Continuation", symbol: "صلى", color: settings.accentColor.color)
-            StopInfoRow(title: "The Mandatory Continuation", symbol: "لا", color: settings.accentColor.color)
-
-            if let url = URL(string: "https://studioarabiya.com/blog/tajweed-rules-stopping-pausing-signs/") {
-                Link("View More: Tajweed Rules & Stopping/Pausing Signs", destination: url)
-                    .font(.subheadline)
-                    .foregroundColor(settings.accentColor.color)
-            }
+            QuranSignsSectionContent(accentColor: settings.accentColor.color)
         }
     }
 }
@@ -334,11 +332,18 @@ struct ArabicLetterView: View {
             Section(header: LetterSectionHeader(letterData: letterData)) {
                 VStack {
                     HStack(alignment: .center) {
-                        Spacer()
-
                         Text(letterData.transliteration)
                             .font(.subheadline)
 
+                        Spacer()
+                        
+                        Text(letterData.letter)
+                            .font(
+                                useQuranicFontForLetter
+                                    ? .custom(settings.fontArabic, size: UIFont.preferredFont(forTextStyle: .largeTitle).pointSize)
+                                    : .title
+                            )
+                        
                         Spacer()
 
                         Text(letterData.name)
@@ -347,21 +352,16 @@ struct ArabicLetterView: View {
                                     ? .custom(settings.fontArabic, size: UIFont.preferredFont(forTextStyle: .title1).pointSize)
                                     : .title2
                             )
-
-                        Spacer()
                     }
                 }
-                #if os(iOS)
-                .listRowSeparator(.hidden, edges: .bottom)
-                #endif
                 .padding(.vertical, useQuranicFontForLetter ? 0 : 2)
             }
 
             if let weight = letterData.weight {
                 Section(header: Text("LIGHT / HEAVY PRONUNCIATION")) {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text(weight == .heavy ? "Heavy letter (Tafkhīm)"
-                             : weight == .light ? "Light letter (Tarqīq)"
+                            Text(weight == .heavy ? "Heavy letter (Tafkhim)"
+                                : weight == .light ? "Light letter (Tarqiq)"
                              : weight == .conditional ? "Conditional letter"
                              : "Follows previous letter")
                             .font(.headline)
@@ -392,9 +392,6 @@ struct ArabicLetterView: View {
                         }
                     }
                 }
-                #if os(iOS)
-                .listRowSeparator(.hidden, edges: .bottom)
-                #endif
                 .padding(.vertical, useQuranicFontForLetter ? 0 : 2)
             }
 
@@ -445,25 +442,13 @@ struct ArabicLetterView: View {
                         .listRowSeparator(.hidden, edges: .bottom)
                         #endif
                     }
+                }
 
-                    #if os(iOS)
-                    Text("WITH ALIF HAMZA")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-
+                Section(header: Text("WITH HAMZA")) {
                     HamzaPracticeRow(
                         letterData: letterData,
                         useQuranicFontForLetter: useQuranicFontForLetter
                     )
-                    .padding(.bottom, 8)
-                    .listRowSeparator(.hidden, edges: .bottom)
-                    #else
-                    HamzaPracticeRow(
-                        letterData: letterData,
-                        useQuranicFontForLetter: useQuranicFontForLetter
-                    )
-                    #endif
                 }
             }
 
@@ -485,7 +470,6 @@ struct ArabicLetterView: View {
             }
         }
         .applyConditionalListStyle(defaultView: settings.defaultView)
-        .dismissKeyboardOnScroll()
         .navigationTitle(letterData.letter)
     }
 
@@ -619,18 +603,79 @@ struct HamzaPracticeRow: View {
     let letterData: LetterData
     let useQuranicFontForLetter: Bool
 
-    private var syllables: [(latin: String, arabic: String)] {
-        let sound = letterData.sound
-        let letter = letterData.letter
-
+    private var hamzaShortSyllables: [(latin: String, arabic: String)] {
+        let s = letterData.sound
+        let l = letterData.letter
         return [
-            ("A" + sound, "أَ" + letter),
-            ("I" + sound, "إِ" + letter),
-            ("U" + sound, "أُ" + letter)
+            ("a" + s, "أَ" + l),
+            ("i" + s, "إِ" + l),
+            ("u" + s, "أُ" + l)
         ]
     }
 
-    var body: some View {
+    private var hamzaLongSyllablesBasic: [(latin: String, arabic: String)] {
+        let s = letterData.sound
+        let l = letterData.letter
+        return [
+            ("aa" + s, "ءَ" + "ا" + l),
+            ("ii" + s, "إِ" + "ي" + l),
+            ("uu" + s, "أُ" + "و" + l)
+        ]
+    }
+
+    private var hamzaLongSyllables: [(latin: String, arabic: String)] {
+        let s = letterData.sound
+        let l = letterData.letter
+        return [
+            ("a" + s + "aa", "أَ" + l + "َا"),
+            ("a" + s + "ii", "أَ" + l + "ِي"),
+            ("a" + s + "uu", "أَ" + l + "ُو")
+        ]
+    }
+
+    private var hamzaShaddahA: [(latin: String, arabic: String)] {
+        let s = letterData.sound
+        let l = letterData.letter
+        return [
+            ("a" + s + s + "aa", "أَ" + l + "َّا"),
+            ("a" + s + s + "ii", "أَ" + l + "ِّي"),
+            ("a" + s + s + "uu", "أَ" + l + "ُّو")
+        ]
+    }
+
+    private var hamzaShaddahI: [(latin: String, arabic: String)] {
+        let s = letterData.sound
+        let l = letterData.letter
+        return [
+            ("i" + s + s + "aa", "إِ" + l + "َّا"),
+            ("i" + s + s + "ii", "إِ" + l + "ِّي"),
+            ("i" + s + s + "uu", "إِ" + l + "ُّو")
+        ]
+    }
+
+    private var hamzaShaddahU: [(latin: String, arabic: String)] {
+        let s = letterData.sound
+        let l = letterData.letter
+        return [
+            ("u" + s + s + "aa", "أُ" + l + "َّا"),
+            ("u" + s + s + "ii", "أُ" + l + "ِّي"),
+            ("u" + s + s + "uu", "أُ" + l + "ُّو")
+        ]
+    }
+
+    private var rows: [[(latin: String, arabic: String)]] {
+        [
+            hamzaShortSyllables,
+            hamzaLongSyllablesBasic,
+            hamzaLongSyllables,
+            hamzaShaddahA,
+            hamzaShaddahI,
+            hamzaShaddahU
+        ]
+    }
+
+    @ViewBuilder
+    private func practiceTriplet(_ syllables: [(latin: String, arabic: String)]) -> some View {
         HStack(spacing: 20) {
             ForEach(syllables, id: \.latin) { syllable in
                 VStack {
@@ -647,6 +692,20 @@ struct HamzaPracticeRow: View {
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, useQuranicFontForLetter ? 0 : 8)
                 }
+            }
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            ForEach(rows.indices, id: \.self) { idx in
+                #if os(iOS)
+                if idx > 0 {
+                    Divider().padding(.trailing, -100)
+                }
+                #endif
+
+                practiceTriplet(rows[idx])
             }
         }
         .padding(.top, 6)
@@ -813,8 +872,34 @@ struct StopInfoRow: View {
     }
 }
 
+struct QuranSignsSectionContent: View {
+    let accentColor: Color
+    var includeLearnMoreLink: Bool = true
+
+    var body: some View {
+        Group {
+            StopInfoRow(title: "Make Sujood (Prostration)", symbol: "۩", color: accentColor)
+            StopInfoRow(title: "Hizb (Quarter-Hizb Marker)", symbol: "۞", color: accentColor)
+            StopInfoRow(title: "The Mandatory Stop", symbol: "مـ", color: accentColor)
+            StopInfoRow(title: "The Preferred Stop", symbol: "قلى", color: accentColor)
+            StopInfoRow(title: "The Permissible Stop", symbol: "ج", color: accentColor)
+            StopInfoRow(title: "The Short Pause", symbol: "س", color: accentColor)
+            StopInfoRow(title: "Stop at One", symbol: "∴ ∴", color: accentColor)
+            StopInfoRow(title: "The Preferred Continuation", symbol: "صلى", color: accentColor)
+            StopInfoRow(title: "The Mandatory Continuation", symbol: "لا", color: accentColor)
+
+            if includeLearnMoreLink,
+               let url = URL(string: "https://studioarabiya.com/blog/tajweed-rules-stopping-pausing-signs/") {
+                Link("View More: Tajweed Rules & Stopping/Pausing Signs", destination: url)
+                    .font(.subheadline)
+                    .foregroundColor(accentColor)
+            }
+        }
+    }
+}
+
 #Preview {
-    AlIslamPreviewContainer(embedInNavigation: false) {
+    AlIslamPreviewContainer(embedInNavigation: true) {
         ArabicView()
     }
 }

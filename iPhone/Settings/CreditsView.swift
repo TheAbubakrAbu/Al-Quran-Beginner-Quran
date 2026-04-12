@@ -8,7 +8,7 @@ struct CreditsView: View {
     var body: some View {
         NavigationView {
             creditsList
-                .safeAreaInset(edge: .bottom) {
+                .adaptiveSafeArea(edge: .bottom) {
                     doneButton
                 }
         }
@@ -68,7 +68,7 @@ struct CreditsView: View {
     private var storySection: some View {
         Section {
             Text("""
-            This app was inspired by my desire to help new reverts and non-Muslims learn about Islam and easily access the Quran and prayer times. I’m deeply grateful to my parents for instilling in me a love for the faith (may Allah ﷻ‎ reward them).
+            This app was inspired by my desire to help new reverts and non-Muslims learn about Islam and easily access the Quran and prayer times. I’m deeply grateful to my parents for instilling in me a love for the faith (may Allah reward them).
 
             I also want to express my gratitude to my high school teacher, Mr. Joe Silvey, who, despite not being Muslim, stood with our Muslim Student Association and helped us organize weekly Jumuah prayers.
             """)
@@ -129,10 +129,6 @@ struct CreditsView: View {
     private var creditsLinksSection: some View {
         Section(header: Text("CREDITS")) {
             Group {
-                creditLink("Credit for the Adhan calculations, which does everything offline on the device, goes to Batoul Apps", url: "https://github.com/batoulapps/adhan-swift")
-                
-                creditLink("Credit for the Adhan sounds goes to Omar Al-Ejel", url: "https://github.com/oalejel/Athan-Utility")
-                
                 creditLink("Credit for the English transliteration of the Quran data goes to Risan Bagja Pradana", url: "https://github.com/risan/quran-json")
                 
                 creditLink("Credit for the English Saheeh International translation of the Quran data goes to Global Quran", url: "https://globalquran.com/download/data/")
@@ -143,13 +139,13 @@ struct CreditsView: View {
                 
                 creditLink("Credit for the Indopak Quran font goes to Urdu Nigar", url: "https://urdunigaar.com/download/al-mushaf-arabic-font-ttf-font-download/")
                 
-                creditLink("Credit for the Tajweed rules goes to Collin Fair", url: "https://github.com/cpfair/quran-tajweed")
-                                
                 creditLink("Credit for the Surah Quran Recitations goes to MP3 Quran", url: "https://mp3quran.net/eng")
                 
                 creditLink("Credit for the Ayah Quran Recitations goes to Al Quran", url: "https://alquran.cloud/cdn")
+
+                creditLink("Credit for the Tafsir API goes to Quran API Pages", url: "https://quranapi.pages.dev/")
                 
-                creditLink("Credit for the 99 Names of Allah from KabDeveloper", url: "https://github.com/KabDeveloper/99-Names-Of-Allah/tree/main")
+                creditLink("Credit for the 99 Names of Allah goes to MyIslam", url: "https://myislam.org/99-names-of-allah/")
             }
             .foregroundColor(settings.accentColor.color)
             .font(.body)
@@ -176,6 +172,14 @@ struct CreditsView: View {
     private func creditLink(_ title: String, url: String) -> some View {
         if let destination = URL(string: url) {
             Link(title, destination: destination)
+                .contextMenu {
+                    Button {
+                        settings.hapticFeedback()
+                        UIPasteboard.general.string = title
+                    } label: {
+                        Label("Copy Link", systemImage: "doc.on.doc")
+                    }
+                }
         }
     }
 
@@ -189,9 +193,7 @@ struct CreditsView: View {
                 .foregroundColor(.primary)
                 .frame(maxWidth: .infinity, alignment: .center)
                 .padding()
-                .contentShape(Capsule())
         }
-        .buttonStyle(.plain)
         .foregroundColor(settings.accentColor.color)
         .conditionalGlassEffect(useColor: 0.25)
         .padding(.horizontal, 24)

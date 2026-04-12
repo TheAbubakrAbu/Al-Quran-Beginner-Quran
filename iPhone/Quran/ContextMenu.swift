@@ -7,12 +7,12 @@ struct SurahContextMenu: View {
 
     let surahID: Int
     let surahName: String
-    
+
     let favoriteSurahs: Set<Int>
-    
+
     @Binding var searchText: String
     @Binding var scrollToSurahID: Int
-    
+
     var lastListened: Bool?
 
     private var isFavorite: Bool {
@@ -29,10 +29,10 @@ struct SurahContextMenu: View {
                 systemImage: isFavorite ? "star.fill" : "star"
             )
         }
-        
+
         Button {
             settings.hapticFeedback()
-            
+
             if let surah = quranData.surah(surahID) {
                 if let randomAyah = surah.ayahs.randomElement() {
                     quranPlayer.playAyah(
@@ -43,12 +43,13 @@ struct SurahContextMenu: View {
                 }
             }
         } label: {
-            Label("Play Random Ayah", systemImage: "shuffle")
+            Label("Play Random Ayah", systemImage: "shuffle.circle")
         }
-        
+
         if lastListened == nil {
             Button {
                 settings.hapticFeedback()
+
                 quranPlayer.playSurah(surahNumber: surahID, surahName: surahName)
             } label: {
                 Label("Play Surah", systemImage: "play.fill")
@@ -57,7 +58,7 @@ struct SurahContextMenu: View {
 
         Button {
             settings.hapticFeedback()
-            
+
             withAnimation {
                 searchText = ""
                 scrollToSurahID = surahID
@@ -97,6 +98,7 @@ private enum TafsirAuthor: String, CaseIterable, Identifiable {
         text
             .lowercased()
             .replacingOccurrences(of: "-", with: "")
+            .replacingOccurrences(of: "_", with: "")
             .replacingOccurrences(of: " ", with: "")
     }
 }
@@ -158,9 +160,15 @@ struct AyahTafsirSheet: View {
     let surahNumber: Int
     let ayahNumber: Int
 
-    @StateObject private var viewModel = AyahTafsirViewModel()
-    @AppStorage("quran.selected_tafsir_author") private var selectedAuthorRawValue = TafsirAuthor.ibnKathir.rawValue
-    @State private var revealContent = false
+    @StateObject private var viewModel: AyahTafsirViewModel
+    @AppStorage("quran.tafsir.author") private var selectedAuthorRawValue = TafsirAuthor.ibnKathir.rawValue
+
+    init(surahName: String, surahNumber: Int, ayahNumber: Int) {
+        self.surahName = surahName
+        self.surahNumber = surahNumber
+        self.ayahNumber = ayahNumber
+        _viewModel = StateObject(wrappedValue: AyahTafsirViewModel())
+    }
 
     private var selectedAuthor: TafsirAuthor {
         get { TafsirAuthor(rawValue: selectedAuthorRawValue) ?? .ibnKathir }
@@ -174,9 +182,8 @@ struct AyahTafsirSheet: View {
         )
     }
 
-    private var selectedTafsir: AyahTafsirEntry? {
-        viewModel.tafsirs.first { selectedAuthor.matches($0.author) }
-            ?? viewModel.tafsirs.first
+    private var selectedTafsirText: String? {
+        viewModel.tafsirs.first(where: { selectedAuthor.matches($0.author) })?.content ?? viewModel.tafsirs.first?.content
     }
 
     var body: some View {
@@ -198,27 +205,17 @@ struct AyahTafsirSheet: View {
                             .pickerStyle(.segmented)
                             .animation(.easeInOut, value: selectedAuthor)
 
-                            if let tafsir = selectedTafsir {
+                            if let tafsirText = selectedTafsirText {
                                 VStack(alignment: .leading, spacing: 12) {
-                                    Text(tafsir.author)
+                                    Text(selectedAuthor.rawValue)
                                         .font(.headline)
 
-                                    if let groupVerse = tafsir.groupVerse,
-                                       !groupVerse.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                                        Text(groupVerse)
-                                            .font(.subheadline)
-                                            .foregroundStyle(.secondary)
-                                    }
-
-                                    tafsirContentView(for: tafsir.content)
+                                    tafsirContentView(for: tafsirText)
                                         .frame(maxWidth: .infinity, alignment: .leading)
                                 }
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .id(selectedAuthor.rawValue)
-                                .opacity(revealContent ? 1 : 0)
-                                .offset(y: revealContent ? 0 : 8)
-                                .animation(.easeInOut(duration: 0.25), value: revealContent)
-                                .transition(.opacity.combined(with: .move(edge: .bottom)))
+                                .textSelection(.enabled)
                             } else if let errorMessage = viewModel.errorMessage {
                                 tafsirPlaceholder(
                                     title: "Couldn't Load Tafsir",
@@ -243,30 +240,12 @@ struct AyahTafsirSheet: View {
         .task(id: "\(surahNumber)-\(ayahNumber)") {
             await viewModel.load(surah: surahNumber, ayah: ayahNumber)
         }
-        .onChange(of: selectedAuthor) { _ in
-            withAnimation(.easeInOut(duration: 0.18)) {
-                revealContent = false
-            }
-
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                withAnimation(.easeInOut(duration: 0.25)) {
-                    revealContent = true
-                }
-            }
-        }
-        .onChange(of: viewModel.isLoading) { loading in
-            if !loading {
-                withAnimation(.easeInOut(duration: 0.3)) {
-                    revealContent = true
-                }
-            }
-        }
         .modifier(TafsirSheetPresentationModifier())
     }
 
     private var noticeCard: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Label("Loaded from the internet", systemImage: "icloud.and.arrow.down")
+            Label("Loaded from the Internet", systemImage: "icloud.and.arrow.down")
                 .font(.subheadline.weight(.semibold))
 
             Text("Tafsir is fetched online for this ayah only. The app loads all 3 available tafsirs together, then you can switch between them with the picker. Full tafsir downloads are not available.")
@@ -292,7 +271,7 @@ struct AyahTafsirSheet: View {
                 noticeCard
 
                 ProgressView("Loading tafsir...")
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.top, 4)
 
                 RoundedRectangle(cornerRadius: 12)
@@ -399,6 +378,7 @@ private struct TafsirMarkdownView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .textSelection(.enabled)
     }
 }
 
@@ -432,7 +412,13 @@ private struct TafsirMarkdownBlock {
 
     var attributedText: AttributedString? {
         guard kind == .body else { return nil }
-        return try? AttributedString(markdown: displayText)
+        guard var attributed = try? AttributedString(markdown: displayText) else { return nil }
+        for run in attributed.runs {
+            if let intent = run.inlinePresentationIntent, intent.contains(.code) {
+                attributed[run.range].inlinePresentationIntent = nil
+            }
+        }
+        return attributed
     }
 }
 
@@ -547,7 +533,7 @@ struct AyahContextMenuModifier: ViewModifier {
                             settings.lastReadSurah = 0
                             settings.lastReadAyah = 0
                         }
-                    } label: { Label("Remove", systemImage: "trash") }
+                    } label: { Label("Remove", systemImage: "minus.circle") }
                     
                     Divider()
                 }
@@ -578,7 +564,7 @@ struct AyahContextMenuModifier: ViewModifier {
                         settings.hapticFeedback()
                         removeNote()
                     } label: {
-                        Label("Remove Note", systemImage: "trash")
+                        Label("Remove Note", systemImage: "minus.circle")
                     }
                 }
 
@@ -651,6 +637,7 @@ struct AyahContextMenuModifier: ViewModifier {
                     surahNumber: surah,
                     ayahNumber: ayah
                 )
+                .smallMediumSheetPresentation()
             }
             .sheet(isPresented: $showTafsirSheet) {
                 if let surahObj = surahObj {
@@ -676,7 +663,11 @@ struct AyahContextMenuModifier: ViewModifier {
                     PlayCustomRangeSheet(
                         surah: surahObj,
                         initialStartAyah: ayah,
-                        initialEndAyah: surahObj.numberOfAyahs(for: settings.displayQiraahForArabic),
+                        initialEndAyah: PlayCustomRangeSheet.defaultEndAyah(
+                            startAyah: ayah,
+                            surah: surahObj,
+                            displayQiraah: settings.displayQiraahForArabic
+                        ),
                         onPlay: { start, end, repAyah, repSec in
                             quranPlayer.playCustomRange(
                                 surahNumber: surahObj.id,
@@ -690,6 +681,7 @@ struct AyahContextMenuModifier: ViewModifier {
                         onCancel: { showCustomRangeSheet = false }
                     )
                     .environmentObject(settings)
+                    .fullScreenSheetPresentation()
                 }
             }
             .sheet(isPresented: $showingNoteSheet) {
@@ -712,7 +704,7 @@ struct AyahContextMenuModifier: ViewModifier {
                 }
             }
             .confirmationDialog("Note not saved", isPresented: $showRespectAlert, titleVisibility: .visible) {
-                Button("OK", role: .cancel) { }
+                Button("OK") { }
             } message: {
                 Text("Please keep notes Islamic and respectful.")
             }
@@ -721,7 +713,7 @@ struct AyahContextMenuModifier: ViewModifier {
                     settings.hapticFeedback()
                     settings.toggleBookmark(surah: surah, ayah: ayah)
                 }
-                Button("Cancel", role: .cancel) {}
+                Button("Cancel") {}
             } message: {
                 Text("This ayah has a note. Unbookmarking will delete the note.")
             }
@@ -829,7 +821,7 @@ struct LeftSwipeActions: ViewModifier {
                     settings.hapticFeedback()
                     settings.toggleBookmark(surah: bookmarkedSurah ?? 1, ayah: bookmarkedAyah ?? 1)
                 }
-                Button("Cancel", role: .cancel) {}
+                Button("Cancel") {}
             } message: {
                 Text("This ayah has a note. Unbookmarking will delete the note.")
             }
@@ -979,18 +971,17 @@ struct NoteEditorSheet: View {
                             .stroke(cardStroke, lineWidth: 1)
                     )
 
-                HStack(spacing: 8) {
-                    Text("\(remaining) characters left")
-                        .font(.footnote.monospacedDigit())
-                        .foregroundColor(.secondary)
-                    Spacer()
-                }
-                .accessibilityElement(children: .combine)
-                .accessibilityLabel("Character limit")
-                .accessibilityValue("\(maxChars) limit, \(remaining) remaining")
+                Text("\(remaining) characters left")
+                    .font(.footnote)
+                    .monospacedDigit()
+                    .foregroundColor(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel("Character limit")
+                    .accessibilityValue("\(maxChars) limit, \(remaining) remaining")
 
                 VStack(alignment: .leading, spacing: 10) {
-                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    HStack(spacing: 8) {
                         Image(systemName: "hands.sparkles")
                             .imageScale(.large)
                         Text("A respectful reminder")

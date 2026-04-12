@@ -6,76 +6,146 @@ struct SurahRow: View {
     let surah: Surah
     var ayah: Int?
     var end: Bool?
+    var isFavorite: Bool = false
+
+    private var revelationEmoji: String {
+        surah.type == "makkan" ? "🕋" : "🕌"
+    }
+
+    private var revelationName: String {
+        surah.type == "makkan" ? "Makkan" : "Madinan"
+    }
+
+    private var pageCountLabel: String {
+        let count = max(surah.pageCount, 1)
+        if count == 1, surah.isLessThanOnePage == true {
+            return "<1 Page"
+        }
+        return count == 1 ? "1 Page" : "\(count) Pages"
+    }
+
+    private var startPageNumber: Int {
+        surah.pageStart ?? surah.ayahs.compactMap(\.page).min() ?? 1
+    }
+
+    private var ayahAndRevelationLine: String {
+        "\(surah.numberOfAyahs) Ayahs \(revelationEmoji)"
+    }
+
+    private var pageLine: String {
+        "Page \(startPageNumber) • \(pageCountLabel)"
+    }
+
+    private var positionContextLine: String? {
+        guard let ayah else { return nil }
+        if end != nil {
+            return "Ends at \(surah.id):\(ayah)"
+        }
+        return "Starts at \(surah.id):\(ayah)"
+    }
+
+    private var badgeWidth: CGFloat {
+        let font = UIFont.preferredFont(forTextStyle: .headline)
+        let text = "100" as NSString
+        let size = text.size(withAttributes: [.font: font])
+        return size.width + 8
+    }
+    
+    @ViewBuilder
+    private var surahNumberPill: some View {
+        ZStack(alignment: .topTrailing) {
+            Text("\(surah.id)")
+                .font(.caption.weight(.bold))
+                .foregroundColor(settings.accentColor.color)
+                .frame(width: badgeWidth)
+                .frame(maxHeight: .infinity)
+                .conditionalGlassEffect(
+                    useColor: isFavorite ? 0.3 : nil,
+                    customTint: isFavorite ? settings.accentColor.color : nil
+                )
+                .onTapGesture {
+                    settings.hapticFeedback()
+                    settings.toggleSurahFavorite(surah: surah.id)
+                }
+                .accessibilityLabel("Surah \(surah.id)")
+
+            if isFavorite {
+                Image(systemName: "star.fill")
+                    .font(.caption2)
+                    .foregroundStyle(settings.accentColor.color)
+                    .padding(4)
+                    .offset(x: 8, y: -6)
+            }
+        }
+    }
     
     var body: some View {
         #if os(iOS)
-        VStack {
-            HStack {
-                VStack(alignment: .leading) {
-                    HStack {
-                        if let ayah = ayah {
-                            if end != nil {
-                                Text("Ends at \(surah.id):\(ayah)")
-                                    .font(.subheadline)
-                                    .foregroundColor(.secondary)
-                            } else {
-                                Text("Starts at \(surah.id):\(ayah)")
-                                    .font(.subheadline)
-                                    .foregroundColor(.secondary)
-                            }
-                        } else {
-                            Text("\(surah.numberOfAyahs) Ayahs")
-                                .font(.subheadline)
-                                .multilineTextAlignment(.leading)
-                                .foregroundColor(.secondary)
-                            
-                            Text(surah.type == "meccan" ? "🕋" : "🕌")
-                                .font(.caption2)
-                                .multilineTextAlignment(.leading)
-                                .foregroundColor(settings.accentColor.color)
-                        }
-                    }
+        HStack(alignment: .center) {
+            surahNumberPill
+
+            VStack(alignment: .leading, spacing: 2) {
+                if let context = positionContextLine {
+                    Text(context)
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+                
+                HStack {
+                    Text(surah.nameTransliteration)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundColor(.primary)
                     
                     Text(surah.nameEnglish)
-                        .foregroundColor(.primary)
-                        .font(.subheadline)
-                        .multilineTextAlignment(.leading)
+                        .foregroundColor(.secondary)
+                        .font(.caption2)
                 }
+
+                Text(pageLine)
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
                 
-                Spacer()
-                
-                VStack(alignment: .trailing) {
-                    Text("\(surah.nameArabic) - \(surah.idArabic)")
-                        .font(.headline)
-                        .multilineTextAlignment(.trailing)
-                        .foregroundColor(settings.accentColor.color)
+                Text(ayahAndRevelationLine)
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            if UIDevice.current.userInterfaceIdiom != .pad {
+                HStack {
+                    Text(surah.nameArabic)
+                        .font(.custom(settings.fontArabic, size: UIFont.preferredFont(forTextStyle: .title3).pointSize))
+                        .foregroundColor(.primary)
                     
-                    Text("\(surah.nameTransliteration) - \(surah.id)")
-                        .foregroundColor(.primary)
-                        .font(.subheadline)
-                        .multilineTextAlignment(.trailing)
+                    Text(surah.idArabic)
+                        .font(.custom("KFGQPCQUMBULUthmanicScript-Regu", size: UIFont.preferredFont(forTextStyle: .title1).pointSize))
+                        .foregroundColor(settings.accentColor.color)
                 }
-                .padding(.vertical, 8)
+                .minimumScaleFactor(1)
+                .frame(maxWidth: .infinity, alignment: .trailing)
             }
         }
+        .padding(.vertical, 6)
         .lineLimit(1)
-        .minimumScaleFactor(0.5)
+        .minimumScaleFactor(0.75)
         #else
         VStack {
             HStack {
-                Spacer()
+                Text("\(surah.id) - \(surah.nameTransliteration)")
+                    .font(.subheadline)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 
                 Text("\(surah.nameArabic) - \(surah.idArabic)")
                     .font(.headline)
                     .foregroundColor(settings.accentColor.color)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+                    .minimumScaleFactor(0.9)
             }
-            
-            HStack {
-                Text("\(surah.id) - \(surah.nameTransliteration)")
-                    .font(.subheadline)
-                
-                Spacer()
-            }
+
+            Text("\(revelationEmoji) • \(surah.numberOfAyahs) Ayahs • \(pageLine)")
+                .font(.caption2)
+                .foregroundColor(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
         .lineLimit(1)
         .minimumScaleFactor(0.5)
@@ -89,14 +159,21 @@ struct SurahAyahRow: View {
     var surah: Surah
     var ayah: Ayah
     var note: String? = nil
+    var disableTajweedColors: Bool = false
+
+    private var isBookmarked: Bool {
+        settings.bookmarkedAyahs.contains { $0.surah == surah.id && $0.ayah == ayah.id }
+    }
 
     private func arabicDisplayText() -> String {
-        let text = ayah.displayArabicText(surahId: surah.id, clean: settings.cleanArabicText)
+        let clean = settings.cleanArabicText && !shouldShowTajweedColors
+        let text = ayah.displayArabicText(surahId: surah.id, clean: clean)
         return settings.beginnerMode ? text.map { "\($0) " }.joined() : text
     }
 
     private var shouldShowTajweedColors: Bool {
-        settings.showTajweedColors
+        if disableTajweedColors { return false }
+        return settings.showTajweedColors
             && settings.showArabicText
             && settings.isHafsDisplay
             && !settings.cleanArabicText
@@ -122,21 +199,59 @@ struct SurahAyahRow: View {
         ].joined(separator: "|")
     }
     
+    private var badgeWidth: CGFloat {
+        let font = UIFont.preferredFont(forTextStyle: .headline)
+        let text = "10:100" as NSString
+        let size = text.size(withAttributes: [.font: font])
+        return size.width + 8
+    }
+    
     var body: some View {
         HStack {
             VStack {
-                Text("\(surah.id):\(ayah.id)")
-                    .font(.headline)
+                ZStack(alignment: .topTrailing) {
+                    Text("\(surah.id):\(ayah.id)")
+                        .font(.headline)
+                        .monospacedDigit()
+                        #if os(iOS)
+                        .frame(width: badgeWidth, alignment: .center)
+                        .padding(4)
+                        #else
+                        .padding(.vertical, 6)
+                        .padding(.horizontal, 8)
+                        #endif
+                        .conditionalGlassEffect(
+                            useColor: isBookmarked ? 0.3 : nil,
+                            customTint: isBookmarked ? settings.accentColor.color : nil,
+                            interactive: false
+                        )
+                        .onTapGesture {
+                            settings.hapticFeedback()
+                            settings.toggleBookmark(surah: surah.id, ayah: ayah.id)
+                        }
+
+                    if isBookmarked {
+                        Image(systemName: "bookmark.fill")
+                            .font(.caption2)
+                            .foregroundStyle(settings.accentColor.color)
+                            .padding(4)
+                            .offset(x: 8, y: -6)
+                    }
+                }
                 
                 Text(surah.nameTransliteration)
+                    #if os(iOS)
                     .font(.caption)
+                    #else
+                    .font(.caption2)
+                    #endif
             }
             .lineLimit(1)
             .minimumScaleFactor(0.5)
             #if os(iOS)
             .frame(width: 65, alignment: .center)
             #else
-            .frame(width: 40, alignment: .center)
+            .frame(width: 50, alignment: .center)
             #endif
             .foregroundColor(settings.accentColor.color)
             .padding(.trailing, 8)
@@ -216,6 +331,7 @@ struct LastListenedSurahRow: View {
     
     @Binding var searchText: String
     @Binding var scrollToSurahID: Int
+    var qiraahRefreshKey: String = ""
     @Binding var showListeningHistory: Bool
 
     var body: some View {
@@ -235,8 +351,9 @@ struct LastListenedSurahRow: View {
                             .padding(4)
                             .conditionalGlassEffect()
                             .onTapGesture {
+                                settings.hapticFeedback()
+                                
                                 withAnimation {
-                                    settings.hapticFeedback()
                                     showListeningHistory.toggle()
                                 }
                             }
@@ -294,7 +411,7 @@ struct LastListenedSurahRow: View {
                     .padding(.bottom, 1)
 
                     HStack {
-                        Text(lastListenedSurah.reciter.name)
+                        Text(lastListenedSurah.reciter.displayNameWithEnglishQiraah)
                             .font(.caption)
                             .foregroundColor(.primary)
                             .lineLimit(1)
@@ -351,7 +468,7 @@ struct LastListenedSurahRow: View {
                         settings.lastListenedSurah = nil
                     }
                 } label: {
-                    Label("Remove", systemImage: "trash")
+                    Label("Remove", systemImage: "minus.circle")
                 }
 
                 Divider()
@@ -439,8 +556,9 @@ struct LastReadAyahRow: View {
                         .padding(4)
                         .conditionalGlassEffect()
                         .onTapGesture {
+                            settings.hapticFeedback()
+                            
                             withAnimation {
-                                settings.hapticFeedback()
                                 showReadingHistory.toggle()
                             }
                         }
@@ -450,6 +568,7 @@ struct LastReadAyahRow: View {
             NavigationLink(destination: AyahsView(surah: surah, ayah: ayah.id)) {
                 SurahAyahRow(surah: surah, ayah: ayah, note: noteToShow)
             }
+            .tag(surah.id)
             .rightSwipeActions(
                 surahID: surah.id,
                 surahName: surah.nameTransliteration,
@@ -486,6 +605,7 @@ struct LastReadAyahRow: View {
                             )
                             .opacity(0.6)
                         }
+                        .tag(surah.id)
                         .rightSwipeActions(
                             surahID: surah.id,
                             surahName: surah.nameTransliteration,
@@ -527,6 +647,7 @@ struct AyahSearchResultRow: View {
 
     @Binding var searchText: String
     @Binding var scrollToSurahID: Int
+    var disableTajweedColors: Bool = false
 
     private var isBookmarked: Bool {
         bookmarkedAyahs.contains("\(surah.id)-\(ayah.id)")
@@ -534,7 +655,7 @@ struct AyahSearchResultRow: View {
 
     var body: some View {
         NavigationLink(destination: AyahsView(surah: surah, ayah: ayah.id)) {
-            SurahAyahRow(surah: surah, ayah: ayah)
+            SurahAyahRow(surah: surah, ayah: ayah, disableTajweedColors: disableTajweedColors)
         }
         .rightSwipeActions(
             surahID: surah.id,
@@ -578,13 +699,55 @@ struct AyahSearchRow: View, Equatable {
     
     @Binding var searchText: String
     @Binding var scrollToSurahID: Int
+    var qiraahRefreshKey: String = ""
+
+    /// When true (Quran search grouped by surah): `surah:ayah` label + same Arabic / transliteration / English visibility rules as the full row, without the top surah name line.
+    var compact: Bool = false
+    var disableTajweedColors: Bool = false
     
     private var isBookmarked: Bool {
         bookmarkedAyahs.contains("\(surah)-\(ayah)")
     }
+    
+    private var badgeWidth: CGFloat {
+        let font = UIFont.preferredFont(forTextStyle: .headline)
+        let text = "10:100" as NSString
+        let size = text.size(withAttributes: [.font: font])
+        return size.width + 8
+    }
+
+    @ViewBuilder
+    private var ayahReferenceBadge: some View {
+        ZStack(alignment: .topTrailing) {
+            Text("\(surah):\(ayah)")
+                .font(.caption.weight(.semibold))
+                .foregroundColor(settings.accentColor.color)
+                .monospacedDigit()
+                .frame(width: badgeWidth, alignment: .center)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 4)
+                .conditionalGlassEffect(
+                    useColor: isBookmarked ? 0.3 : nil,
+                    customTint: isBookmarked ? settings.accentColor.color : nil
+                )
+                .onTapGesture {
+                    settings.hapticFeedback()
+                    settings.toggleBookmark(surah: surah, ayah: ayah)
+                }
+
+            if isBookmarked {
+                Image(systemName: "bookmark.fill")
+                    .font(.caption2)
+                    .foregroundStyle(settings.accentColor.color)
+                    .padding(4)
+                    .offset(x: 8, y: -6)
+            }
+        }
+    }
 
     private var shouldShowTajweedColors: Bool {
-        settings.showTajweedColors
+        if disableTajweedColors { return false }
+        return settings.showTajweedColors
             && settings.showArabicText
             && settings.isHafsDisplay
             && !settings.cleanArabicText
@@ -609,64 +772,122 @@ struct AyahSearchRow: View, Equatable {
             query
         ].joined(separator: "|")
     }
-    
-    var body: some View {
+
+    @ViewBuilder
+    private func buildCompactSearchRow() -> some View {
         let normalizedQuery = settings.cleanSearch(query, whitespace: true).removingArabicDiacriticsAndSigns
 
-        // Precompute cleaned sources ONCE per render
-        let srcArabic  = settings.cleanSearch(arabic,          whitespace: false).removingArabicDiacriticsAndSigns
-        let srcTr      = settings.cleanSearch(transliteration, whitespace: false).removingArabicDiacriticsAndSigns
-        let srcSaheeh  = settings.cleanSearch(englishSaheeh,   whitespace: false).removingArabicDiacriticsAndSigns
-        let srcMustafa = settings.cleanSearch(englishMustafa,  whitespace: false).removingArabicDiacriticsAndSigns
+        let srcArabic = settings.cleanSearch(arabic, whitespace: false).removingArabicDiacriticsAndSigns
+        let srcTr = settings.cleanSearch(transliteration, whitespace: false).removingArabicDiacriticsAndSigns
+        let srcSaheeh = settings.cleanSearch(englishSaheeh, whitespace: false).removingArabicDiacriticsAndSigns
+        let srcMustafa = settings.cleanSearch(englishMustafa, whitespace: false).removingArabicDiacriticsAndSigns
 
-        // Matches
-        let mArabic  = !normalizedQuery.isEmpty && srcArabic.contains(normalizedQuery)
-        let mTr      = !normalizedQuery.isEmpty && srcTr.contains(normalizedQuery)
-        let mSaheeh  = !normalizedQuery.isEmpty && srcSaheeh.contains(normalizedQuery)
+        let mArabic = !normalizedQuery.isEmpty && srcArabic.contains(normalizedQuery)
+        let mTr = !normalizedQuery.isEmpty && srcTr.contains(normalizedQuery)
+        let mSaheeh = !normalizedQuery.isEmpty && srcSaheeh.contains(normalizedQuery)
         let mMustafa = !normalizedQuery.isEmpty && srcMustafa.contains(normalizedQuery)
 
-        // Arabic + Transliteration: show if ON or matched. When non-Hafs qiraah, only Arabic.
-        let showArabicLine  = settings.showArabicText      || mArabic
-        let showTrLine      = settings.isHafsDisplay && (settings.showTransliteration || mTr)
+        let showArabicLine = settings.showArabicText || mArabic
+        let showTrLine = settings.isHafsDisplay && (settings.showTransliteration || mTr)
 
-        // --- English selection logic (only one unless both match). Hidden when non-Hafs. ---
         let (showSaheehLine, showMustafaLine): (Bool, Bool) = {
             guard settings.isHafsDisplay else { return (false, false) }
-            let userSaheehOn  = settings.showEnglishSaheeh
+            let userSaheehOn = settings.showEnglishSaheeh
             let userMustafaOn = settings.showEnglishMustafa
+            if mSaheeh && mMustafa { return (true, true) }
+            if mSaheeh || mMustafa { return (mSaheeh, mMustafa) }
+            if userSaheehOn && !userMustafaOn { return (true, false) }
+            if userMustafaOn && !userSaheehOn { return (false, true) }
+            if userSaheehOn && userMustafaOn { return (true, false) }
+            return (false, false)
+        }()
 
-            if mSaheeh && mMustafa {
-                // both matched -> show both
-                return (true, true)
-            } else if mSaheeh || mMustafa {
-                // only the one that matched
-                return (mSaheeh, mMustafa)
-            } else {
-                // no matches -> respect toggles but cap to ONE line
-                if userSaheehOn && !userMustafaOn {
-                    return (true, false)
-                } else if userMustafaOn && !userSaheehOn {
-                    return (false, true)
-                } else if userSaheehOn && userMustafaOn {
-                    // both ON, no match -> pick default single
-                    // default = Saheeh; switch to (false, true) if you prefer Mustafa
-                    return (true, false)
-                } else {
-                    // neither ON -> none
-                    return (false, false)
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                ayahReferenceBadge
+
+                if showArabicLine {
+                    HighlightedSnippet(
+                        source: arabic,
+                        term: query,
+                        font: .custom(settings.fontArabic, size: UIFont.preferredFont(forTextStyle: .body).pointSize),
+                        accent: settings.accentColor.color,
+                        fg: .primary,
+                        preStyledSource: arabicTajweedText(),
+                        beginnerMode: settings.beginnerMode
+                    )
+                    .animation(.easeInOut, value: tajweedAnimationKey)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+                    .multilineTextAlignment(.trailing)
                 }
             }
+
+            if showTrLine {
+                HighlightedSnippet(
+                    source: transliteration,
+                    term: query,
+                    font: .footnote,
+                    accent: settings.accentColor.color,
+                    fg: .secondary
+                )
+            }
+
+            if showSaheehLine {
+                HighlightedSnippet(
+                    source: englishSaheeh,
+                    term: query,
+                    font: .footnote,
+                    accent: settings.accentColor.color,
+                    fg: .secondary
+                )
+            }
+
+            if showMustafaLine {
+                HighlightedSnippet(
+                    source: englishMustafa,
+                    term: query,
+                    font: .footnote,
+                    accent: settings.accentColor.color,
+                    fg: .secondary
+                )
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func buildFullSearchRow() -> some View {
+        let normalizedQuery = settings.cleanSearch(query, whitespace: true).removingArabicDiacriticsAndSigns
+
+        let srcArabic = settings.cleanSearch(arabic, whitespace: false).removingArabicDiacriticsAndSigns
+        let srcTr = settings.cleanSearch(transliteration, whitespace: false).removingArabicDiacriticsAndSigns
+        let srcSaheeh = settings.cleanSearch(englishSaheeh, whitespace: false).removingArabicDiacriticsAndSigns
+        let srcMustafa = settings.cleanSearch(englishMustafa, whitespace: false).removingArabicDiacriticsAndSigns
+
+        let mArabic = !normalizedQuery.isEmpty && srcArabic.contains(normalizedQuery)
+        let mTr = !normalizedQuery.isEmpty && srcTr.contains(normalizedQuery)
+        let mSaheeh = !normalizedQuery.isEmpty && srcSaheeh.contains(normalizedQuery)
+        let mMustafa = !normalizedQuery.isEmpty && srcMustafa.contains(normalizedQuery)
+
+        let showArabicLine = settings.showArabicText || mArabic
+        let showTrLine = settings.isHafsDisplay && (settings.showTransliteration || mTr)
+
+        let (showSaheehLine, showMustafaLine): (Bool, Bool) = {
+            guard settings.isHafsDisplay else { return (false, false) }
+            let userSaheehOn = settings.showEnglishSaheeh
+            let userMustafaOn = settings.showEnglishMustafa
+            if mSaheeh && mMustafa { return (true, true) }
+            if mSaheeh || mMustafa { return (mSaheeh, mMustafa) }
+            if userSaheehOn && !userMustafaOn { return (true, false) }
+            if userMustafaOn && !userSaheehOn { return (false, true) }
+            if userSaheehOn && userMustafaOn { return (true, false) }
+            return (false, false)
         }()
 
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("\(surahName) \(surah):\(ayah)")
-                
-                if isBookmarked {
-                    Spacer()
-                    
-                    Image(systemName: "bookmark.fill")
-                }
+                ayahReferenceBadge
+
+                Text(surahName)
             }
             .font(.caption)
             .foregroundColor(settings.accentColor.color)
@@ -717,6 +938,16 @@ struct AyahSearchRow: View, Equatable {
                 )
             }
         }
+    }
+    
+    var body: some View {
+        Group {
+            if compact {
+                buildCompactSearchRow()
+            } else {
+                buildFullSearchRow()
+            }
+        }
         .padding(.vertical, 2)
         .rightSwipeActions(
             surahID: surah,
@@ -745,6 +976,9 @@ struct AyahSearchRow: View, Equatable {
     static func == (l: Self, r: Self) -> Bool {
         l.surah == r.surah && l.ayah == r.ayah &&
         l.query == r.query &&
+        l.qiraahRefreshKey == r.qiraahRefreshKey &&
+        l.compact == r.compact &&
+        l.disableTajweedColors == r.disableTajweedColors &&
         l.favoriteSurahs == r.favoriteSurahs &&
         l.bookmarkedAyahs == r.bookmarkedAyahs
     }
@@ -753,6 +987,10 @@ struct AyahSearchRow: View, Equatable {
 private struct SurahRowsPreviewContent: View {
     var body: some View {
         List {
+            SurahRow(
+                surah: AlIslamPreviewData.surah,
+            )
+            
             SurahAyahRow(
                 surah: AlIslamPreviewData.surah,
                 ayah: AlIslamPreviewData.ayah

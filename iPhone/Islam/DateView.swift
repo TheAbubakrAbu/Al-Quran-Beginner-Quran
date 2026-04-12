@@ -24,13 +24,13 @@ struct DateView: View {
         hijriCal.locale = Locale(identifier: "ar")
         fmt.calendar = hijriCal
         fmt.locale = Locale(identifier: "en")
-        fmt.dateFormat = "EEEE, d MMMM yyyy"
+        fmt.dateFormat = "d MMMM yyyy"
         return fmt
     }()
     private static let gregFormatter: DateFormatter = {
         let fmt = DateFormatter()
         fmt.calendar = Calendar(identifier: .gregorian)
-        fmt.dateFormat = "EEEE, d MMMM yyyy"
+        fmt.dateFormat = "d MMMM yyyy"
         return fmt
     }()
 
@@ -57,10 +57,47 @@ struct DateView: View {
     }
 
     private var convertedDateSection: some View {
-        Section("CONVERTED DATE") {
-            Text(formatted(convertedDate, using: selectedTab == .hijriToGregorian ? gregorianCalendar : hijriCalendar))
-                .bold()
-                .foregroundColor(settings.accentColor.color)
+        Section("CONVERTED DATES") {
+            let hijriDateText = formatted(convertedDate, using: hijriCalendar)
+            let gregorianDateText = formatted(convertedDate, using: gregorianCalendar)
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Hijri")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                Text(hijriDateText)
+                    .bold()
+                    .foregroundColor(settings.accentColor.color)
+            }
+            #if os(iOS)
+            .contextMenu {
+                Button {
+                    settings.hapticFeedback()
+                    UIPasteboard.general.string = hijriDateText
+                } label: {
+                    Label("Copy Hijri Date", systemImage: "doc.on.doc")
+                }
+            }
+            #endif
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Gregorian")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                Text(gregorianDateText)
+                    .bold()
+                    .foregroundColor(settings.accentColor.color)
+            }
+            #if os(iOS)
+            .contextMenu {
+                Button {
+                    settings.hapticFeedback()
+                    UIPasteboard.general.string = gregorianDateText
+                } label: {
+                    Label("Copy Gregorian Date", systemImage: "doc.on.doc")
+                }
+            }
+            #endif
         }
     }
 

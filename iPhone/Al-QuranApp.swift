@@ -86,7 +86,7 @@ private struct NowPlayingInsetModifier: ViewModifier {
             }
             .padding(.horizontal, 24)
             .padding(.bottom, 8)
-            .animation(.easeInOut, value: quranPlayer.isPlaying)
+            .animation(.easeInOut, value: quranPlayer.isPlaying || quranPlayer.isPaused)
         }
     }
 }

@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct NameOfAllah: Decodable, Identifiable {
+struct NameOfAllah: Decodable, Identifiable, Equatable {
     let number: Int
     let id: String
     let name: String
@@ -76,37 +76,91 @@ struct NameOfAllah: Decodable, Identifiable {
 }
 
 final class NamesViewModel: ObservableObject {
-    static let shared = NamesViewModel()
+    enum LoadState: Equatable {
+        case idle
+        case loading
+        case ready
+        case failed
+    }
+
+    static let shared: NamesViewModel = {
+        let model = NamesViewModel()
+        model.startLoading()
+        return model
+    }()
+
+    private static let decoder = JSONDecoder()
 
     @Published var namesOfAllah: [NameOfAllah] = []
     @Published private(set) var firstFoundTargetsByNameNumber: [Int: (surahID: Int, ayahID: Int)] = [:]
+    @Published private(set) var loadState: LoadState = .idle
     private var filterCache = [String: [NameOfAllah]]()
+    private var loadTask: Task<Void, Never>?
 
-    private init() { loadJSON() }
+    private init() {}
 
-    private func loadJSON() {
-        guard let url = Bundle.main.url(forResource: "NamesOfAllah", withExtension: "json") else {
-            logger.debug("❌ 99 Names JSON not found."); return
+    private func startLoading() {
+        guard loadTask == nil else { return }
+        loadTask = Task(priority: .utility) { [weak self] in
+            await self?.loadJSON()
         }
-        DispatchQueue.global(qos: .utility).async {
-            do {
-                let data = try Data(contentsOf: url, options: .mappedIfSafe)
-                let decoder = JSONDecoder()
-                let names = (try? decoder.decode([NameOfAllah].self, from: data)) ?? []
-                var targets = [Int: (surahID: Int, ayahID: Int)]()
-                targets.reserveCapacity(names.count)
-                for name in names {
-                    guard let surah = name.firstFoundSurah,
-                          let ayah = name.firstFoundAyah else { continue }
-                    targets[name.number] = (surahID: surah, ayahID: ayah)
-                }
-                DispatchQueue.main.async {
-                    self.namesOfAllah = names
-                    self.firstFoundTargetsByNameNumber = targets
-                    self.filterCache.removeAll()
-                }
-            } catch {
-                logger.debug("❌ JSON decode error: \(error)")
+    }
+
+    var isReadyForUI: Bool {
+        loadState == .ready
+    }
+
+    func waitUntilLoaded() async {
+        while true {
+            let state = await MainActor.run { self.loadState }
+            if state == .ready || state == .failed {
+                return
+            }
+            try? await Task.sleep(nanoseconds: 25_000_000)
+        }
+    }
+
+    private func loadJSON() async {
+        await MainActor.run {
+            loadState = .loading
+        }
+
+        defer {
+            Task { @MainActor in
+                self.loadTask = nil
+            }
+        }
+
+        guard let url = Bundle.main.url(forResource: "NamesOfAllah", withExtension: "json") else {
+            logger.debug("❌ 99 Names JSON not found.")
+            await MainActor.run {
+                self.loadState = .failed
+            }
+            return
+        }
+
+        do {
+            let data = try Data(contentsOf: url, options: .mappedIfSafe)
+            let names = try Self.decoder.decode([NameOfAllah].self, from: data)
+            var targets = [Int: (surahID: Int, ayahID: Int)]()
+            targets.reserveCapacity(names.count)
+            for name in names {
+                guard let surah = name.firstFoundSurah,
+                      let ayah = name.firstFoundAyah else { continue }
+                targets[name.number] = (surahID: surah, ayahID: ayah)
+            }
+            let finalizedTargets = targets
+
+            await MainActor.run {
+                self.namesOfAllah = names
+                self.firstFoundTargetsByNameNumber = finalizedTargets
+                self.filterCache.removeAll(keepingCapacity: true)
+                self.loadState = .ready
+            }
+        } catch {
+            logger.debug("❌ JSON decode error: \(error)")
+            await MainActor.run {
+                self.loadState = .failed
             }
         }
     }
@@ -243,7 +297,10 @@ struct NamesView: View {
                         firstFoundTarget: namesData.firstFoundTargetsByNameNumber[name.number],
                         showDescription: settings.showDescription,
                         isExpanded: expandedNameNumbers.contains(name.number),
-                        isFavorite: true
+                        isFavorite: true,
+                        accentColor: settings.accentColor,
+                        useFontArabic: settings.useFontArabic,
+                        fontArabic: settings.fontArabic
                     ) {
                         handleNameTap(name: name, hasActiveSearch: hasActiveSearch, proxy: proxy)
                     }
@@ -262,7 +319,10 @@ struct NamesView: View {
                     firstFoundTarget: namesData.firstFoundTargetsByNameNumber[name.number],
                     showDescription: settings.showDescription,
                     isExpanded: expandedNameNumbers.contains(name.number),
-                    isFavorite: favoriteNameNumberSet.contains(name.number)
+                    isFavorite: favoriteNameNumberSet.contains(name.number),
+                    accentColor: settings.accentColor,
+                    useFontArabic: settings.useFontArabic,
+                    fontArabic: settings.fontArabic
                 ) {
                     handleNameTap(name: name, hasActiveSearch: hasActiveSearch, proxy: proxy)
                 }
@@ -337,20 +397,40 @@ struct NamesView: View {
     }
 }
 
-#Preview {
-    AlIslamPreviewContainer {
-        NamesView()
-    }
-}
-
-private struct NameRow: View {
+private struct NameRow: View, Equatable {
     @EnvironmentObject var settings: Settings
+    
     let name: NameOfAllah
     let firstFoundTarget: (surahID: Int, ayahID: Int)?
     let showDescription: Bool
     let isExpanded: Bool
     let isFavorite: Bool
+    let accentColor: AccentColor
+    let useFontArabic: Bool
+    let fontArabic: String
     let onTap: () -> Void
+
+    init(
+        name: NameOfAllah,
+        firstFoundTarget: (surahID: Int, ayahID: Int)? = nil,
+        showDescription: Bool,
+        isExpanded: Bool,
+        isFavorite: Bool,
+        accentColor: AccentColor = Settings.shared.accentColor,
+        useFontArabic: Bool = Settings.shared.useFontArabic,
+        fontArabic: String = Settings.shared.fontArabic,
+        onTap: @escaping () -> Void
+    ) {
+        self.name = name
+        self.firstFoundTarget = firstFoundTarget
+        self.showDescription = showDescription
+        self.isExpanded = isExpanded
+        self.isFavorite = isFavorite
+        self.accentColor = accentColor
+        self.useFontArabic = useFontArabic
+        self.fontArabic = fontArabic
+        self.onTap = onTap
+    }
 
     var body: some View {
         #if os(iOS)
@@ -410,13 +490,13 @@ private struct NameRow: View {
 
                     HStack {
                         Text(name.name.removeDiacriticsFromLastLetter())
-                            .font(settings.useFontArabic ? .custom(settings.fontArabic, size: 24) : .title2)
+                            .font(useFontArabic ? .custom(fontArabic, size: 24) : .title2)
                             .foregroundColor(.primary)
                             .lineLimit(1)
 
                         Text(name.numberArabic)
                             .font(.custom("KFGQPCQUMBULUthmanicScript-Regu", size: 28))
-                            .foregroundColor(settings.accentColor.color)
+                            .foregroundColor(accentColor.color)
                             .lineLimit(1)
                     }
                 }
@@ -428,7 +508,6 @@ private struct NameRow: View {
                     }
                 }
             }
-            .padding(.vertical, 6)
             
             if showDescription || isExpanded {
                 NameRowDetails(
@@ -456,18 +535,18 @@ private struct NameRow: View {
         ZStack(alignment: .topTrailing) {
             Text("\(name.number)")
                 .font(.subheadline.weight(.bold))
-                .foregroundColor(settings.accentColor.color)
+                .foregroundColor(accentColor.color)
                 .frame(minWidth: 40)
                 .frame(maxHeight: .infinity)
                 .conditionalGlassEffect(
                     useColor: isFavorite ? 0.3 : nil,
-                    customTint: isFavorite ? settings.accentColor.color : nil
+                    customTint: isFavorite ? accentColor.color : nil
                 )
 
             if isFavorite {
                 Image(systemName: "star.fill")
                     .font(.caption2)
-                    .foregroundStyle(settings.accentColor.color)
+                    .foregroundStyle(accentColor.color)
                     .padding(4)
                     .offset(x: 8, y: -6)
             }
@@ -476,6 +555,9 @@ private struct NameRow: View {
             settings.hapticFeedback()
             settings.toggleNameFavorite(number: name.number)
         }
+        .padding(.vertical, {
+            if #available(iOS 26, *) { 0 } else { 8 }
+        }())
     }
 
     #if os(iOS)
@@ -498,13 +580,25 @@ private struct NameRow: View {
 
     private func menuItem(_ label: String, text: String) -> some View {
         Button {
-            UIPasteboard.general.string = text
             settings.hapticFeedback()
+            UIPasteboard.general.string = text
         } label: {
             Label(label, systemImage: "doc.on.doc")
         }
     }
     #endif
+
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.name == rhs.name &&
+        lhs.firstFoundTarget?.surahID == rhs.firstFoundTarget?.surahID &&
+        lhs.firstFoundTarget?.ayahID == rhs.firstFoundTarget?.ayahID &&
+        lhs.showDescription == rhs.showDescription &&
+        lhs.isExpanded == rhs.isExpanded &&
+        lhs.isFavorite == rhs.isFavorite &&
+        lhs.accentColor == rhs.accentColor &&
+        lhs.useFontArabic == rhs.useFontArabic &&
+        lhs.fontArabic == rhs.fontArabic
+    }
 }
 
 private struct NameRowDetails: View {
@@ -591,5 +685,11 @@ private struct VerseReflectionCard: View {
                 .fill(Color.secondary.opacity(0.1))
         )
         .padding(-4)
+    }
+}
+
+#Preview {
+    AlIslamPreviewContainer {
+        NamesView()
     }
 }

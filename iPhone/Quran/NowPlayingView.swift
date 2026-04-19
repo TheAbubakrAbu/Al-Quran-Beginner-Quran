@@ -26,35 +26,37 @@ struct NowPlayingView: View {
         }
 
         #if os(iOS)
-        return AnyView(
-            VStack(spacing: 8) {
-                if quranView {
-                    NavigationLink {
-                        destinationView(for: playbackContext)
-                    } label: {
+        return
+            AnyView(
+                VStack(spacing: 8) {
+                    if quranView {
+                        NavigationLink {
+                            destinationView(for: playbackContext)
+                        } label: {
+                            playerRow(isPlaying: quranPlayer.isPlaying)
+                        }
+                    } else {
                         playerRow(isPlaying: quranPlayer.isPlaying)
                     }
-                } else {
-                    playerRow(isPlaying: quranPlayer.isPlaying)
                 }
-            }
-            .contextMenu {
-                contextMenu(for: playbackContext)
-            }
-            .cornerRadius(24)
-            .padding(.horizontal, 8)
-            .transition(.opacity)
-            .conditionalGlassEffect(rectangle: quranPlayer.isPlayingCustomRange)
-        )
-        #else
-        return AnyView(
-            Section(header: Text("NOW PLAYING")) {
-                VStack(spacing: 8) {
-                    playerRow(isPlaying: quranPlayer.isPlaying)
+                .contextMenu {
+                    contextMenu(for: playbackContext)
                 }
+                .cornerRadius(24)
+                .padding(.horizontal, 8)
                 .transition(.opacity)
-            }
-        )
+                .conditionalGlassEffect(rectangle: quranPlayer.isPlayingCustomRange)
+            )
+        #else
+        return
+            AnyView(
+                Section(header: Text("NOW PLAYING")) {
+                    VStack(spacing: 8) {
+                        playerRow(isPlaying: quranPlayer.isPlaying)
+                    }
+                    .transition(.opacity)
+                }
+            )
         #endif
     }
 
@@ -77,11 +79,11 @@ struct NowPlayingView: View {
     private var bookmarkIndex: Int? {
         let surah = quranPlayer.currentSurahNumber ?? 1
         let ayah = quranPlayer.currentAyahNumber ?? 1
-        return settings.bookmarkedAyahs.firstIndex { $0.surah == surah && $0.ayah == ayah }
+        return settings.bookmarkIndex(surah: surah, ayah: ayah)
     }
 
     private var bookmark: BookmarkedAyah? {
-        bookmarkIndex.map { settings.bookmarkedAyahs[$0] }
+        settings.bookmarkedAyah(surah: quranPlayer.currentSurahNumber ?? 1, ayah: quranPlayer.currentAyahNumber ?? 1)
     }
 
     private var isBookmarkedHere: Bool {
@@ -89,7 +91,7 @@ struct NowPlayingView: View {
     }
 
     private var currentNote: String {
-        (bookmark?.note ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        settings.bookmarkNoteText(surah: quranPlayer.currentSurahNumber ?? 1, ayah: quranPlayer.currentAyahNumber ?? 1)
     }
 
     @ViewBuilder
@@ -107,6 +109,7 @@ struct NowPlayingView: View {
             Image(systemName: "gobackward.10")
                 .font(.title2)
                 .foregroundColor(settings.accentColor.color)
+                .contentShape(Rectangle())
                 .onTapGesture {
                     settings.hapticFeedback()
                     quranPlayer.seek(by: -10)
@@ -115,6 +118,7 @@ struct NowPlayingView: View {
             Image(systemName: "backward.fill")
                 .font(.title2)
                 .foregroundColor(settings.accentColor.color)
+                .contentShape(Rectangle())
                 .onTapGesture {
                     settings.hapticFeedback()
                     quranPlayer.skipBackward()
@@ -124,6 +128,7 @@ struct NowPlayingView: View {
         Image(systemName: isPlaying ? "pause.fill" : "play.fill")
             .font(.title2)
             .foregroundColor(settings.accentColor.color)
+            .contentShape(Rectangle())
             .onTapGesture {
                 settings.hapticFeedback()
                 withAnimation {
@@ -135,6 +140,7 @@ struct NowPlayingView: View {
             Image(systemName: "goforward.10")
                 .font(.title2)
                 .foregroundColor(settings.accentColor.color)
+                .contentShape(Rectangle())
                 .onTapGesture {
                     settings.hapticFeedback()
                     quranPlayer.seek(by: 10)
@@ -143,6 +149,7 @@ struct NowPlayingView: View {
             Image(systemName: "forward.fill")
                 .font(.title2)
                 .foregroundColor(settings.accentColor.color)
+                .contentShape(Rectangle())
                 .onTapGesture {
                     settings.hapticFeedback()
                     quranPlayer.skipForward()
@@ -181,8 +188,8 @@ struct NowPlayingView: View {
         .padding(.vertical, 8)
         .padding(.horizontal, 12)
         .transition(.opacity)
-        .animation(.easeInOut, value: quranPlayer.isPlaying)
-        .confirmationDialog("Remove bookmark and delete note?", isPresented: $confirmRemoveNote, titleVisibility: .visible) {
+        .animation(.easeInOut, value: quranPlayer.isPlaying || quranPlayer.isPaused)
+        .confirmationDialog(Settings.bookmarkNoteRemovalDialogTitle, isPresented: $confirmRemoveNote, titleVisibility: .visible) {
             Button("Remove", role: .destructive) {
                 let surah = quranPlayer.currentSurahNumber ?? 1
                 let ayah = quranPlayer.currentAyahNumber ?? 1
@@ -192,7 +199,7 @@ struct NowPlayingView: View {
             }
             Button("Cancel") {}
         } message: {
-            Text("This ayah has a note. Unbookmarking will delete the note.")
+            Text(Settings.bookmarkNoteRemovalDialogMessage)
         }
         #else
         VStack(alignment: .center, spacing: 6) {
@@ -275,11 +282,8 @@ struct NowPlayingView: View {
         let surah = quranPlayer.currentSurahNumber ?? 1
         let ayah = quranPlayer.currentAyahNumber ?? 1
 
-        if isBookmarkedHere, !currentNote.isEmpty {
+        if !settings.toggleBookmarkIfNoNoteLoss(surah: surah, ayah: ayah) {
             confirmRemoveNote = true
-        } else {
-            settings.hapticFeedback()
-            settings.toggleBookmark(surah: surah, ayah: ayah)
         }
     }
 

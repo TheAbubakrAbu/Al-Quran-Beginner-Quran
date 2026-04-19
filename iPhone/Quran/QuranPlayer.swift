@@ -13,6 +13,7 @@ final class QuranPlayer: ObservableObject {
     @ObservedObject var quranData = QuranData.shared
     
     @Published var isLoading = false
+    @Published private(set) var isReadyForUI = false
     @Published private(set) var isPlaying = false
     @Published private(set) var isPaused = false
     
@@ -77,6 +78,15 @@ final class QuranPlayer: ObservableObject {
         )
         loadHistoryFromDefaults()
         setupRemoteTransportControls()
+        isReadyForUI = true
+    }
+
+    func waitUntilReady() async {
+        while true {
+            let isReady = await MainActor.run { self.isReadyForUI }
+            if isReady { return }
+            try? await Task.sleep(nanoseconds: 10_000_000)
+        }
     }
     
     deinit {
@@ -1062,7 +1072,7 @@ final class QuranPlayer: ObservableObject {
         }
         info[MPNowPlayingInfoPropertyElapsedPlaybackTime] = CMTimeGetSeconds(player?.currentTime() ?? .zero)
         info[MPNowPlayingInfoPropertyPlaybackRate] = player?.rate
-        if let img = UIImage(named: "Al-Quran") {
+        if let img = UIImage(named: AppIdentifiers.appName) {
             info[MPMediaItemPropertyArtwork] = MPMediaItemArtwork(boundsSize: img.size) { _ in img }
         }
         MPNowPlayingInfoCenter.default().nowPlayingInfo = info
@@ -1304,7 +1314,7 @@ final class QuranPlayer: ObservableObject {
 final class ReciterDownloadManager: NSObject, ObservableObject, URLSessionDownloadDelegate {
     static let shared = ReciterDownloadManager()
 
-    struct DownloadState {
+    struct DownloadState: Equatable {
         var isDownloading = false
         var completedSurahs = 0
         var totalSurahs = 114

@@ -6,6 +6,7 @@ let logger = Logger(subsystem: AppIdentifiers.bundleIdentifier, category: "Setti
 final class Settings: ObservableObject {
     static let shared = Settings()
     private let appGroupUserDefaults = UserDefaults(suiteName: AppIdentifiers.appGroupSuiteName)
+    @Published private(set) var isReadyForUI = false
 
     static let encoder: JSONEncoder = {
         let enc = JSONEncoder()
@@ -20,9 +21,18 @@ final class Settings: ObservableObject {
     }()
 
     private init() {
-        self.accentColor = AccentColor(rawValue: appGroupUserDefaults?.string(forKey: "accentColor") ?? "green") ?? .green
+        self.accentColor = AccentColor(rawValue: appGroupUserDefaults?.string(forKey: "accentColor") ?? AppIdentifiers.mainColorString) ?? AppIdentifiers.mainColor
         
         runQuranStartupMigrations()
+        isReadyForUI = true
+    }
+
+    func waitUntilReady() async {
+        while true {
+            let isReady = await MainActor.run { self.isReadyForUI }
+            if isReady { return }
+            try? await Task.sleep(nanoseconds: 10_000_000)
+        }
     }
 
     // MARK: - App group — shared with widgets / extensions
@@ -178,6 +188,7 @@ final class Settings: ObservableObject {
     @AppStorage("showEnglishMustafa") var showEnglishMustafa: Bool = false
     @AppStorage("showPageJuzDividers") var showPageJuzDividers: Bool = true
     @AppStorage("showPageJuzOverlay") var showPageJuzOverlay: Bool = false
+    @AppStorage("showFullSurahRow") var showFullSurahRow: Bool = false
 
     @AppStorage("quranSearchHistoryData") private var quranSearchHistoryData = Data()
     var quranSearchHistory: [String] {

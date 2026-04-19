@@ -203,18 +203,26 @@ struct PlayCustomRangeSheet: View {
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 8)
-                .padding(.bottom, 100)
             }
-            .background(Color(UIColor.systemGroupedBackground))
             .navigationTitle("Custom Range")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        settings.hapticFeedback()
-                        onCancel()
+                    if #available(iOS 26.0, *) {
+                        Button(role: .cancel) {
+                            settings.hapticFeedback()
+                            onCancel()
+                        } label: {
+                            Image(systemName: "xmark")
+                        }
+                    } else {
+                        Button {
+                            settings.hapticFeedback()
+                            onCancel()
+                        } label: {
+                            Image(systemName: "xmark")
+                        }
                     }
-                    .foregroundColor(settings.accentColor.color)
                 }
             }
             .adaptiveSafeArea(edge: .bottom) {
@@ -236,6 +244,7 @@ struct PlayCustomRangeSheet: View {
                 Text(surah.nameTransliteration)
                     .font(.title3.weight(.semibold))
                     .foregroundColor(.primary)
+                
                 Text("Surah \(surah.id) · \(maxAyah) ayahs")
                     .font(.subheadline)
                     .foregroundColor(.secondary)
@@ -618,8 +627,10 @@ struct PlayCustomRangeSheet: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 16)
                 .foregroundColor(.white)
-                .background(canPlay ? settings.accentColor.color : Color(UIColor.tertiaryLabel))
-                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .conditionalGlassEffect(
+                    useColor: 0.35,
+                    customTint: canPlay ? settings.accentColor.color : .secondary
+                )
                 .contentShape(Rectangle())
             }
             .disabled(!canPlay)

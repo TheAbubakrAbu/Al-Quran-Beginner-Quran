@@ -64,14 +64,14 @@ struct ArabicView: View {
 
         if let weight = letter.weight {
             switch weight {
+            case .followsPrevious:
+                parts += ["follows previous", "follows", "previous"]
+            case .conditional:
+                parts += ["conditional"]
             case .heavy:
                 parts += ["heavy", "tafkhim", "istila", "isti'la"]
             case .light:
                 parts += ["light", "tarqiq"]
-            case .conditional:
-                parts += ["conditional"]
-            case .followsPrevious:
-                parts += ["follows previous", "follows", "previous"]
             }
         }
 
@@ -94,7 +94,7 @@ struct ArabicView: View {
     var body: some View {
         List {
             #if os(watchOS)
-            fontPickerSection
+            arabicFontPickerSection
             #endif
             favoriteLettersSection
             mainLetterSections
@@ -105,12 +105,7 @@ struct ArabicView: View {
         #else
         .adaptiveSafeArea(edge: .bottom) {
             VStack(spacing: SafeAreaInsetVStackSpacing.standard) {
-                Picker("Arabic Font", selection: $settings.useFontArabic.animation(.easeInOut)) {
-                    Text("Quranic Font").tag(true)
-                    Text("Basic Font").tag(false)
-                }
-                .pickerStyle(.segmented)
-                .conditionalGlassEffect()
+                arabicFontPicker
 
                 HStack(spacing: 0) {
                     SearchBar(text: $searchText.animation(.easeInOut))
@@ -149,22 +144,42 @@ struct ArabicView: View {
         if searchText.isEmpty, !settings.favoriteLetters.isEmpty {
             Section("FAVORITE LETTERS") {
                 ForEach(settings.favoriteLetters.sorted(), id: \.id) {
-                    ArabicLetterRow(letterData: $0)
+                    letterRow(for: $0)
                 }
             }
         }
     }
 
     @ViewBuilder
-    private var fontPickerSection: some View {
+    private var arabicFontPickerSection: some View {
         Section {
-            Picker("Arabic Font", selection: $settings.useFontArabic.animation(.easeInOut)) {
-                Text("Quranic Font").tag(true)
-                Text("Basic Font").tag(false)
-            }
+            arabicFontPicker
         } header: {
             Text("ARABIC FONT")
         }
+    }
+
+    @ViewBuilder
+    private var arabicFontPicker: some View {
+        Picker("Arabic Font", selection: $settings.useFontArabic.animation(.easeInOut)) {
+            Text("Quranic Font").tag(true)
+            Text("Basic Font").tag(false)
+        }
+        #if !os(watchOS)
+        .pickerStyle(.segmented)
+        #endif
+        .conditionalGlassEffect()
+    }
+
+    private func letterRow(for letterData: LetterData) -> some View {
+        ArabicLetterRow(
+            letterData: letterData,
+            isFavorite: settings.isLetterFavorite(letterData: letterData),
+            accentColor: settings.accentColor,
+            useFontArabic: settings.useFontArabic,
+            fontArabic: settings.fontArabic
+        )
+        .equatable()
     }
 
     @ViewBuilder
@@ -174,7 +189,7 @@ struct ArabicView: View {
 
             Section("SPECIAL ARABIC LETTERS") {
                 ForEach(otherArabicLetters, id: \.letter) {
-                    ArabicLetterRow(letterData: $0)
+                    letterRow(for: $0)
                 }
             }
 
@@ -186,7 +201,7 @@ struct ArabicView: View {
 
             Section("NON-ARABIC LETTERS") {
                 ForEach(nonArabicArabicScriptLetters, id: \.letter) {
-                    ArabicLetterRow(letterData: $0)
+                    letterRow(for: $0)
                 }
             }
         }
@@ -198,7 +213,7 @@ struct ArabicView: View {
         case .normal:
             Section("STANDARD ARABIC LETTERS") {
                 ForEach(standardArabicLetters, id: \.letter) {
-                    ArabicLetterRow(letterData: $0)
+                    letterRow(for: $0)
                 }
             }
         case .similarity:
@@ -207,14 +222,26 @@ struct ArabicView: View {
                 let header = idx == 0 ? "VOWEL LETTERS" : group.joined(separator: " - ")
                 Section(header) {
                     ForEach(group, id: \.self) { ch in
-                        letterData(for: ch).map(ArabicLetterRow.init)
+                        letterData(for: ch).map { letterRow(for: $0) }
                     }
                 }
             }
         case .heavyLight:
+            Section("FOLLOWS PREVIOUS") {
+                ForEach(standardArabicLetters.filter { $0.weight == .followsPrevious }, id: \.letter) {
+                    letterRow(for: $0)
+                }
+            }
+            
+            Section("CONDITIONAL") {
+                ForEach(standardArabicLetters.filter { $0.weight == .conditional }, id: \.letter) {
+                    letterRow(for: $0)
+                }
+            }
+            
             Section("HEAVY LETTERS") {
                 ForEach(standardArabicLetters.filter { $0.weight == .heavy }, id: \.letter) {
-                    ArabicLetterRow(letterData: $0)
+                    letterRow(for: $0)
                 }
             }
 
@@ -224,19 +251,7 @@ struct ArabicView: View {
                         || $0.transliteration == "taa marbuuTa"
                         || $0.transliteration.lowercased().contains("hamza")
                 }, id: \.id) {
-                    ArabicLetterRow(letterData: $0)
-                }
-            }
-
-            Section("CONDITIONAL") {
-                ForEach(standardArabicLetters.filter { $0.weight == .conditional }, id: \.letter) {
-                    ArabicLetterRow(letterData: $0)
-                }
-            }
-
-            Section("FOLLOWS PREVIOUS") {
-                ForEach(standardArabicLetters.filter { $0.weight == .followsPrevious }, id: \.letter) {
-                    ArabicLetterRow(letterData: $0)
+                    letterRow(for: $0)
                 }
             }
         }
@@ -247,11 +262,11 @@ struct ArabicView: View {
         if !searchText.isEmpty {
             Section {
                 ForEach(filteredStandardForMode) {
-                    ArabicLetterRow(letterData: $0)
+                    letterRow(for: $0)
                 }
 
                 ForEach(filteredOther) {
-                    ArabicLetterRow(letterData: $0)
+                    letterRow(for: $0)
                 }
             } header: {
                 HStack {
@@ -329,6 +344,9 @@ struct ArabicLetterView: View {
 
     var body: some View {
         List {
+            #if os(watchOS)
+            arabicFontPickerSection
+            #endif
             Section(header: LetterSectionHeader(letterData: letterData)) {
                 VStack {
                     HStack(alignment: .center) {
@@ -469,8 +487,39 @@ struct ArabicLetterView: View {
                 }
             }
         }
+        #if !os(watchOS)
+        .adaptiveSafeArea(edge: .bottom) {
+            VStack(spacing: SafeAreaInsetVStackSpacing.standard) {
+                arabicFontPicker
+            }
+            .padding(.horizontal, 24)
+            .padding(.bottom)
+            .background(Color.white.opacity(0.00001))
+        }
+        #endif
         .applyConditionalListStyle(defaultView: settings.defaultView)
         .navigationTitle(letterData.letter)
+    }
+
+    @ViewBuilder
+    private var arabicFontPickerSection: some View {
+        Section {
+            arabicFontPicker
+        } header: {
+            Text("ARABIC FONT")
+        }
+    }
+
+    @ViewBuilder
+    private var arabicFontPicker: some View {
+        Picker("Arabic Font", selection: $settings.useFontArabic.animation(.easeInOut)) {
+            Text("Quranic Font").tag(true)
+            Text("Basic Font").tag(false)
+        }
+        #if !os(watchOS)
+        .pickerStyle(.segmented)
+        #endif
+        .conditionalGlassEffect()
     }
 
     @ViewBuilder
@@ -749,13 +798,29 @@ struct NonArabicVowelPracticeRow: View {
     }
 }
 
-struct ArabicLetterRow: View {
+struct ArabicLetterRow: View, Equatable {
     @EnvironmentObject private var settings: Settings
     let letterData: LetterData
+    let isFavorite: Bool
+    let accentColor: AccentColor
+    let useFontArabic: Bool
+    let fontArabic: String
+
+    init(
+        letterData: LetterData,
+        isFavorite: Bool? = nil,
+        accentColor: AccentColor = Settings.shared.accentColor,
+        useFontArabic: Bool = Settings.shared.useFontArabic,
+        fontArabic: String = Settings.shared.fontArabic
+    ) {
+        self.letterData = letterData
+        self.isFavorite = isFavorite ?? Settings.shared.isLetterFavorite(letterData: letterData)
+        self.accentColor = accentColor
+        self.useFontArabic = useFontArabic
+        self.fontArabic = fontArabic
+    }
 
     var body: some View {
-        let isFav = settings.isLetterFavorite(letterData: letterData)
-
         NavigationLink(destination: ArabicLetterView(letterData: letterData)) {
             HStack {
                 Text(letterData.transliteration)
@@ -765,41 +830,41 @@ struct ArabicLetterRow: View {
 
                 Text(letterData.letter)
                     .font(
-                        (settings.useFontArabic && !letterData.isNonArabicScriptLetter)
-                            ? .custom(settings.fontArabic, size: UIFont.preferredFont(forTextStyle: .title2).pointSize)
+                        (useFontArabic && !letterData.isNonArabicScriptLetter)
+                            ? .custom(fontArabic, size: UIFont.preferredFont(forTextStyle: .title2).pointSize)
                             : .title2
                     )
-                    .foregroundColor(settings.accentColor.color)
+                    .foregroundColor(accentColor.color)
             }
             .padding(.vertical, -2)
         }
         #if os(iOS)
-        .swipeActions(edge: .leading) { favButton(isFav: isFav) }
-        .swipeActions(edge: .trailing) { favButton(isFav: isFav) }
-        .contextMenu { contextItems(isFav: isFav) }
+        .swipeActions(edge: .leading) { favButton() }
+        .swipeActions(edge: .trailing) { favButton() }
+        .contextMenu { contextItems() }
         #endif
     }
 
     @ViewBuilder
-    private func favButton(isFav: Bool) -> some View {
+    private func favButton() -> some View {
         Button {
             settings.hapticFeedback()
             settings.toggleLetterFavorite(letterData: letterData)
         } label: {
-            Image(systemName: isFav ? "star.fill" : "star")
+            Image(systemName: isFavorite ? "star.fill" : "star")
         }
-        .tint(settings.accentColor.color)
+        .tint(accentColor.color)
     }
 
     @ViewBuilder
-    private func contextItems(isFav: Bool) -> some View {
+    private func contextItems() -> some View {
         #if os(iOS)
-        Button(role: isFav ? .destructive : nil) {
+        Button(role: isFavorite ? .destructive : nil) {
             settings.hapticFeedback()
             settings.toggleLetterFavorite(letterData: letterData)
         } label: {
-            Label(isFav ? "Unfavorite Letter" : "Favorite Letter",
-                  systemImage: isFav ? "star.fill" : "star")
+            Label(isFavorite ? "Unfavorite Letter" : "Favorite Letter",
+                  systemImage: isFavorite ? "star.fill" : "star")
         }
 
         Button {
@@ -816,6 +881,14 @@ struct ArabicLetterRow: View {
             Label("Copy Transliteration", systemImage: "doc.on.doc")
         }
         #endif
+    }
+
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.letterData == rhs.letterData &&
+        lhs.isFavorite == rhs.isFavorite &&
+        lhs.accentColor == rhs.accentColor &&
+        lhs.useFontArabic == rhs.useFontArabic &&
+        lhs.fontArabic == rhs.fontArabic
     }
 }
 

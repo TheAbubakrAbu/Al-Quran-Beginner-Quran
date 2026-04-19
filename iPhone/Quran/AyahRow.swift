@@ -1,7 +1,7 @@
 import SwiftUI
 import Foundation
 
-struct AyahRow: View {
+struct AyahRow: View, Equatable {
     @EnvironmentObject var settings: Settings
     @EnvironmentObject var quranData: QuranData
     @EnvironmentObject var quranPlayer: QuranPlayer
@@ -30,6 +30,14 @@ struct AyahRow: View {
     
     @State private var showRespectAlert = false
 
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.surah == rhs.surah &&
+        lhs.ayah == rhs.ayah &&
+        lhs.comparisonQiraahOverride == rhs.comparisonQiraahOverride &&
+        lhs.scrollDown == rhs.scrollDown &&
+        lhs.searchText == rhs.searchText
+    }
+
     private static let arabicDisplayCache: NSCache<NSString, NSString> = {
         let cache = NSCache<NSString, NSString>()
         cache.countLimit = 5000
@@ -46,40 +54,24 @@ struct AyahRow: View {
     }
     
     private var bookmarkIndex: Int? {
-        settings.bookmarkedAyahs.firstIndex { $0.surah == surah.id && $0.ayah == ayah.id }
+        settings.bookmarkIndex(surah: surah.id, ayah: ayah.id)
     }
     
     private var bookmark: BookmarkedAyah? {
-        bookmarkIndex.flatMap { settings.bookmarkedAyahs[$0] }
+        settings.bookmarkedAyah(surah: surah.id, ayah: ayah.id)
     }
     
     private var isBookmarkedHere: Bool { bookmarkIndex != nil }
     private var currentNote: String {
-        (bookmark?.note ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        settings.bookmarkNoteText(surah: surah.id, ayah: ayah.id)
     }
     
     private func setNote(_ text: String?) {
-        withAnimation {
-            let normalized = text?.trimmingCharacters(in: .whitespacesAndNewlines)
-            if let idx = bookmarkIndex {
-                var b = settings.bookmarkedAyahs[idx]
-                b.note = (normalized?.isEmpty == true) ? nil : normalized
-                settings.bookmarkedAyahs[idx] = b
-            } else {
-                let new = BookmarkedAyah(surah: surah.id, ayah: ayah.id,
-                                         note: (normalized?.isEmpty == true ? nil : normalized))
-                settings.bookmarkedAyahs.append(new)
-            }
-        }
+        settings.setBookmarkNote(surah: surah.id, ayah: ayah.id, note: text)
     }
 
     private func removeNote() {
-        guard let idx = bookmarkIndex else { return }
-        withAnimation {
-            var b = settings.bookmarkedAyahs[idx]
-            b.note = nil
-            settings.bookmarkedAyahs[idx] = b
-        }
+        settings.removeBookmarkNote(surah: surah.id, ayah: ayah.id)
     }
     
     private func spacedArabic(_ text: String) -> String {
@@ -188,13 +180,13 @@ struct AyahRow: View {
                     .fill(
                         currentAyah == ayah.id
                         ? settings.accentColor.color.opacity(settings.defaultView ? 0.15 : 0.25)
-                        : .white.opacity(0.00001)
+                        : .clear
                     )
                     .padding(.horizontal, -12)
                     .padding(.vertical, ayahHighlightBackgroundVerticalPadding)
             }
             
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 4) {
                     ZStack(alignment: .topTrailing) {
                         Text("\(surah.id):\(ayah.id)")
@@ -211,7 +203,7 @@ struct AyahRow: View {
                             )
                             .onTapGesture {
                                 settings.hapticFeedback()
-                                settings.toggleBookmark(surah: surah.id, ayah: ayah.id)
+                                toggleBookmarkWithNoteGuard()
                             }
 
                         if isBookmarked {
@@ -331,7 +323,9 @@ struct AyahRow: View {
                     Button {
                         if !searchText.isEmpty {
                             settings.hapticFeedback()
-                            scrollDown = ayah.id
+                            withAnimation {
+                                scrollDown = ayah.id
+                            }
                         }
                     } label: {
                         ayahTextBlock(
@@ -344,6 +338,7 @@ struct AyahRow: View {
                         )
                     }
                     .disabled(searchText.isEmpty)
+                    .contentShape(Rectangle())
                     #else
                     ayahTextBlock(
                         showArabic: showArabic,
@@ -359,6 +354,7 @@ struct AyahRow: View {
                 .fixedSize(horizontal: false, vertical: true)
             }
         }
+        .contentShape(Rectangle())
         .lineLimit(nil)
         #if os(iOS)
         .contextMenu {
@@ -370,14 +366,14 @@ struct AyahRow: View {
         } message: {
             Text("Please keep notes Islamic and respectful.")
         }
-        .confirmationDialog("Remove bookmark and delete note?", isPresented: $confirmRemoveNote, titleVisibility: .visible) {
+        .confirmationDialog(Settings.bookmarkNoteRemovalDialogTitle, isPresented: $confirmRemoveNote, titleVisibility: .visible) {
             Button("Remove", role: .destructive) {
                 settings.hapticFeedback()
                 settings.toggleBookmark(surah: surah.id, ayah: ayah.id)
             }
             Button("Cancel") {}
         } message: {
-            Text("This ayah has a note. Unbookmarking will delete the note.")
+            Text(Settings.bookmarkNoteRemovalDialogMessage)
         }
         #if os(watchOS)
         .confirmationDialog("Play Ayah", isPresented: $showWatchPlaybackDialog, titleVisibility: .visible) {
@@ -423,8 +419,7 @@ struct AyahRow: View {
         } message: {
             Text("Choose how you want to start playback for this ayah.")
         }
-        #endif
-        #if os(iOS)
+        #else
         .sheet(isPresented: $showCustomRangeSheet) {
             PlayCustomRangeSheet(
                 surah: surah,
@@ -447,7 +442,6 @@ struct AyahRow: View {
                 onCancel: { showCustomRangeSheet = false }
             )
             .environmentObject(settings)
-            .fullScreenSheetPresentation()
         }
         #endif
     }
@@ -479,11 +473,12 @@ struct AyahRow: View {
                 }
                 .padding(10)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 20)
+                    RoundedRectangle(cornerRadius: 24)
                         .stroke(settings.accentColor.color.opacity(0.25), lineWidth: 1)
                 )
-                .conditionalGlassEffect()
+                .conditionalGlassEffect(rectangle: true)
                 .frame(maxWidth: .infinity, alignment: .center)
+                .contentShape(Rectangle())
                 #if os(iOS)
                 .onTapGesture {
                     settings.hapticFeedback()
@@ -491,6 +486,7 @@ struct AyahRow: View {
                     showingNoteSheet = true
                 }
                 #endif
+                .padding(.top, 4)
             }
 
             if showArabic {
@@ -573,11 +569,8 @@ struct AyahRow: View {
     @State private var confirmRemoveNote = false
 
     private func toggleBookmarkWithNoteGuard() {
-        if isBookmarkedHere, !currentNote.isEmpty {
+        if !settings.toggleBookmarkIfNoNoteLoss(surah: surah.id, ayah: ayah.id) {
             confirmRemoveNote = true
-        } else {
-            settings.hapticFeedback()
-            settings.toggleBookmark(surah: surah.id, ayah: ayah.id)
         }
     }
 
@@ -705,7 +698,7 @@ struct AyahRow: View {
             Button {
                 settings.hapticFeedback()
                 if !isBookmarked {
-                    settings.toggleBookmark(surah: surah.id, ayah: ayah.id)
+                    settings.ensureBookmarkExists(surah: surah.id, ayah: ayah.id)
                 }
                 draftNote = currentNote
                 showingNoteSheet = true

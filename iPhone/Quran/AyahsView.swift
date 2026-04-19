@@ -33,6 +33,7 @@ struct AyahsView: View {
     @State private var surahInfoDialog: SurahInfoDialog? = nil
     let surah: Surah
     var ayah: Int? = nil
+    var onSelectSurah: ((Int) -> Void)? = nil
 
     private struct DividerInfo: Identifiable {
         let id = UUID()
@@ -528,7 +529,6 @@ struct AyahsView: View {
         .onDisappear(perform: saveLastRead)
         .onChange(of: scenePhase) { _ in saveLastRead() }
         #if os(iOS)
-        //.navigationTitle(surah.nameEnglish)
         .toolbar {
             ToolbarItem(placement: .principal) {
                 surahTitlePickerButton
@@ -549,7 +549,7 @@ struct AyahsView: View {
 
                 guard selectedSurah.id != surah.id else { return }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                    selectedSurahNavigation = selectedSurah.id
+                    navigateToSurah(selectedSurah)
                 }
             }
             .environmentObject(settings)
@@ -759,10 +759,8 @@ struct AyahsView: View {
             guard showBoundaryDividers, searchText.isEmpty else { return nil }
             return boundaryModel?.endOfSurahDivider
         }()
-        //let previousSurah = searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? neighboringSurah(before: surah.id) : nil
-        let nextSurah = searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            ? neighboringSurah(after: surah.id)
-            : nil
+        let previousSurah = searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? neighboringSurah(before: surah.id) : nil
+        let nextSurah = searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? neighboringSurah(after: surah.id) : nil
         let currentFloatingAyah = firstVisibleAyahID
             .flatMap { visibleID in ayahByID[visibleID] }
             ?? ayahsForQiraah.first
@@ -827,12 +825,12 @@ struct AyahsView: View {
         return
             List {
                 Section {
-                    SurahRow(surah: surah, hideInfo: true).equatable()
+                    /*SurahRow(surah: surah, hideInfo: true).equatable()
                         .contentShape(Rectangle())
                         .onLongPressGesture(minimumDuration: 0.45) {
                             settings.hapticFeedback()
                             surahInfoDialog = surahInfoDialog(for: surah)
-                        }
+                        }*/
                 } header: {
                     ZStack {
                         if searchText.isEmpty {
@@ -864,13 +862,14 @@ struct AyahsView: View {
                     }
                     .animation(.easeInOut, value: searchText)
                     .transition(.opacity)
+                    .padding(.bottom, -12)
                 }
                 
-                /*if let previousSurah {
+                if let previousSurah {
                     Section {
                         surahNavigationButton(title: "Go to Previous Surah", surah: previousSurah, systemImage: "chevron.up")
                     }
-                }*/
+                }
                  
                 Section {
                     VStack {
@@ -1096,7 +1095,8 @@ struct AyahsView: View {
                             .animation(.easeInOut, value: quranPlayer.isPlaying || quranPlayer.isPaused)
                     }
                 }
-                .padding(.bottom, 8)
+                .padding(.bottom, 7)
+                .background(Color.white.opacity(0.00001))
             }
             .adaptiveSafeArea(edge: .bottom) {
                 bottomInsetContent(proxy: proxy)
@@ -1126,9 +1126,7 @@ struct AyahsView: View {
                     .animation(.easeInOut(duration: 0.18), value: floatingDividerAnimationKey)
             }
         }
-        .padding(.top, {
-            if #available(iOS 26, *) { 0 } else { 4 }
-        }())
+        .padding(.top, 4)
         .padding(.horizontal, settings.defaultView ? 20 : 16)
         .background(Color.clear)
         .opacity(showFloatingHeader ? 1 : 0)
@@ -1182,9 +1180,6 @@ struct AyahsView: View {
                 )
 
                 playButton(proxy: proxy)
-                    .frame(width: 27, height: 27)
-                    .padding()
-                    .conditionalGlassEffect()
                     .padding(.bottom, 2)
             }
             .padding([.leading, .top], -8)
@@ -1199,7 +1194,6 @@ struct AyahsView: View {
     @ViewBuilder
     private func nowPlayingInset(proxy: ScrollViewProxy) -> some View {
         NowPlayingView(quranView: false)
-            .animation(.easeInOut, value: quranPlayer.isPlaying)
             .onTapGesture {
                 guard
                     let curSurah = quranPlayer.currentSurahNumber,
@@ -1322,7 +1316,9 @@ struct AyahsView: View {
                     Label("Other Options", systemImage: "ellipsis.circle")
                 }
             } label: {
-                playIcon()
+                playbackMenuControlLabel {
+                    playIcon()
+                }
             }
         } else {
             Button {
@@ -1336,9 +1332,22 @@ struct AyahsView: View {
                     quranPlayer.stop()
                 }
             } label: {
-                playIcon()
+                playbackMenuControlLabel {
+                    playIcon()
+                }
             }
         }
+    }
+
+    private func playbackMenuControlLabel<Content: View>(
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        content()
+            .frame(width: 27, height: 27)
+            .padding()
+            .frame(minWidth: 44, minHeight: 44)
+            .contentShape(Rectangle())
+            .conditionalGlassEffect()
     }
 
     private func playRandomReciterForCurrentSurah() {
@@ -1374,14 +1383,39 @@ struct AyahsView: View {
             settings.hapticFeedback()
             showSurahPickerSheet = true
         } label: {
-            Text("\(surah.id) - \(surah.nameTransliteration)")
-                .font(.headline)
-                .lineLimit(1)
-                .foregroundColor(.primary)
-                .contentShape(Rectangle())
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .conditionalGlassEffect()
+            VStack(spacing: 0) {
+                HStack {
+                    HStack {
+                        Text("\(surah.id)")
+                            .font(.subheadline.bold())
+                            .foregroundColor(settings.accentColor.color)
+                        
+                        Text(surah.nameTransliteration)
+                            .font(.subheadline.bold())
+                    }
+                    
+                    Spacer()
+                    
+                    HStack {
+                        Text(surah.nameArabic)
+                            .font(.custom(settings.fontArabic, size: UIFont.preferredFont(forTextStyle: .headline).pointSize + 2))
+                        
+                        Text(surah.idArabic)
+                            .font(.custom("KFGQPCQUMBULUthmanicScript-Regu", size: UIFont.preferredFont(forTextStyle: .headline).pointSize + 2))
+                            .foregroundColor(settings.accentColor.color)
+                    }
+                }
+                
+                Text(surah.nameEnglish)
+                    .font(.caption2)
+                    .padding(.top, -4)
+            }
+            .lineLimit(1)
+            .foregroundColor(.primary)
+            .contentShape(Rectangle())
+            .padding(.horizontal)
+            .padding(.vertical, 8)
+            .conditionalGlassEffect()
         }
     }
 
@@ -1450,7 +1484,17 @@ struct AyahsView: View {
     private func navigateToSurah(_ targetSurah: Surah) {
         guard targetSurah.id != surah.id else { return }
         settings.hapticFeedback()
-        selectedSurahNavigation = targetSurah.id
+        if let onSelectSurah {
+            searchText = ""
+            pendingScrollAfterSearchClear = nil
+            scrollDown = nil
+            visibleAyahIDs.removeAll()
+            visibleBoundaryAyahIDs.removeAll()
+            firstVisibleAyahID = nil
+            onSelectSurah(targetSurah.id)
+        } else {
+            selectedSurahNavigation = targetSurah.id
+        }
     }
 
     @ViewBuilder

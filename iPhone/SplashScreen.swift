@@ -62,6 +62,8 @@ struct SplashScreen: View {
                         .padding(.bottom, 28)
                 }
                 .frame(width: geo.size.width, height: geo.size.height)
+                .animation(.easeInOut, value: settings.firstLaunch)
+                .transition(.opacity)
             }
             .navigationTitle("Assalamu Alaikum")
             .navigationBarTitleDisplayMode(.inline)

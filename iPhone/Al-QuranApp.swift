@@ -24,6 +24,7 @@ struct AlQuranApp: App {
                 .tint(settings.accentColor.color)
                 .preferredColorScheme(settings.colorScheme)
                 .animation(.easeInOut, value: settings.firstLaunch)
+                .animation(.easeInOut, value: isLaunching)
                 .appReviewPrompt()
         }
         .onChange(of: settings.accentColor) { _ in
@@ -86,6 +87,7 @@ private struct NowPlayingInsetModifier: ViewModifier {
             }
             .padding(.horizontal, 24)
             .padding(.bottom, 8)
+            .background(Color.white.opacity(0.00001))
             .animation(.easeInOut, value: quranPlayer.isPlaying || quranPlayer.isPaused)
         }
     }

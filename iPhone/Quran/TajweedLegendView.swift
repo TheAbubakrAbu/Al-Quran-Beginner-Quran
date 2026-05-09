@@ -5,6 +5,8 @@ struct TajweedLegendView: View {
     @EnvironmentObject var settings: Settings
     @Environment(\.presentationMode) private var presentationMode
 
+    var showsDismissButton = true
+
     private struct LegendSection: Identifiable {
         let section: TajweedLegendCategory.Section
         let items: [TajweedLegendCategory]
@@ -25,6 +27,26 @@ struct TajweedLegendView: View {
             GridItem(.flexible(), spacing: 10, alignment: .top),
             GridItem(.flexible(), spacing: 10, alignment: .top)
         ]
+    }
+
+    @ViewBuilder
+    private func visibilityButton(title: String, systemImage: String, visible: Bool) -> some View {
+        Button {
+            settings.hapticFeedback()
+            withAnimation {
+                TajweedLegendCategory.allCases.forEach {
+                    settings.setTajweedCategory($0, visible: visible)
+                }
+            }
+        } label: {
+            Label(title, systemImage: systemImage)
+                .font(.subheadline.weight(.semibold))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 10)
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(settings.accentColor.color)
+        .conditionalGlassEffect(rectangle: true)
     }
     
     @ViewBuilder
@@ -70,12 +92,21 @@ struct TajweedLegendView: View {
 
             countBadge(item)
 
-            Text(item.shortDescription)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(2)
-                .lineSpacing(1)
-                .fixedSize(horizontal: false, vertical: true)
+            if #available(iOS 16.0, *) {
+                Text(item.shortDescription)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2 ,reservesSpace: true)
+                    .lineSpacing(1)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                Text(item.shortDescription)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                    .lineSpacing(1)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
 
             Label(settings.isTajweedCategoryVisible(item) ? "Hide" : "Show", systemImage: settings.isTajweedCategoryVisible(item) ? "eye.fill" : "eye.slash.fill")
                 .font(.caption.weight(.semibold))
@@ -193,6 +224,11 @@ struct TajweedLegendView: View {
                     }
                 }
 
+                HStack(spacing: 10) {
+                    visibilityButton(title: "Show All", systemImage: "eye.fill", visible: true)
+                    visibilityButton(title: "Hide All", systemImage: "eye.slash.fill", visible: false)
+                }
+
                 VStack(alignment: .leading, spacing: 12) {
                     Text("More Detail")
                         .font(.headline)
@@ -223,6 +259,13 @@ struct TajweedLegendView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .conditionalGlassEffect(rectangle: true, useColor: 0.1)
                 }
+
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Mushaf Signs and Stops")
+                        .font(.headline)
+
+                    QuranSignsSectionContent(accentColor: settings.accentColor.color)
+                }
             }
             .padding(.horizontal, 20)
             .padding(.top, 20)
@@ -233,13 +276,15 @@ struct TajweedLegendView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
-                Button {
-                    settings.hapticFeedback()
-                    presentationMode.wrappedValue.dismiss()
-                } label: {
-                    Image(systemName: "xmark")
+                if showsDismissButton {
+                    Button {
+                        settings.hapticFeedback()
+                        presentationMode.wrappedValue.dismiss()
+                    } label: {
+                        Image(systemName: "xmark")
+                    }
+                    .tint(settings.accentColor.color)
                 }
-                .tint(settings.accentColor.color)
             }
         }
     }

@@ -15,6 +15,8 @@ struct AyahRow: View, Equatable {
     @State private var showingNoteSheet = false
     @State private var draftNote: String = ""
     @State private var showCustomRangeSheet = false
+    @State private var showQiraahComparisonSheet = false
+    @State private var showEnglishComparisonSheet = false
     #endif
     #if os(watchOS)
     @State private var showWatchPlaybackDialog = false
@@ -24,6 +26,7 @@ struct AyahRow: View, Equatable {
     let ayah: Ayah
     /// When non-nil (e.g. comparison mode), use this qiraah for Arabic instead of global setting.
     var comparisonQiraahOverride: String? = nil
+    var renderSettingsSignature: String = ""
 
     @Binding var scrollDown: Int?
     @Binding var searchText: String
@@ -34,6 +37,7 @@ struct AyahRow: View, Equatable {
         lhs.surah == rhs.surah &&
         lhs.ayah == rhs.ayah &&
         lhs.comparisonQiraahOverride == rhs.comparisonQiraahOverride &&
+        lhs.renderSettingsSignature == rhs.renderSettingsSignature &&
         lhs.scrollDown == rhs.scrollDown &&
         lhs.searchText == rhs.searchText
     }
@@ -43,6 +47,9 @@ struct AyahRow: View, Equatable {
         cache.countLimit = 5000
         return cache
     }()
+
+    private static let uthmaniFontName = "KFGQPCQUMBULUthmanicScript-Regu"
+    private static let qiraatFontName = "Qiraat"
     
     func containsProfanity(_ text: String) -> Bool {
         let t = text.folding(options: [.diacriticInsensitive, .widthInsensitive], locale: .current).lowercased()
@@ -65,6 +72,22 @@ struct AyahRow: View, Equatable {
     private var currentNote: String {
         settings.bookmarkNoteText(surah: surah.id, ayah: ayah.id)
     }
+
+    private var canCompareEnglishText: Bool {
+        settings.isHafsDisplay
+    }
+
+    private var shouldShowKhatmCheckmark: Bool {
+        settings.quranSortMode == .khatm && settings.isKhatmAyahComplete(surah: surah.id, ayah: ayah.id)
+    }
+
+    private var shouldShowManualKhatmButton: Bool {
+        settings.quranSortMode == .khatm &&
+        !settings.automaticKhatmCompletion &&
+        comparisonQiraahOverride == nil &&
+        searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        !settings.isKhatmAyahComplete(surah: surah.id, ayah: ayah.id)
+    }
     
     private func setNote(_ text: String?) {
         settings.setBookmarkNote(surah: surah.id, ayah: ayah.id, note: text)
@@ -79,8 +102,7 @@ struct AyahRow: View, Equatable {
     }
 
     private func arabicDisplayText() -> String {
-        // Tajweed needs full diacritics; when colors are on, show unclean Arabic even if "clean" is enabled elsewhere.
-        let clean = settings.cleanArabicText && !shouldShowTajweedColors
+        let clean = settings.cleanArabicText
         let qiraahKey = comparisonQiraahOverride ?? (settings.displayQiraahForArabic ?? "Hafs")
         let key = "\(surah.id):\(ayah.id)|\(clean ? 1 : 0)|\((settings.beginnerMode || ayahBeginnerMode) ? 1 : 0)|\(qiraahKey)"
 
@@ -92,6 +114,15 @@ struct AyahRow: View, Equatable {
         let spaced = spacedArabic(baseText)
         Self.arabicDisplayCache.setObject(spaced as NSString, forKey: key as NSString)
         return spaced
+    }
+
+    private func ayahArabicFontName(for qiraah: String?) -> String {
+        guard settings.fontArabic == Self.uthmaniFontName else {
+            return settings.fontArabic
+        }
+
+        let normalizedQiraah = Settings.normalizeLegacyRiwayahTag(qiraah ?? Settings.Riwayah.hafsTag)
+        return normalizedQiraah.isEmpty ? Self.uthmaniFontName : Self.qiraatFontName
     }
 
     private func queryForInlineHighlight(_ query: String) -> String {
@@ -106,6 +137,8 @@ struct AyahRow: View, Equatable {
     }
 
     private var shouldShowTajweedColors: Bool {
+        if !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return false }
+
         let usingHafs: Bool = if let override = comparisonQiraahOverride {
             override.isEmpty || override == "Hafs"
         } else {
@@ -115,14 +148,24 @@ struct AyahRow: View, Equatable {
         return settings.showTajweedColors
             && settings.showArabicText
             && usingHafs
-            && !settings.cleanArabicText
-            && !(settings.beginnerMode || ayahBeginnerMode)
     }
 
     private func arabicTajweedText() -> AttributedString? {
         guard shouldShowTajweedColors else { return nil }
+        let beginner = settings.beginnerMode || ayahBeginnerMode
         let text = ayah.displayArabicText(surahId: surah.id, clean: false, qiraahOverride: comparisonQiraahOverride)
-        return TajweedStore.shared.attributedText(surah: surah.id, ayah: ayah.id, text: text)
+        let displayText = settings.cleanArabicText
+            ? ayah.displayArabicText(surahId: surah.id, clean: true, qiraahOverride: comparisonQiraahOverride)
+            : text
+        let renderedDisplayText = beginner ? spacedArabic(displayText) : displayText
+        return TajweedStore.shared.attributedText(
+            surah: surah.id,
+            ayah: ayah.id,
+            text: text,
+            displayText: renderedDisplayText,
+            cleanDisplayText: settings.cleanArabicText,
+            beginnerSpacing: beginner
+        )
     }
 
     private var tajweedAnimationKey: String {
@@ -132,6 +175,7 @@ struct AyahRow: View, Equatable {
         let qiraahKey = comparisonQiraahOverride ?? settings.displayQiraah
         return [
             settings.showTajweedColors ? "1" : "0",
+            settings.highlightAllahNames ? "1" : "0",
             settings.cleanArabicText ? "1" : "0",
             (settings.beginnerMode || ayahBeginnerMode) ? "1" : "0",
             qiraahKey,
@@ -186,7 +230,7 @@ struct AyahRow: View, Equatable {
                     .padding(.vertical, ayahHighlightBackgroundVerticalPadding)
             }
             
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 4) {
                     ZStack(alignment: .topTrailing) {
                         Text("\(surah.id):\(ayah.id)")
@@ -218,8 +262,38 @@ struct AyahRow: View, Equatable {
                     Spacer()
                     
                     #if os(iOS)
+                    if shouldShowManualKhatmButton {
+                        Button {
+                            settings.hapticFeedback()
+                            settings.markKhatmAyahComplete(surah: surah.id, ayah: ayah.id)
+                        } label: {
+                            Image(systemName: "checkmark.circle")
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .frame(width: 25, height: 25)
+                                .foregroundColor(settings.accentColor.color)
+                                .conditionalGlassEffect()
+                                .frame(width: 28, height: 28)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Mark Ayah Viewed")
+                    }
+
+                    if shouldShowKhatmCheckmark {
+                        Image(systemName: "checkmark.circle.fill")
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: 25, height: 25)
+                            .foregroundColor(settings.accentColor.color)
+                            .conditionalGlassEffect()
+                            .frame(width: 28, height: 28)
+                    }
+
                     if settings.isHafsDisplay {
                         Menu {
+                            Text("Ayah Playback")
+                                .foregroundStyle(.secondary)
+
                             playbackMenuBlock()
                         } label: {
                             Image(systemName: "play.circle")
@@ -233,6 +307,9 @@ struct AyahRow: View, Equatable {
                     }
                     
                     Menu {
+                        Text("Ayah Actions")
+                            .foregroundStyle(.secondary)
+
                         menuBlock(isBookmarked: isBookmarked, includePlaybackOptions: false)
                     } label: {
                         Image(systemName: "ellipsis.circle")
@@ -258,6 +335,18 @@ struct AyahRow: View, Equatable {
                         )
                         .smallMediumSheetPresentation()
                     }
+                    .sheet(isPresented: $showQiraahComparisonSheet) {
+                        AyahQiraahComparisonSheet(surahNumber: surah.id, ayahNumber: ayah.id)
+                            .environmentObject(settings)
+                            .environmentObject(quranData)
+                            .smallMediumSheetPresentation()
+                    }
+                    .sheet(isPresented: $showEnglishComparisonSheet) {
+                        AyahEnglishComparisonSheet(surahNumber: surah.id, ayahNumber: ayah.id)
+                            .environmentObject(settings)
+                            .environmentObject(quranData)
+                            .smallMediumSheetPresentation()
+                    }
                     .sheet(isPresented: $showingNoteSheet) {
                         NoteEditorSheet(
                             title: "Note for \(surah.nameTransliteration) \(surah.id):\(ayah.id)",
@@ -274,6 +363,7 @@ struct AyahRow: View, Equatable {
                             onCancel: {},
                             onSave: { setNote(draftNote) }
                         )
+                        .smallMediumSheetPresentation()
                     }
                     #else
                     HStack(spacing: 8) {
@@ -408,6 +498,7 @@ struct AyahRow: View, Equatable {
                 onCancel: { showCustomRangeSheet = false }
             )
             .environmentObject(settings)
+            .smallMediumSheetPresentation()
         }
         #endif
     }
@@ -457,18 +548,28 @@ struct AyahRow: View, Equatable {
             }
 
             if showArabic {
+                let arabicFont: Font = settings.removeArabicDots
+                    ? .system(size: settings.fontArabicSize)
+                    : .custom(
+                        ayahArabicFontName(for: comparisonQiraahOverride ?? settings.displayQiraahForArabic),
+                        size: settings.fontArabicSize
+                    )
+                let suffixFont: Font = .custom("KFGQPCQUMBULUthmanicScript-Regu", size: settings.fontArabicSize)
+
                 HighlightedSnippet(
                     source: arabicDisplayText(),
                     term: highlightQuery,
-                    font: .custom(settings.fontArabic, size: settings.fontArabicSize),
+                    font: arabicFont,
                     accent: settings.accentColor.color,
                     fg: .primary,
                     preStyledSource: arabicTajweedText(),
                     beginnerMode: (settings.beginnerMode || ayahBeginnerMode),
                     trailingSuffix: " \(ayah.idArabic)",
-                    trailingSuffixFont: .custom("KFGQPCQUMBULUthmanicScript-Regu", size: settings.fontArabicSize),
-                    trailingSuffixColor: settings.accentColor.color
+                    trailingSuffixFont: suffixFont,
+                    trailingSuffixColor: settings.accentColor.color,
+                    highlightAllahNames: settings.highlightAllahNames
                 )
+                .id(tajweedAnimationKey)
                 .animation(.easeInOut, value: tajweedAnimationKey)
                 .multilineTextAlignment(.trailing)
                 .frame(maxWidth: .infinity, alignment: .trailing)
@@ -482,7 +583,8 @@ struct AyahRow: View, Equatable {
                     term: highlightQuery,
                     font: .system(size: fontSizeEN),
                     accent: settings.accentColor.color,
-                    fg: .primary
+                    fg: .primary,
+                    highlightAllahNames: settings.highlightAllahNames
                 )
                 .multilineTextAlignment(.leading)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -497,7 +599,8 @@ struct AyahRow: View, Equatable {
                         term: highlightQuery,
                         font: .system(size: fontSizeEN),
                         accent: settings.accentColor.color,
-                        fg: .primary
+                        fg: .primary,
+                        highlightAllahNames: settings.highlightAllahNames
                     )
                     Text("— Saheeh International")
                         .font(.caption)
@@ -516,7 +619,8 @@ struct AyahRow: View, Equatable {
                         term: highlightQuery,
                         font: .system(size: fontSizeEN),
                         accent: settings.accentColor.color,
-                        fg: .primary
+                        fg: .primary,
+                        highlightAllahNames: settings.highlightAllahNames
                     )
                     Text("— Clear Quran (Mustafa Khattab)")
                         .font(.caption)
@@ -548,6 +652,9 @@ struct AyahRow: View, Equatable {
 
         Group {
             Menu {
+                Text("Repeat Count")
+                    .foregroundStyle(.secondary)
+
                 ForEach(repeatOptions, id: \.self) { count in
                     Button {
                         settings.hapticFeedback()
@@ -639,6 +746,43 @@ struct AyahRow: View, Equatable {
             Label("Play Ayah", systemImage: "play.circle")
         }
     }
+
+    @ViewBuilder
+    private func comparisonMenuBlock(canShowQiraah: Bool, canShowTranslation: Bool) -> some View {
+        if canShowQiraah && canShowTranslation {
+            Menu {
+                Button {
+                    settings.hapticFeedback()
+                    showQiraahComparisonSheet = true
+                } label: {
+                    Label("Qiraah Comparison", systemImage: "textformat.size.ar")
+                }
+
+                Button {
+                    settings.hapticFeedback()
+                    showEnglishComparisonSheet = true
+                } label: {
+                    Label("Translation Comparison", systemImage: "text.bubble")
+                }
+            } label: {
+                Label("Compare Ayah", systemImage: "rectangle.split.2x1")
+            }
+        } else if canShowQiraah {
+            Button {
+                settings.hapticFeedback()
+                showQiraahComparisonSheet = true
+            } label: {
+                Label("Qiraah Comparison", systemImage: "textformat.size.ar")
+            }
+        } else if canShowTranslation {
+            Button {
+                settings.hapticFeedback()
+                showEnglishComparisonSheet = true
+            } label: {
+                Label("Translation Comparison", systemImage: "text.bubble")
+            }
+        }
+    }
     #endif
 
     @ViewBuilder
@@ -690,6 +834,11 @@ struct AyahRow: View, Equatable {
                     Label("See Tafsir", systemImage: "text.book.closed")
                 }
             }
+
+            comparisonMenuBlock(
+                canShowQiraah: settings.showQiraahDetails,
+                canShowTranslation: canCompareEnglishText
+            )
             
             if settings.showArabicText && !settings.beginnerMode {
                 Button {

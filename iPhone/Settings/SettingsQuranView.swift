@@ -53,6 +53,18 @@ struct SettingsQuranView: View {
             }
         )
     }
+
+    private var cleanArabicTextBinding: Binding<Bool> {
+        Binding(
+            get: { settings.cleanArabicText },
+            set: { newValue in
+                settings.cleanArabicText = newValue
+                if !newValue {
+                    settings.removeArabicDots = false
+                }
+            }
+        )
+    }
     
     var body: some View {
         List {
@@ -61,7 +73,6 @@ struct SettingsQuranView: View {
             arabicTextSection
             englishTextSection
             qiraahSection
-            favoritesAndBookmarksSection
         }
         .applyConditionalListStyle(defaultView: true)
         .navigationTitle("Al-Quran Settings")
@@ -106,9 +117,14 @@ struct SettingsQuranView: View {
 
     private var recitationEndingPicker: some View {
         Picker("After Surah Recitation Ends", selection: $settings.reciteType.animation(.easeInOut)) {
-            Text("Go to Next").tag("Continue to Next")
-            Text("Go to Previous").tag("Continue to Previous")
-            Text("End Recitation").tag("End Recitation")
+            Section {
+                Text("Go to Next").tag("Continue to Next")
+                Text("Go to Previous").tag("Continue to Previous")
+                Text("End Recitation").tag("End Recitation")
+            } header: {
+                Text("Recitation End")
+                    .foregroundStyle(.secondary)
+            }
         }
         .font(.subheadline)
     }
@@ -125,6 +141,7 @@ struct SettingsQuranView: View {
     private var displaySection: some View {
         Section(header: Text("DISPLAY")) {
             pageAndJuzDividersGroup
+            khatmModeGroup
             
             VStack(alignment: .leading) {
                 Toggle("Show Full Surah Details", isOn: $settings.showFullSurahRow.animation(.easeInOut))
@@ -137,6 +154,18 @@ struct SettingsQuranView: View {
             }
             
             systemFontSizeToggle
+        }
+    }
+
+    private var khatmModeGroup: some View {
+        VStack(alignment: .leading) {
+            Toggle("Automatically Mark Khatm Ayahs", isOn: $settings.automaticKhatmCompletion.animation(.easeInOut))
+                .font(.subheadline)
+
+            Text("When Khatm mode is selected, ayahs are marked as viewed as soon as they appear. Turn this off to require manual tapping.")
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .padding(.vertical, 2)
         }
     }
 
@@ -190,6 +219,7 @@ struct SettingsQuranView: View {
     private var arabicTextSection: some View {
         Section(header: Text("ARABIC TEXT")) {
             arabicVisibilityToggle
+            highlightAllahGroup
             tajweedSettingsGroup
             arabicDisplayControls
         }
@@ -201,12 +231,23 @@ struct SettingsQuranView: View {
             .disabled(!settings.showTransliteration && !settings.showEnglishSaheeh && !settings.showEnglishMustafa)
     }
 
+    private var highlightAllahGroup: some View {
+        VStack(alignment: .leading) {
+            Toggle("Highlight Allah", isOn: $settings.highlightAllahNames.animation(.easeInOut))
+                .font(.subheadline)
+                .disabled(!settings.showArabicText)
+
+            Text("Colors the majestic and glorius name الله (Allah) in red throughout the Quran.")
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .padding(.vertical, 2)
+        }
+    }
+
     private var tajweedSettingsGroup: some View {
         VStack(alignment: .leading, spacing: 12) {
             let tajweedCanRenderNow = settings.showArabicText
                 && settings.isHafsDisplay
-                && !settings.beginnerMode
-                && !settings.cleanArabicText
             let tajweedToggleBinding = Binding<Bool>(
                 get: { settings.showTajweedColors && tajweedCanRenderNow },
                 set: { settings.showTajweedColors = $0 }
@@ -217,7 +258,7 @@ struct SettingsQuranView: View {
                 .disabled(!tajweedCanRenderNow)
 
             #if os(iOS)
-            NavigationLink(destination: TajweedLegendView()) {
+            NavigationLink(destination: TajweedLegendView(showsDismissButton: false)) {
                 Text("Customize Tajweed Colors")
                     .font(.subheadline)
                     .foregroundColor(settings.accentColor.color)
@@ -225,12 +266,12 @@ struct SettingsQuranView: View {
             .disabled(!settings.showTajweedColors)
             #endif
 
-            Text(settings.isHafsDisplay
-                ? "Available for Hafs an Asim. If Clean Arabic or Beginner Mode is enabled, tajweed is temporarily inactive."
-                : "Tajweed colors are currently available only for Hafs an Asim.")
-                .font(.caption)
-                .foregroundColor(.secondary)
-                .padding(.vertical, 2)
+            if settings.showQiraahDetails {
+                Text("Tajweed colors are currently available only for Hafs an Asim, not the other qiraat or riwayat.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .padding(.vertical, 2)
+            }
         }
     }
 
@@ -246,21 +287,29 @@ struct SettingsQuranView: View {
 
     private var cleanArabicTextGroup: some View {
         VStack(alignment: .leading) {
-            Toggle("Remove Arabic Tashkeel (Vowel Diacritics) and Signs", isOn: $settings.cleanArabicText.animation(.easeInOut))
+            Toggle("Hide Arabic Tashkeel (Vowel Diacritics) and Signs", isOn: cleanArabicTextBinding.animation(.easeInOut))
                 .font(.subheadline)
                 .disabled(!settings.showArabicText)
 
             #if os(iOS)
-            Text("This option removes Tashkeel, which are vowel diacretic marks such as Fatha, Damma, Kasra, and others, while retaining essential vowels like Alif, Yaa, and Waw. It also adjusts \"Mad\" letters and the \"Hamzatul Wasl,\" and removes baby vowel letters, various textual annotations including stopping signs, chapter markers, and prayer indicators. This option is not recommended.")
-                .font(.caption)
-                .foregroundColor(.secondary)
-                .padding(.vertical, 2)
-            #else
-            Text("This option removes Tashkeel (vowel diacretics).")
+            Text("This option removes Tashkeel (like Fatha, Damma, Kasra, and others), while keeping vowel letters like Alif, Yaa, and Waw. It also adjusts \"Mad\" letters and the \"Hamzatul Wasl,\" and removes tiny vowel letters, stopping signs, chapter markers, and prayer indicators. This option is not recommended.")
                 .font(.caption)
                 .foregroundColor(.secondary)
                 .padding(.vertical, 2)
             #endif
+            
+            if settings.cleanArabicText || settings.removeArabicDots {
+                Toggle("Hide Arabic Dots", isOn: $settings.removeArabicDots.animation(.easeInOut))
+                    .font(.subheadline)
+                    .disabled(!settings.showArabicText)
+
+                #if os(iOS)
+                Text("This removes Arabic dots, such as turning ب into ٮ. It is very difficult to read and is not recommended for beginners, but it allows you to experience how some of the earliest Muslims read and wrote the Quran in early manuscripts such as the Birmingham Manuscript.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .padding(.vertical, 2)
+                #endif
+            }
         }
     }
 
@@ -277,12 +326,12 @@ struct SettingsQuranView: View {
 
     private var arabicFontSizeControls: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Stepper(value: $settings.fontArabicSize.animation(.easeInOut), in: 15...50, step: 1) {
+            Stepper(value: $settings.fontArabicSize.animation(.easeInOut), in: 15...75, step: 1) {
                 Text("Arabic Font Size: \(Int(settings.fontArabicSize))")
                     .font(.subheadline)
             }
 
-            Slider(value: $settings.fontArabicSize.animation(.easeInOut), in: 15...50, step: 1)
+            Slider(value: $settings.fontArabicSize.animation(.easeInOut), in: 15...75, step: 1)
         }
     }
 
@@ -450,28 +499,6 @@ struct SettingsQuranView: View {
         }
     }
 
-    @ViewBuilder
-    private var favoritesAndBookmarksSection: some View {
-        #if os(iOS)
-        if showEdits {
-            Section(header: Text("FAVORITES AND BOOKMARKS")) {
-                favoritesLink(title: "Edit Favorite Surahs", type: .surah)
-                favoritesLink(title: "Edit Bookmarked Ayahs", type: .ayah)
-                favoritesLink(title: "Edit Favorite Letters", type: .letter)
-            }
-        }
-        #endif
-    }
-
-    #if os(iOS)
-    private func favoritesLink(title: String, type: FavoriteType) -> some View {
-        NavigationLink(destination: FavoritesView(type: type).environmentObject(quranData).accentColor(settings.accentColor.color)) {
-            Text(title)
-                .font(.subheadline)
-                .foregroundColor(settings.accentColor.color)
-        }
-    }
-    #endif
 }
 
 /// Section header for qiraat reciter groups: title and Arabic on one row (same idea as `JuzHeader`).
@@ -515,7 +542,7 @@ private struct MurattalSectionHeader: View {
 struct ReciterListView: View {
     /// When `true`, dismisses the sheet (or pops navigation) after the user picks a reciter or Random.
     var dismissAfterSelectingReciter = false
-    /// When `false`, list opens at top without scrolling to favorites/selected reciter.
+    /// When `false`, list opens at top without scrolling to the selected reciter.
     var autoScrollToInitialSelection = true
 
     @EnvironmentObject var settings: Settings
@@ -620,22 +647,8 @@ struct ReciterListView: View {
         return false
     }
 
-    private var orderedUniqueReciters: [Reciter] {
-        var seen = Set<String>()
-        return allReciterSections
-            .flatMap(\.reciters)
-            .filter { seen.insert($0.id).inserted }
-    }
-
-    private var favoriteReciters: [Reciter] {
-        orderedUniqueReciters.filter { settings.isReciterFavorite(reciterID: $0.id) }
-    }
-
     /// Matches row `.id(...)` for `ScrollViewReader.scrollTo`.
     private var reciterListScrollTargetID: String {
-        if let firstFavorite = favoriteReciters.first {
-            return firstFavorite.id
-        }
         if settings.reciter == Settings.randomReciterName {
             return Settings.randomReciterName
         }
@@ -687,7 +700,7 @@ struct ReciterListView: View {
     }
 
     private var qiraahReciterSections: [ReciterSectionGroup] {
-        [
+        let sections = [
             ReciterSectionGroup(
                 id: "khalaf",
                 title: Settings.Riwayah.khalaf.uppercased(),
@@ -731,6 +744,41 @@ struct ReciterListView: View {
                 isQiraah: true
             )
         ]
+
+        if let uncategorizedReciterSection {
+            return sections + [uncategorizedReciterSection]
+        }
+
+        return sections
+    }
+
+    private var categorizedReciterIDs: Set<String> {
+        Set((
+            recitersMinshawi +
+            recitersMurattal +
+            recitersMujawwad +
+            recitersMuallim +
+            recitersKhalaf +
+            recitersWarsh +
+            recitersQaloon +
+            recitersBuzzi +
+            recitersQunbul +
+            recitersDuri
+        ).map(\.id))
+    }
+
+    private var uncategorizedReciterSection: ReciterSectionGroup? {
+        let unmatched = filteredReciters(reciters)
+            .filter { !categorizedReciterIDs.contains($0.id) }
+
+        guard !unmatched.isEmpty else { return nil }
+        return ReciterSectionGroup(
+            id: "other-uncategorized",
+            title: "OTHER GROUP",
+            arabic: nil,
+            reciters: unmatched,
+            isQiraah: false
+        )
     }
 
     private var allReciterSections: [ReciterSectionGroup] {
@@ -842,7 +890,8 @@ struct ReciterListView: View {
                 "hani al-rifai",
                 "abu bakr al-shatri",
                 "muhammad al-luhaidan",
-                "hazza al-balushi"
+                "hazza al-balushi",
+                "ahmad al-nufais",
             ]
         )
 
@@ -1008,12 +1057,6 @@ struct ReciterListView: View {
                         }
                     }
                 } else {
-                    if !favoriteReciters.isEmpty {
-                        Section(header: Text("FAVORITE RECITERS")) {
-                            reciterButtons(favoriteReciters)
-                        }
-                    }
-                    
                     Section {
                         randomReciterButton
                     }
@@ -1259,9 +1302,9 @@ struct ReciterListView: View {
                             }
                         }
                     }
-                    #endif
-                }
-            }
+            #endif
+        }
+        }
             .navigationTitle("Select Reciter")
             #if os(iOS)
             .adaptiveSafeArea(edge: .bottom) {
@@ -1271,7 +1314,7 @@ struct ReciterListView: View {
                     .background(Color.white.opacity(0.00001))
             }
             #elseif os(watchOS)
-            .searchable(text: $searchText)
+            .searchable(text: $searchText.animation(.easeInOut))
             #endif
             .applyConditionalListStyle(defaultView: true)
             .confirmationDialog(qiraahChangeDialogTitle, isPresented: Binding(
@@ -1428,10 +1471,10 @@ struct ReciterListView: View {
         ReciterRow(
             reciter: reciter,
             qiraah: qiraah,
-            isFavorite: settings.isReciterFavorite(reciterID: reciter.id),
             isSelected: isSelectedReciter(reciter),
             downloadState: downloadManager.stateSnapshot(for: reciter),
             accentColor: settings.accentColor,
+            searchQuery: searchText,
             onSelect: {
                 settings.hapticFeedback()
                 withAnimation {
@@ -1452,7 +1495,6 @@ struct ReciterListView: View {
         WatchReciterRow(
             reciter: reciter,
             qiraah: qiraah,
-            isFavorite: settings.isReciterFavorite(reciterID: reciter.id),
             isSelected: isSelectedReciter(reciter),
             accentColor: settings.accentColor,
             onSelect: {
@@ -1477,10 +1519,10 @@ private struct ReciterRow: View {
 
     let reciter: Reciter
     let qiraah: Bool
-    let isFavorite: Bool
     let isSelected: Bool
     let downloadState: ReciterDownloadManager.DownloadState
     let accentColor: AccentColor
+    let searchQuery: String
     let onSelect: () -> Void
     let onScrollToReciter: () -> Void
 
@@ -1494,20 +1536,14 @@ private struct ReciterRow: View {
 
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .center, spacing: 12) {
-                Image(systemName: isFavorite ? "star.fill" : "star")
-                    .font(.body.weight(.semibold))
-                    .foregroundColor(accentColor.color)
-                    .onTapGesture {
-                        settings.hapticFeedback()
-                        withAnimation {
-                            settings.toggleReciterFavorite(reciterID: reciter.id)
-                        }
-                    }
-
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(reciter.name)
-                        .font(.subheadline)
-                        .foregroundColor(isSelected ? accentColor.color : .primary)
+                    HighlightedSnippet(
+                        source: reciter.name,
+                        term: searchQuery,
+                        font: .subheadline,
+                        accent: accentColor.color,
+                        fg: isSelected ? accentColor.color : .primary
+                    )
                         .multilineTextAlignment(.leading)
 
                     if isDownloading {
@@ -1577,6 +1613,9 @@ private struct ReciterRow: View {
                 .tint(.secondary)
             }
             .contextMenu {
+                Text("Reciter Actions")
+                    .foregroundStyle(.secondary)
+
                 Button {
                     settings.hapticFeedback()
                     UIPasteboard.general.string = reciter.displayNameWithEnglishQiraah
@@ -1621,7 +1660,6 @@ private struct WatchReciterRow: View {
 
     let reciter: Reciter
     let qiraah: Bool
-    let isFavorite: Bool
     let isSelected: Bool
     let accentColor: AccentColor
     let onSelect: () -> Void
@@ -1632,9 +1670,6 @@ private struct WatchReciterRow: View {
         } label: {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 8) {
-                    Image(systemName: isFavorite ? "star.fill" : "star")
-                        .foregroundColor(accentColor.color)
-
                     Text(reciter.name)
                         .font(.subheadline)
                         .foregroundColor(isSelected ? accentColor.color : .primary)
@@ -1658,177 +1693,6 @@ private struct WatchReciterRow: View {
         .buttonStyle(.plain)
     }
 
-}
-#endif
-enum FavoriteType {
-    case surah, ayah, letter
-}
-
-#if os(iOS)
-struct FavoritesView: View {
-    @EnvironmentObject var quranData: QuranData
-    @EnvironmentObject var settings: Settings
-    
-    @State private var editMode: EditMode = .inactive
-
-    let type: FavoriteType
-
-    var body: some View {
-        List {
-            switch type {
-            case .surah:
-                if settings.favoriteSurahs.isEmpty {
-                    Text("No favorite surahs here, long tap a surah to favorite it.")
-                } else {
-                    ForEach(settings.favoriteSurahs.sorted(), id: \.self) { surahId in
-                        if let surah = quranData.quran.first(where: { $0.id == surahId }) {
-                            SurahRow(surah: surah, isFavorite: true).equatable()
-                        }
-                    }
-                    .onDelete(perform: removeSurahs)
-                }
-            case .ayah:
-                if settings.bookmarkedAyahs.isEmpty {
-                    Text("No bookmarked ayahs here, long tap an ayah to bookmark it.")
-                } else {
-                    ForEach(settings.bookmarkedAyahs.sorted {
-                        $0.surah == $1.surah ? ($0.ayah < $1.ayah) : ($0.surah < $1.surah)
-                    }, id: \.id) { bookmarkedAyah in
-                        if let surah = quranData.quran.first(where: { $0.id == bookmarkedAyah.surah }), let ayah = surah.ayahs.first(where: { $0.id == bookmarkedAyah.ayah }) {
-                                SurahAyahRow(surah: surah, ayah: ayah)
-                            }
-                    }
-                    .onDelete(perform: removeAyahs)
-                }
-            case .letter:
-                if settings.favoriteLetters.isEmpty {
-                    Text("No favorite letters here, long tap a letter to favorite it.")
-                } else {
-                    ForEach(settings.favoriteLetters.sorted(), id: \.id) { favorite in
-                        ArabicLetterRow(letterData: favorite).equatable()
-                    }
-                    .onDelete(perform: removeLetters)
-                }
-            }
-            
-            Section {
-                if !isListEmpty {
-                    Button("Delete All") {
-                        deleteAll()
-                    }
-                    .foregroundColor(.red)
-                }
-            }
-        }
-        .applyConditionalListStyle(defaultView: true)
-        .navigationTitle(titleForFavoriteType(type))
-        .toolbar {
-            EditButton()
-        }
-        .environment(\.editMode, $editMode)
-    }
-
-    private var isListEmpty: Bool {
-        switch type {
-        case .surah: return settings.favoriteSurahs.isEmpty
-        case .ayah: return settings.bookmarkedAyahs.isEmpty
-        case .letter: return settings.favoriteLetters.isEmpty
-        }
-    }
-
-    private func deleteAll() {
-        switch type {
-        case .surah:
-            settings.favoriteSurahs.removeAll()
-        case .ayah:
-            settings.bookmarkedAyahs.removeAll()
-        case .letter:
-            settings.favoriteLetters.removeAll()
-        }
-    }
-    
-    private func removeSurahs(at offsets: IndexSet) {
-        settings.favoriteSurahs.remove(atOffsets: offsets)
-    }
-
-    private func removeAyahs(at offsets: IndexSet) {
-        settings.bookmarkedAyahs.remove(atOffsets: offsets)
-    }
-
-    private func removeLetters(at offsets: IndexSet) {
-        settings.favoriteLetters.remove(atOffsets: offsets)
-    }
-    
-    private func titleForFavoriteType(_ type: FavoriteType) -> String {
-        switch type {
-        case .surah:
-            return "Favorite Surahs"
-        case .ayah:
-            return "Bookmarked Ayahs"
-        case .letter:
-            return "Favorite Letters"
-        }
-    }
-    
-    func resourceLink<Destination: View>(
-        title: String,
-        systemImage: String,
-        @ViewBuilder destination: () -> Destination
-    ) -> some View {
-        NavigationLink(destination: destination()) {
-            toolLabel(title, systemImage: systemImage)
-        }
-        .tint(settings.accentColor.color)
-    }
-
-    func toolLabel(_ title: String, systemImage: String) -> some View {
-        Label(
-            title: { Text(title) },
-            icon: {
-                Image(systemName: systemImage)
-                    .foregroundColor(settings.accentColor.color)
-            }
-        )
-        .padding(.vertical, 4)
-        .accentColor(settings.accentColor.color)
-    }
-
-    func leaveReview() {
-        settings.hapticFeedback()
-
-        withAnimation(.smooth()) {
-            if let url = URL(string: "itms-apps://itunes.apple.com/app/id6449729655?action=write-review") {
-                UIApplication.shared.open(url)
-            }
-        }
-    }
-
-    func openAppSettings() {
-        settings.hapticFeedback()
-
-        withAnimation(.smooth()) {
-            if let url = URL(string: UIApplication.openSettingsURLString) {
-                UIApplication.shared.open(url, options: [:], completionHandler: nil)
-            }
-        }
-    }
-
-    func columnWidth(for textStyle: UIFont.TextStyle, extra: CGFloat = 4, sample: String? = nil, fontName: String? = nil) -> CGFloat {
-        let sampleString = (sample ?? "M") as NSString
-        let font: UIFont
-
-        if let fontName = fontName, let customFont = UIFont(name: fontName, size: UIFont.preferredFont(forTextStyle: textStyle).pointSize) {
-            font = customFont
-        } else {
-            font = UIFont.preferredFont(forTextStyle: textStyle)
-        }
-
-        return ceil(sampleString.size(withAttributes: [.font: font]).width) + extra
-    }
-
-    var glyphWidth: CGFloat {
-        columnWidth(for: .subheadline, extra: 0, sample: "Contact: ")
-    }
 }
 #endif
 

@@ -12,6 +12,23 @@ struct AlQuranApp: App {
     @Environment(\.scenePhase) private var scenePhase
 
     @State private var isLaunching = true
+    
+    private enum RootStage: Equatable {
+        case launch
+        case splash
+        case main
+    }
+
+    private var rootStage: RootStage {
+        if isLaunching {
+            return .launch
+        }
+        return settings.firstLaunch ? .splash : .main
+    }
+
+    private var rootTransitionAnimation: Animation {
+        .easeInOut(duration: 0.42)
+    }
 
     var body: some Scene {
         WindowGroup {
@@ -37,13 +54,26 @@ struct AlQuranApp: App {
 
     @ViewBuilder
     private var rootContent: some View {
-        if isLaunching {
-            LaunchScreen(isLaunching: $isLaunching)
-        } else if settings.firstLaunch {
-            SplashScreen()
-        } else {
-            MainTabView()
+        ZStack {
+            if rootStage == .launch {
+                LaunchScreen(isLaunching: $isLaunching)
+                    .zIndex(3)
+                    .transition(.opacity)
+            }
+
+            if rootStage == .splash {
+                SplashScreen()
+                    .zIndex(2)
+                    .transition(.opacity)
+            }
+
+            if rootStage == .main {
+                MainTabView()
+                    .zIndex(1)
+                    .transition(.opacity)
+            }
         }
+        .animation(rootTransitionAnimation, value: rootStage)
     }
 }
 

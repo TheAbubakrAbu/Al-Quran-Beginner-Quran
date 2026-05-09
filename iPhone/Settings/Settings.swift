@@ -65,6 +65,31 @@ final class Settings: ObservableObject {
         }
     }
 
+    @AppStorage("favoriteQiraahTagsData") private var favoriteQiraahTagsData = Data()
+    var favoriteQiraahTags: [String] {
+        get {
+            (try? Self.decoder.decode([String].self, from: favoriteQiraahTagsData)) ?? []
+        }
+        set {
+            let normalized = Array(NSOrderedSet(array: newValue.map(Self.normalizeLegacyRiwayahTag))) as? [String] ?? []
+            favoriteQiraahTagsData = (try? Self.encoder.encode(normalized)) ?? Data()
+        }
+    }
+
+    @AppStorage("favoriteEnglishTranslationIDsData") private var favoriteEnglishTranslationIDsData = Data()
+    var favoriteEnglishTranslationIDs: [String] {
+        get {
+            (try? Self.decoder.decode([String].self, from: favoriteEnglishTranslationIDsData)) ?? []
+        }
+        set {
+            let normalized = Array(NSOrderedSet(array: newValue.compactMap {
+                let trimmed = $0.trimmingCharacters(in: .whitespacesAndNewlines)
+                return trimmed.isEmpty ? nil : trimmed
+            })) as? [String] ?? []
+            favoriteEnglishTranslationIDsData = (try? Self.encoder.encode(normalized)) ?? Data()
+        }
+    }
+
     @AppStorage("reciteType") var reciteType: String = "Continue to Next"
 
     @AppStorage("favoriteSurahsData") private var favoriteSurahsData = Data()
@@ -74,6 +99,21 @@ final class Settings: ObservableObject {
         }
         set {
             favoriteSurahsData = (try? Self.encoder.encode(newValue)) ?? Data()
+        }
+    }
+
+    @AppStorage("khatmCompletedAyahsData") var khatmCompletedAyahsData = Data()
+    @AppStorage("automaticKhatmCompletion") var automaticKhatmCompletion = true
+    var khatmCompletedAyahSetCache: Set<String> = []
+    var khatmCompletedSurahCountsCache: [Int: Int] = [:]
+    var khatmProgressSaveTask: Task<Void, Never>?
+
+    var khatmCompletedAyahs: [String] {
+        get {
+            Array(khatmCompletedAyahSetCache)
+        }
+        set {
+            applyKhatmCompletedAyahKeys(newValue, persistImmediately: true)
         }
     }
 
@@ -136,7 +176,7 @@ final class Settings: ObservableObject {
     /// Which qiraah/riwayah to show for Arabic text. Empty or "Hafs" = Hafs an Asim (default). Transliteration and translations only apply to Hafs.
     @AppStorage("displayQiraah") var displayQiraah: String = ""
 
-    /// When on, AyahsView shows a qiraat picker above the search bar to compare riwayat in that view.
+    /// When on, SurahView shows a qiraat picker above the search bar to compare riwayat in that view.
     @AppStorage("qiraatComparisonMode") var qiraatComparisonMode: Bool = false
 
     /// When on, ReciterListView reveals non-Hafs qiraat reciters.
@@ -155,7 +195,7 @@ final class Settings: ObservableObject {
 
     /// When false, only Arabic is shown (no transliteration or English), since those are for Hafs an Asim only.
     var isHafsDisplay: Bool {
-        displayQiraah.isEmpty || displayQiraah == "Hafs"
+        Self.normalizeLegacyRiwayahTag(displayQiraah).isEmpty
     }
 
     /// Arabic riwayah line for settings section headers (matches on-screen Arabic text riwayah).
@@ -165,6 +205,7 @@ final class Settings: ObservableObject {
     }
 
     @AppStorage("showArabicText") var showArabicText: Bool = true
+    @AppStorage("highlightAllahNames") var highlightAllahNames: Bool = false
     @AppStorage("showTajweedColors") var showTajweedColors: Bool = false
     @AppStorage("showTajweedTafkhim") var showTajweedTafkhim: Bool = true
     @AppStorage("showTajweedQalqalah") var showTajweedQalqalah: Bool = true
@@ -172,16 +213,19 @@ final class Settings: ObservableObject {
     @AppStorage("showTajweedSukoonJazm") var showTajweedDroppedLetter: Bool = true
     @AppStorage("showTajweedBareNuunMeem") var showTajweedIdghamBiGhunnahLight: Bool = true
     @AppStorage("showTajweedIdghamBiGhunnahHeavy") var showTajweedIdghamBiGhunnahHeavy: Bool = true
+    @AppStorage("showTajweedGeneralGhunnah") var showTajweedGeneralGhunnah: Bool = true
     @AppStorage("showTajweedIkhfaa") var showTajweedIkhfaa: Bool = true
     @AppStorage("showTajweedIqlab") var showTajweedIqlab: Bool = true
     @AppStorage("showTajweedIdghamBilaGhunnah") var showTajweedIdghamBilaGhunnah: Bool = true
     @AppStorage("showTajweedHamzatWaslSilent") var showTajweedHamzatWaslSilent: Bool = true
     @AppStorage("showTajweedMaddNatural2") var showTajweedMaddNatural2: Bool = true
+    @AppStorage("showTajweedMaddNaturalMiniature") var showTajweedMaddNaturalMiniature: Bool = true
     @AppStorage("showTajweedMadd246") var showTajweedMaddAaridLisSukoon: Bool = true
     @AppStorage("showTajweedMaddNecessary6") var showTajweedMaddNecessary6: Bool = true
     @AppStorage("showTajweedMaddSeparated") var showTajweedMaddSeparated: Bool = true
     @AppStorage("showTajweedMaddConnected") var showTajweedMaddConnected: Bool = true
     @AppStorage("cleanArabicText") var cleanArabicText: Bool = false
+    @AppStorage("removeArabicDots") var removeArabicDots: Bool = false
 
     @AppStorage("showTransliteration") var showTransliteration: Bool = false
     @AppStorage("showEnglishSaheeh") var showEnglishSaheeh: Bool = true
@@ -256,6 +300,69 @@ final class Settings: ObservableObject {
 
     func isNameFavorite(number: Int) -> Bool {
         favoriteNameNumbers.contains(number)
+    }
+    
+    func cleanSearch(_ text: String, whitespace: Bool = false) -> String {
+        let normalized = normalizedArabicForSearch(text)
+        var cleaned = String(normalized.unicodeScalars
+            .filter { !Self.unwantedCharSet.contains($0) }
+        ).lowercased()
+        cleaned = collapsingWhitespace(cleaned)
+
+        if whitespace {
+            cleaned = cleaned.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+
+        return cleaned
+    }
+    
+    private func normalizedArabicForSearch(_ text: String) -> String {
+        Self.canonicalArabicSearchMap.reduce(text) { partial, pair in
+            partial.replacingOccurrences(of: pair.key, with: pair.value)
+        }
+    }
+    
+    private static let canonicalArabicSearchMap: [String: String] = [
+        // Alif family
+        "\u{0670}": "ا", // dagger alif
+        "ٱ": "ا",
+        // Hamza family folds to plain carrier letters for forgiving search.
+        "أ": "ا",
+        "إ": "ا",
+        "آ": "ا",
+        "ٲ": "ا",
+        "ٳ": "ا",
+        "ٵ": "ا",
+        "ؤ": "و",
+        "ئ": "ي",
+        "ء": "",
+        "ٴ": "",
+        "ٶ": "و",
+        "ٷ": "و",
+        "ٸ": "ي",
+        // Waw variants
+        "ۥ": "و",
+        // Ya variants
+        "ۦ": "ي",
+        "ى": "ي", // alif maqsurah -> ya
+        // Teh marbuta equivalence (broad)
+        "ة": "ه"
+    ]
+    
+    private static let unwantedCharSet: CharacterSet = {
+        var set = CharacterSet.punctuationCharacters
+            .union(.symbols)
+            .union(.nonBaseCharacters)
+        // Keep boolean-search operators in the normalized query.
+        set.remove(charactersIn: "&|!#")
+        return set
+    }()
+    
+    private func collapsingWhitespace(_ text: String) -> String {
+        text
+            .components(separatedBy: .whitespacesAndNewlines)
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
     }
     
     // MARK: - App-wide appearance & misc @AppStorage

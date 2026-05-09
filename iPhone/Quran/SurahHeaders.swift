@@ -18,6 +18,7 @@ struct SurahsHeader: View {
             #if os(iOS)
             Spacer()
             
+            goToSurah
             randomSurahLink
             #endif
         }
@@ -33,7 +34,7 @@ struct SurahsHeader: View {
         NavigationLink {
             Group {
                 if let randomSurah {
-                    AyahsView(surah: randomSurah)
+                    SurahView(surah: randomSurah)
                 } else {
                     Text("No surah found!")
                 }
@@ -46,6 +47,10 @@ struct SurahsHeader: View {
                 .padding(4)
                 .conditionalGlassEffect()
         }
+    }
+    
+    private var goToSurah: some View {
+        EmptyView()
     }
     #endif
 }
@@ -93,7 +98,7 @@ struct JuzHeader: View {
         NavigationLink {
             Group {
                 if let randomSurah {
-                    AyahsView(surah: randomSurah)
+                    SurahView(surah: randomSurah)
                 } else {
                     Text("No surah found in Juz \(juz.id).")
                 }
@@ -219,32 +224,53 @@ struct HeaderRow: View {
 
     var body: some View {
         VStack(alignment: .center, spacing: 2) {
-            Text(displayArabicText)
-                .font(.custom(settings.fontArabic, size: settings.fontArabicSize))
+            HighlightedSnippet(
+                source: displayArabicText,
+                term: "",
+                font: arabicFont,
+                accent: settings.accentColor.color,
+                fg: settings.accentColor.color,
+                beginnerMode: settings.beginnerMode || ayahBeginnerMode,
+                highlightAllahNames: settings.highlightAllahNames
+            )
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity, alignment: .center)
                 .padding(.vertical, 8)
 
             if settings.showTransliteration, settings.isHafsDisplay {
-                Text(englishTransliteration)
-                    .font(.system(size: settings.englishFontSize))
+                HighlightedSnippet(
+                    source: englishTransliteration,
+                    term: "",
+                    font: .system(size: settings.englishFontSize),
+                    accent: settings.accentColor.color,
+                    fg: settings.accentColor.color,
+                    highlightAllahNames: settings.highlightAllahNames
+                )
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.vertical, 4)
             }
 
             if (settings.showEnglishSaheeh || settings.showEnglishMustafa), settings.isHafsDisplay {
-                Text(englishTranslation)
-                    .font(.system(size: settings.englishFontSize))
+                HighlightedSnippet(
+                    source: englishTranslation,
+                    term: "",
+                    font: .system(size: settings.englishFontSize),
+                    accent: settings.accentColor.color,
+                    fg: settings.accentColor.color,
+                    highlightAllahNames: settings.highlightAllahNames
+                )
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.vertical, 4)
             }
         }
-        .foregroundColor(settings.accentColor.color)
         .padding(.top, -8)
         #if os(iOS)
         .contextMenu {
+            Text("Ayah Actions")
+                .foregroundStyle(.secondary)
+
             if !settings.beginnerMode {
                 Button {
                     settings.hapticFeedback()
@@ -269,11 +295,20 @@ struct HeaderRow: View {
     }
 
     private var displayArabicText: String {
-        let cleanedText = settings.cleanArabicText ? arabicText.removingArabicDiacriticsAndSigns : arabicText
+        var cleanedText = settings.cleanArabicText ? arabicText.removingArabicDiacriticsAndSigns : arabicText
+        if settings.removeArabicDots {
+            cleanedText = cleanedText.removingArabicDots
+        }
         if settings.beginnerMode || ayahBeginnerMode {
             return cleanedText.map { "\($0) " }.joined()
         }
         return cleanedText
+    }
+
+    private var arabicFont: Font {
+        settings.removeArabicDots
+            ? .system(size: settings.fontArabicSize)
+            : .custom(settings.fontArabic, size: settings.fontArabicSize)
     }
 }
 

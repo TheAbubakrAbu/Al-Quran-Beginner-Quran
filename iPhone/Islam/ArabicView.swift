@@ -101,7 +101,7 @@ struct ArabicView: View {
             searchResultsSection
         }
         #if os(watchOS)
-        .searchable(text: $searchText)
+        .searchable(text: $searchText.animation(.easeInOut))
         #else
         .adaptiveSafeArea(edge: .bottom) {
             VStack(spacing: SafeAreaInsetVStackSpacing.standard) {
@@ -112,8 +112,13 @@ struct ArabicView: View {
 
                     Menu {
                         Picker("Arabic Filter", selection: $filterModeRaw.animation(.easeInOut)) {
-                            ForEach(ArabicFilterMode.allCases.reversed(), id: \.rawValue) { mode in
-                                Label(mode.title, systemImage: mode.icon).tag(mode.rawValue)
+                            Section {
+                                ForEach(ArabicFilterMode.allCases.reversed(), id: \.rawValue) { mode in
+                                    Label(mode.title, systemImage: mode.icon).tag(mode.rawValue)
+                                }
+                            } header: {
+                                Text("Arabic Filter")
+                                    .foregroundStyle(.secondary)
                             }
                         }
                     } label: {
@@ -187,7 +192,8 @@ struct ArabicView: View {
             isFavorite: settings.isLetterFavorite(letterData: letterData),
             accentColor: settings.accentColor,
             useFontArabic: settings.useFontArabic,
-            fontArabic: settings.fontArabic
+            fontArabic: settings.fontArabic,
+            searchQuery: searchText
         )
         .equatable()
     }
@@ -429,21 +435,24 @@ struct ArabicLetterView: View {
                         .font(.body)
 
                     if letterData.transliteration == "alif" {
-                        Text("- **Alif (ا)**: Functions as a long vowel 'aa' when used after a letter with a fatha. For example, كِتَاب (kitaab - book). Alif never carries tashkeel unless it represents Hamza.")
+                        Text("- **Alif (ا)**: Functions as a long vowel \"aa\" when used after a letter with a fatha. For example, كِتَاب (kitaab - book). Alif itself is always a vowel letter, never a consonant. Do not confuse it with Hamza on Alif (أ or إ), which is a consonant hamzah.")
                             .font(.body)
                     }
 
                     if letterData.transliteration == "waw" {
-                        Text("- **Waw (و)**: Functions as a long vowel 'uu' when used after a letter with a damma, like in رَسُول (rasool - messenger). As a consonant, it makes the 'w' sound, like in وَقَفَ (waqafa - stood).")
+                        Text("- **Waw (و)**: Functions as a long vowel \"uu\" when used after a letter with a damma, like in رَسُول (rasool - messenger). Otherwise, Waw is usually a consonant and makes the \"w\" sound, like in وَقَفَ (waqafa - stood).")
                             .font(.body)
                     }
 
                     if letterData.transliteration == "yaa" {
-                        Text("- **Yaa (ي)**: Functions as a long vowel 'ii' when used after a letter with a kasra, like in كِتَابِي (kitaabi - my book). As a consonant, it makes the 'y' sound, like in يَد (yad - hand).")
+                        Text("- **Yaa (ي)**: Functions as a long vowel \"ii\" when used after a letter with a kasra, like in كِتَابِي (kitaabi - my book). Otherwise, Yaa is usually a consonant and makes the \"y\" sound, like in يَد (yad - hand).")
                             .font(.body)
                     }
 
-                    Text("These letters serve as vowels when they follow specific diacritics, and as consonants when they begin a word or are preceded by a sukoon.")
+                    Text("When these letters have no tashkeel, or have sukoon, and the letter before them has the matching harakah, they are treated as Madd Tabee (مَدّ طَبِيعِيّ), or natural Madd: Alif after fatha, Waw after damma, and Yaa after kasra. This is held for 2 harakaat (2 counts).")
+                        .font(.body)
+
+                    Text("If a hamzah comes after the vowel letter, or if a shaddah/permanent sukoon comes after it, the natural Madd can turn into one of the special mudood (مُدُود), such as Madd Muttassil, Madd Mufassil, or Madd Lazim. Then the length may become 4, 5, or 6 counts instead of 2.")
                         .font(.body)
                 }
             }
@@ -494,6 +503,16 @@ struct ArabicLetterView: View {
                 || letterData.transliteration == "yaa" {
                 Section(header: Text("PURPOSE")) {
                     purposeSection(for: letterData)
+                }
+            }
+
+            if letterData.transliteration == "alif madd" {
+                Section(header: Text("OUTSIDE OF THE QURAN")) {
+                    Text("In modern Arabic outside of the Quran, Alif Madd usually does not mean a 4, 5, or 6 count Tajweed elongation by itself. It normally represents ءا, so آ is a shortened spelling of ءا.")
+                        .font(.body)
+
+                    Text("For example, قرءان is how it is spelled in the Quran, while outside the Quran it is commonly shortened to قرآن. Likewise, ءامين is commonly written آمين.")
+                        .font(.body)
                 }
             }
         }
@@ -574,12 +593,12 @@ struct ArabicLetterView: View {
                     .font(.body)
                 } else if data.transliteration.contains("mad") {
                     Group {
-                        Text("The wavy line above a vowel letter is called a 'mad'. It elongates the vowel sound, typically lasting 4 counts.")
-                        + (
-                            data.transliteration.contains("alif")
-                                ? Text("\nIf an Alif Mad is followed by a letter with a shaddah, the elongation extends to 6 counts.")
-                                : Text("")
-                        )
+                        Text("The wavy line above a vowel letter is called \"Madd.\" In Arabic, Madd (مَدّ) means stretching or elongation. In Quranic recitation, it marks a measured elongation, not just a decorative spelling mark.")
+                        Text("In the Quran, this Madd can fall under 3 main long-Madd cases from Tajweed: Madd Muttassil, Madd Mufassil, and Madd Lazim.")
+                        Text("Madd Muttassil (مَدّ مُتَّصِل) means \"connected Madd.\" Muttassil means connected because the Madd letter is followed by a hamzah in the same word, so it is lengthened 4 or 5 counts.")
+                        Text("Madd Mufassil (مَدّ مُنْفَصِل) means \"separated Madd.\" Mufassil means separated because the Madd letter comes at the end of one word and the next word begins with hamzah, so it may be read 2, 4, or 5 counts depending on the recitation style.")
+                        Text("Madd Lazim (مَدّ لَازِم) means \"necessary Madd.\" Lazim means necessary or required because the Madd letter is followed by a permanent sukoon or shaddah, so it is lengthened 6 counts.")
+                        Text("These are special mudood (مُدُود), the plural of Madd. They happen when natural Madd is no longer just 2 counts because hamzah, sukoon, or shaddah changes the rule.")
                     }
                     .font(.body)
                 } else if data.transliteration == "alif maqSoorah" {
@@ -815,36 +834,46 @@ struct ArabicLetterRow: View, Equatable {
     let accentColor: AccentColor
     let useFontArabic: Bool
     let fontArabic: String
+    let searchQuery: String
 
     init(
         letterData: LetterData,
         isFavorite: Bool? = nil,
         accentColor: AccentColor = Settings.shared.accentColor,
         useFontArabic: Bool = Settings.shared.useFontArabic,
-        fontArabic: String = Settings.shared.fontArabic
+        fontArabic: String = Settings.shared.fontArabic,
+        searchQuery: String = ""
     ) {
         self.letterData = letterData
         self.isFavorite = isFavorite ?? Settings.shared.isLetterFavorite(letterData: letterData)
         self.accentColor = accentColor
         self.useFontArabic = useFontArabic
         self.fontArabic = fontArabic
+        self.searchQuery = searchQuery
     }
 
     var body: some View {
         NavigationLink(destination: ArabicLetterView(letterData: letterData)) {
             HStack {
-                Text(letterData.transliteration)
-                    .font(.subheadline)
+                HighlightedSnippet(
+                    source: letterData.transliteration,
+                    term: searchQuery,
+                    font: .subheadline,
+                    accent: accentColor.color,
+                    fg: .primary
+                )
 
                 Spacer()
 
-                Text(letterData.letter)
-                    .font(
-                        (useFontArabic && !letterData.isNonArabicScriptLetter)
-                            ? .custom(fontArabic, size: UIFont.preferredFont(forTextStyle: .title2).pointSize)
-                            : .title2
-                    )
-                    .foregroundColor(accentColor.color)
+                HighlightedSnippet(
+                    source: letterData.letter,
+                    term: searchQuery,
+                    font: (useFontArabic && !letterData.isNonArabicScriptLetter)
+                        ? .custom(fontArabic, size: UIFont.preferredFont(forTextStyle: .title2).pointSize)
+                        : .title2,
+                    accent: accentColor.color,
+                    fg: accentColor.color
+                )
             }
             .padding(.vertical, -2)
         }
@@ -869,6 +898,9 @@ struct ArabicLetterRow: View, Equatable {
     @ViewBuilder
     private func contextItems() -> some View {
         #if os(iOS)
+        Text("Letter Actions")
+            .foregroundStyle(.secondary)
+
         Button(role: isFavorite ? .destructive : nil) {
             settings.hapticFeedback()
             settings.toggleLetterFavorite(letterData: letterData)
@@ -898,7 +930,8 @@ struct ArabicLetterRow: View, Equatable {
         lhs.isFavorite == rhs.isFavorite &&
         lhs.accentColor == rhs.accentColor &&
         lhs.useFontArabic == rhs.useFontArabic &&
-        lhs.fontArabic == rhs.fontArabic
+        lhs.fontArabic == rhs.fontArabic &&
+        lhs.searchQuery == rhs.searchQuery
     }
 }
 
@@ -936,22 +969,39 @@ struct ArabicNumberRow: View {
     }
 }
 
+struct StopSignInfo: Identifiable {
+    let title: String
+    let symbol: String
+
+    var id: String { symbol + title }
+}
+
 struct StopInfoRow: View {
     let title: String
     let symbol: String
     let color: Color
 
     var body: some View {
-        HStack {
-            Text(title)
-                .font(.subheadline)
-
-            Spacer()
-
+        HStack(spacing: 10) {
             Text(symbol)
-                .font(.subheadline)
-                .foregroundColor(color)
+                .font(.headline.weight(.semibold))
+                .foregroundStyle(color)
+                .frame(width: 42, height: 42)
+                .background(color.opacity(0.12))
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+
+            Text(title)
+                .font(.caption.weight(.medium))
+                .foregroundStyle(.primary)
+                .lineLimit(2)
+                .minimumScaleFactor(0.8)
+
+            Spacer(minLength: 0)
         }
+        .padding(10)
+        .frame(maxWidth: .infinity, minHeight: 62, alignment: .leading)
+        .background(Color.secondary.opacity(0.08))
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 }
 
@@ -959,23 +1009,44 @@ struct QuranSignsSectionContent: View {
     let accentColor: Color
     var includeLearnMoreLink: Bool = true
 
+    private let signs: [StopSignInfo] = [
+        StopSignInfo(title: "Make Sujood", symbol: "۩"),
+        StopSignInfo(title: "Hizb Marker", symbol: "۞"),
+        StopSignInfo(title: "Mandatory Stop", symbol: "مـ"),
+        StopSignInfo(title: "Preferred Stop", symbol: "قلى"),
+        StopSignInfo(title: "Permissible Stop", symbol: "ج"),
+        StopSignInfo(title: "Short Pause", symbol: "س"),
+        StopSignInfo(title: "Stop at One", symbol: "∴ ∴"),
+        StopSignInfo(title: "Prefer Continue", symbol: "صلى"),
+        StopSignInfo(title: "Must Continue", symbol: "لا")
+    ]
+
+    private var columns: [GridItem] {
+        [
+            GridItem(.flexible(), spacing: 8, alignment: .top),
+            GridItem(.flexible(), spacing: 8, alignment: .top)
+        ]
+    }
+
     var body: some View {
-        Group {
-            StopInfoRow(title: "Make Sujood (Prostration)", symbol: "۩", color: accentColor)
-            StopInfoRow(title: "Hizb (Quarter-Hizb Marker)", symbol: "۞", color: accentColor)
-            StopInfoRow(title: "The Mandatory Stop", symbol: "مـ", color: accentColor)
-            StopInfoRow(title: "The Preferred Stop", symbol: "قلى", color: accentColor)
-            StopInfoRow(title: "The Permissible Stop", symbol: "ج", color: accentColor)
-            StopInfoRow(title: "The Short Pause", symbol: "س", color: accentColor)
-            StopInfoRow(title: "Stop at One", symbol: "∴ ∴", color: accentColor)
-            StopInfoRow(title: "The Preferred Continuation", symbol: "صلى", color: accentColor)
-            StopInfoRow(title: "The Mandatory Continuation", symbol: "لا", color: accentColor)
+        LazyVGrid(columns: columns, alignment: .leading, spacing: 8) {
+            ForEach(signs) { sign in
+                StopInfoRow(title: sign.title, symbol: sign.symbol, color: accentColor)
+            }
 
             if includeLearnMoreLink,
                let url = URL(string: "https://studioarabiya.com/blog/tajweed-rules-stopping-pausing-signs/") {
-                Link("View More: Tajweed Rules & Stopping/Pausing Signs", destination: url)
-                    .font(.subheadline)
+                Link(destination: url) {
+                    HStack(spacing: 8) {
+                        Text("View More")
+                        Image(systemName: "arrow.up.right")
+                    }
+                    .font(.subheadline.weight(.semibold))
                     .foregroundColor(accentColor)
+                    .frame(maxWidth: .infinity, minHeight: 72, alignment: .center)
+                    .offset(y: -1)
+                    .contentShape(Rectangle())
+                }
             }
         }
     }

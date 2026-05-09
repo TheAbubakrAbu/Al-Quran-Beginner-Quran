@@ -149,22 +149,6 @@ extension String {
             options: .regularExpression
         )
     }
-
-    var containsArabicLetters: Bool {
-        unicodeScalars.contains { scalar in
-            switch scalar.value {
-            case 0x0600...0x06FF,
-                 0x0750...0x077F,
-                 0x08A0...0x08FF,
-                 0xFB50...0xFDFF,
-                 0xFE70...0xFEFF,
-                 0x1EE00...0x1EEFF:
-                return true
-            default:
-                return false
-            }
-        }
-    }
 }
 
 struct LastListenedSurah: Identifiable, Codable {
@@ -200,6 +184,8 @@ struct ShareSettings: Equatable {
     var includeQiraah = false
     var shareArabicFont = ""
     var cleanArabic = false
+    var hideArabicDots = false
+    var showTajweed = false
 }
 
 struct Reciter: Identifiable, Comparable, Codable, Hashable {
@@ -282,7 +268,8 @@ let recitersMurattal = [
     Reciter(name: "Ali Jaber", ayahIdentifier: "ar.minshawi", ayahBitrate: "128", surahLink: "https://server11.mp3quran.net/a_jbr/"),
     Reciter(name: "Saad Al-Ghamdi", ayahIdentifier: "ar.minshawi", ayahBitrate: "128", surahLink: "https://server7.mp3quran.net/s_gmd/"),
     Reciter(name: "Yasser Al-Dosari", ayahIdentifier: "ar.minshawi", ayahBitrate: "128", surahLink: "https://server11.mp3quran.net/yasser/"),
-    Reciter(name: "Abdullah Al-Mattrod", ayahIdentifier: "ar.minshawi", ayahBitrate: "128", surahLink: "https://server8.mp3quran.net/mtrod/")
+    Reciter(name: "Abdullah Al-Mattrod", ayahIdentifier: "ar.minshawi", ayahBitrate: "128", surahLink: "https://server8.mp3quran.net/mtrod/"),
+    Reciter(name: "Ahmad Al-Nufais", ayahIdentifier: "ar.minshawi", ayahBitrate: "128", surahLink: "https://server16.mp3quran.net/nufais/Rewayat-Hafs-A-n-Assem/")
 ].sorted()
 
 let recitersMujawwad = [

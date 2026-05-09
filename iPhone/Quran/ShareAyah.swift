@@ -30,6 +30,7 @@ struct ShareAyahSheet: View {
     @State private var includeNote: Bool = false
     @State private var isGeneratingImage = false
     @State private var isSharing = false
+    @State private var imageGenerationID = 0
     private static let shareImageQueue = DispatchQueue(label: "app.shareAyah.imageGeneration", qos: .userInitiated)
     
     private func fetchNote() -> String? {
@@ -51,6 +52,236 @@ struct ShareAyahSheet: View {
         
     private var surah: Surah? { quranData.quran.first(where: { $0.id == surahNumber }) }
     private var ayah: Ayah? { surah?.ayahs.first(where: { $0.id == ayahNumber }) }
+    private var effectiveCleanArabic: Bool { shareSettings.cleanArabic }
+    private var effectiveHideArabicDots: Bool { shareSettings.hideArabicDots }
+    private var canShowHideArabicDotsToggle: Bool {
+        shareSettings.cleanArabic || settings.cleanArabicText || settings.removeArabicDots || shareSettings.hideArabicDots
+    }
+
+    private func updatedShareSettings(
+        includeQiraah: Bool? = nil,
+        shareArabicFont: String? = nil,
+        cleanArabic: Bool? = nil,
+        hideArabicDots: Bool? = nil,
+        showTajweed: Bool? = nil
+    ) -> ShareSettings {
+        ShareSettings(
+            arabic: shareSettings.arabic,
+            transliteration: shareSettings.transliteration,
+            englishSaheeh: shareSettings.englishSaheeh,
+            englishMustafa: shareSettings.englishMustafa,
+            includeQiraah: includeQiraah ?? shareSettings.includeQiraah,
+            shareArabicFont: shareArabicFont ?? shareSettings.shareArabicFont,
+            cleanArabic: cleanArabic ?? shareSettings.cleanArabic,
+            hideArabicDots: hideArabicDots ?? shareSettings.hideArabicDots,
+            showTajweed: showTajweed ?? shareSettings.showTajweed
+        )
+    }
+
+    private static func shareArabicText(
+        surah: Surah,
+        ayah: Ayah,
+        cleanArabic: Bool,
+        hideArabicDots: Bool,
+        qiraahOverride: String? = nil
+    ) -> String {
+        var base = ayah.displayArabicText(surahId: surah.id, clean: false, qiraahOverride: qiraahOverride)
+        if cleanArabic {
+            base = base.removingArabicDiacriticsAndSigns
+            if surah.id == 1 && ayah.id == 1 {
+                let trimmed = base.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !trimmed.hasPrefix("بسم") {
+                    base = Ayah.bismillahCleanArabic
+                }
+            }
+        }
+        return hideArabicDots ? base.removingArabicDots : base
+    }
+
+    private static func shareRawArabicText(surah: Surah, ayah: Ayah) -> String {
+        ayah.displayArabicText(surahId: surah.id, clean: false)
+    }
+
+    private static func allahHighlightRanges(in source: String) -> [Range<String.Index>] {
+        var ranges: [Range<String.Index>] = []
+
+        var englishStart = source.startIndex
+        while englishStart < source.endIndex,
+              let match = source.range(
+                of: "Allah",
+                options: [.caseInsensitive, .diacriticInsensitive],
+                range: englishStart..<source.endIndex
+              ) {
+            ranges.append(match)
+            englishStart = match.upperBound
+        }
+
+        for start in source.indices {
+            if let range = arabicAllahRange(startingAt: start, in: source) {
+                ranges.append(range)
+            }
+        }
+
+        return ranges
+    }
+
+    private static func arabicAllahRange(startingAt start: String.Index, in source: String) -> Range<String.Index>? {
+        if allahBase(for: source[start]) == "ا",
+           let afterAlif = nextNonArabicMarkIndex(after: start, in: source),
+           allahBase(for: source[afterAlif]) == "ل",
+           let secondLam = nextNonArabicMarkIndex(after: afterAlif, in: source),
+           allahBase(for: source[secondLam]) == "ل",
+           let heh = nextNonArabicMarkIndex(after: secondLam, in: source),
+           allahBase(for: source[heh]) == "ه" {
+            return start..<rangeUpperBound(afterBaseAt: heh, in: source)
+        }
+
+        if allahBase(for: source[start]) == "ل",
+           let secondLam = nextNonArabicMarkIndex(after: start, in: source),
+           allahBase(for: source[secondLam]) == "ل",
+           let heh = nextNonArabicMarkIndex(after: secondLam, in: source),
+           allahBase(for: source[heh]) == "ه" {
+            return start..<rangeUpperBound(afterBaseAt: heh, in: source)
+        }
+
+        return nil
+    }
+
+    private static func nextNonArabicMarkIndex(after index: String.Index, in source: String) -> String.Index? {
+        var cursor = source.index(after: index)
+        while cursor < source.endIndex {
+            if !isArabicMark(source[cursor]) {
+                return cursor
+            }
+            cursor = source.index(after: cursor)
+        }
+        return nil
+    }
+
+    private static func rangeUpperBound(afterBaseAt index: String.Index, in source: String) -> String.Index {
+        var cursor = source.index(after: index)
+        while cursor < source.endIndex, isArabicMark(source[cursor]) {
+            cursor = source.index(after: cursor)
+        }
+        return cursor
+    }
+
+    private static func allahBase(for character: Character) -> Character? {
+        for scalar in character.unicodeScalars where !isArabicMarkScalar(scalar) {
+            switch scalar.value {
+            case 0x0627, 0x0671:
+                return "ا"
+            case 0x0644:
+                return "ل"
+            case 0x0647:
+                return "ه"
+            default:
+                continue
+            }
+        }
+
+        return nil
+    }
+
+    private static func isArabicMark(_ character: Character) -> Bool {
+        character.unicodeScalars.allSatisfy(isArabicMarkScalar)
+    }
+
+    private static func isArabicMarkScalar(_ scalar: UnicodeScalar) -> Bool {
+        switch scalar.value {
+        case 0x0610...0x061A,
+             0x064B...0x065F,
+             0x0670,
+             0x06D6...0x06ED:
+            return true
+        default:
+            return false
+        }
+    }
+
+    private static func applyAllahHighlight(to attributed: NSMutableAttributedString, source: String, enabled: Bool) {
+        guard enabled, attributed.length > 0 else { return }
+        for range in allahHighlightRanges(in: source) {
+            attributed.addAttribute(.foregroundColor, value: UIColor.red, range: NSRange(range, in: source))
+        }
+    }
+
+    private static func allahHighlightedAttributedString(
+        _ string: String,
+        attributes: [NSAttributedString.Key: Any],
+        enabled: Bool
+    ) -> NSAttributedString {
+        let attributed = NSMutableAttributedString(string: string, attributes: attributes)
+        applyAllahHighlight(to: attributed, source: string, enabled: enabled)
+        return attributed
+    }
+
+    private static func allahHighlightedSwiftUIText(_ string: String, baseColor: Color, enabled: Bool) -> AttributedString {
+        var attributed = AttributedString(string)
+        attributed.foregroundColor = baseColor
+        guard enabled else { return attributed }
+        for range in allahHighlightRanges(in: string) {
+            if let start = AttributedString.Index(range.lowerBound, within: attributed),
+               let end = AttributedString.Index(range.upperBound, within: attributed) {
+                attributed[start..<end].foregroundColor = .red
+            }
+        }
+        return attributed
+    }
+
+    private static func shareArabicImageAttributedText(
+        surah: Surah,
+        ayah: Ayah,
+        shareSettings: ShareSettings,
+        settings: Settings,
+        font: UIFont,
+        paragraphStyle: NSParagraphStyle,
+        textColor: UIColor
+    ) -> NSAttributedString? {
+        guard shareSettings.showTajweed,
+              !shareSettings.hideArabicDots,
+              settings.isHafsDisplay else {
+            return nil
+        }
+
+        let rawText = ayah.displayArabicText(surahId: surah.id, clean: false, qiraahOverride: settings.displayQiraahForArabic)
+        let displayText = Self.shareArabicText(
+            surah: surah,
+            ayah: ayah,
+            cleanArabic: shareSettings.cleanArabic,
+            hideArabicDots: false,
+            qiraahOverride: settings.displayQiraahForArabic
+        )
+        guard let tajweed = TajweedStore.shared.attributedText(
+            surah: surah.id,
+            ayah: ayah.id,
+            text: rawText,
+            displayText: displayText,
+            cleanDisplayText: shareSettings.cleanArabic
+        ) else {
+            return nil
+        }
+
+        let nsTajweed = NSAttributedString(tajweed)
+        let attributed = NSMutableAttributedString(attributedString: nsTajweed)
+        attributed.addAttributes(
+            [.font: font, .paragraphStyle: paragraphStyle] as [NSAttributedString.Key: Any],
+            range: NSRange(location: 0, length: attributed.length)
+        )
+        let labelColor = UIColor.label.resolvedColor(with: UITraitCollection.current)
+        attributed.enumerateAttribute(NSAttributedString.Key.foregroundColor, in: NSRange(location: 0, length: attributed.length)) { value, range, _ in
+            guard let color = value as? UIColor else {
+                attributed.addAttribute(NSAttributedString.Key.foregroundColor, value: textColor, range: range)
+                return
+            }
+            let resolved = color.resolvedColor(with: UITraitCollection.current)
+            if resolved.isVisuallyEqual(to: labelColor) {
+                attributed.addAttribute(NSAttributedString.Key.foregroundColor, value: textColor, range: range)
+            }
+        }
+        Self.applyAllahHighlight(to: attributed, source: displayText, enabled: settings.highlightAllahNames)
+        return attributed
+    }
     
     private var shareText: String {
         guard let surah = surah, let ayah = ayah else { return "" }
@@ -76,7 +307,13 @@ struct ShareAyahSheet: View {
                 ? "[\(surah.nameArabic) \(surah.idArabic):\(ayah.idArabic)]"
                 : nil
 
-            let arabicText = ayah.displayArabicText(surahId: surah.id, clean: shareSettings.cleanArabic)
+            let arabicText = Self.shareArabicText(
+                surah: surah,
+                ayah: ayah,
+                cleanArabic: effectiveCleanArabic,
+                hideArabicDots: effectiveHideArabicDots,
+                qiraahOverride: settings.displayQiraahForArabic
+            )
             appendBlock(
                 label: header,
                 text: (settings.showAyahInformation ? arabicText : "\(arabicText) \(ayah.idArabic)")
@@ -121,7 +358,7 @@ struct ShareAyahSheet: View {
             }
 
             if shareSettings.englishMustafa {
-                if shareSettings.englishSaheeh { s += "\n\n" } else if !settings.showAyahInformation { /* keep as-is */ } else { s += "\n" }
+                if shareSettings.englishSaheeh { s += "\n\n" }
                 if settings.showAyahInformation {
                     s += "— Mustafa Khattab\n"
                 }
@@ -147,6 +384,10 @@ struct ShareAyahSheet: View {
 
         return s
     }
+
+    private var shareAttributedText: AttributedString {
+        Self.allahHighlightedSwiftUIText(shareText, baseColor: .white, enabled: settings.highlightAllahNames)
+    }
     
     private func combinedName(translit: String, english: String) -> String {
         if translit.isEmpty { return english }
@@ -156,19 +397,8 @@ struct ShareAyahSheet: View {
 
     /// Returns (English, Arabic) display names for the given displayQiraah tag.
     private static func qiraahLabels(displayQiraah: String) -> (english: String, arabic: String) {
-        let key = Settings.normalizeLegacyRiwayahTag(displayQiraah.isEmpty ? "" : displayQiraah)
-        let map: [(tag: String, en: String, ar: String)] = [
-            (Settings.Riwayah.hafsTag, Settings.Riwayah.hafsLabel, "حَفص عَن عَاصِم"),
-            (Settings.Riwayah.warsh, Settings.Riwayah.warsh, "وَرش عَن نَافِع"),
-            (Settings.Riwayah.qaloon, Settings.Riwayah.qaloon, "قَالُون عَن نَافِع"),
-            (Settings.Riwayah.duri, Settings.Riwayah.duri, "الدُّورِي عَن أَبِي عَمرٍو"),
-            (Settings.Riwayah.buzzi, Settings.Riwayah.buzzi, "البَزِّي عَن ابنِ كَثِيرٍ"),
-            (Settings.Riwayah.qunbul, Settings.Riwayah.qunbul, "قُنبُل عَن ابنِ كَثِيرٍ"),
-            (Settings.Riwayah.shubah, Settings.Riwayah.shubah, "شُعبَة عَن عَاصِم"),
-            (Settings.Riwayah.susi, Settings.Riwayah.susi, "السُّوسِي عَن أَبِي عَمرٍو")
-        ]
-
-        return map.first(where: { $0.tag == key }).map { ($0.en, $0.ar) } ?? (map[0].en, map[0].ar)
+        let option = Settings.Riwayah.option(for: displayQiraah)
+        return (option.label, option.arabic)
     }
 
     var body: some View {
@@ -190,9 +420,8 @@ struct ShareAyahSheet: View {
                             EmptyView()
                         }
                     } else {
-                        Text(shareText)
+                        Text(shareAttributedText)
                             .font(.body)
-                            .foregroundColor(.white)
                             .padding()
                             .background(Color.black)
                             .cornerRadius(24)
@@ -231,34 +460,60 @@ struct ShareAyahSheet: View {
                                 .padding(.vertical, 2)
                         }
                         
-                        if shareSettings.arabic && actionMode == .image {
-                            Picker("Arabic Font", selection: Binding(
-                                get: { shareSettings.shareArabicFont.isEmpty ? (settings.fontArabic) : shareSettings.shareArabicFont },
-                                set: { val in
-                                    storedShareArabicFont = val
-                                    shareSettings = ShareSettings(
-                                        arabic: shareSettings.arabic,
-                                        transliteration: shareSettings.transliteration,
-                                        englishSaheeh: shareSettings.englishSaheeh,
-                                        englishMustafa: shareSettings.englishMustafa,
-                                        includeQiraah: shareSettings.includeQiraah,
-                                        shareArabicFont: val,
-                                        cleanArabic: shareSettings.cleanArabic
-                                    )
+                        if shareSettings.arabic {
+                            if actionMode == .image && !shareSettings.hideArabicDots {
+                                Picker("Arabic Font", selection: Binding(
+                                    get: { shareSettings.shareArabicFont.isEmpty ? (settings.fontArabic) : shareSettings.shareArabicFont },
+                                    set: { val in
+                                        storedShareArabicFont = val
+                                        shareSettings = ShareSettings(
+                                            arabic: shareSettings.arabic,
+                                            transliteration: shareSettings.transliteration,
+                                            englishSaheeh: shareSettings.englishSaheeh,
+                                            englishMustafa: shareSettings.englishMustafa,
+                                            includeQiraah: shareSettings.includeQiraah,
+                                            shareArabicFont: val,
+                                            cleanArabic: shareSettings.cleanArabic,
+                                            hideArabicDots: shareSettings.hideArabicDots,
+                                            showTajweed: shareSettings.showTajweed
+                                        )
+                                    }
+                                ).animation(.easeInOut)) {
+                                    Text("Uthmani").tag("KFGQPCQUMBULUthmanicScript-Regu")
+                                    Text("Indopak").tag("Al_Mushaf")
                                 }
-                            ).animation(.easeInOut)) {
-                                Text("Uthmani").tag("KFGQPCQUMBULUthmanicScript-Regu")
-                                Text("Indopak").tag("Al_Mushaf")
+                                .pickerStyle(SegmentedPickerStyle())
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 2)
                             }
-                            .pickerStyle(SegmentedPickerStyle())
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 2)
 
-                            Toggle("Clean Arabic Text (No Tashkeel)", isOn: $shareSettings.cleanArabic.animation(.easeInOut))
+                            if actionMode == .image && settings.isHafsDisplay && !shareSettings.hideArabicDots {
+                                Toggle("Show Tajweed", isOn: Binding(
+                                    get: { shareSettings.showTajweed },
+                                    set: { shareSettings = updatedShareSettings(showTajweed: $0) }
+                                ).animation(.easeInOut))
                                 .tint(settings.accentColor.color)
                                 .scaleEffect(0.8)
                                 .padding(.horizontal, -24)
                                 .padding(.vertical, 2)
+                            }
+
+                            Toggle("Hide Tashkeel and Diacretics", isOn: $shareSettings.cleanArabic.animation(.easeInOut))
+                                .tint(settings.accentColor.color)
+                                .scaleEffect(0.8)
+                                .padding(.horizontal, -24)
+                                .padding(.vertical, 2)
+
+                            if canShowHideArabicDotsToggle {
+                                Toggle("Hide Arabic Dots", isOn: Binding(
+                                    get: { shareSettings.hideArabicDots },
+                                    set: { shareSettings = updatedShareSettings(hideArabicDots: $0) }
+                                ).animation(.easeInOut))
+                                .tint(settings.accentColor.color)
+                                .scaleEffect(0.8)
+                                .padding(.horizontal, -24)
+                                .padding(.vertical, 2)
+                            }
                         }
 
                         Toggle("Show Ayah Information", isOn: $settings.showAyahInformation.animation(.easeInOut))
@@ -276,7 +531,10 @@ struct ShareAyahSheet: View {
                         if settings.showQiraahDetails {
                             Toggle("Show Riwayah/Qiraah", isOn: Binding(
                                 get: { shareSettings.includeQiraah },
-                                set: { shareIncludeRiwayah = $0; shareSettings = ShareSettings(arabic: shareSettings.arabic, transliteration: shareSettings.transliteration, englishSaheeh: shareSettings.englishSaheeh, englishMustafa: shareSettings.englishMustafa, includeQiraah: $0, shareArabicFont: shareSettings.shareArabicFont, cleanArabic: shareSettings.cleanArabic) }
+                                set: {
+                                    shareIncludeRiwayah = $0
+                                    shareSettings = updatedShareSettings(includeQiraah: $0)
+                                }
                             )
                                 .animation(.easeInOut))
                             .tint(settings.accentColor.color)
@@ -333,7 +591,9 @@ struct ShareAyahSheet: View {
                     englishMustafa: settings.isHafsDisplay ? settings.showEnglishMustafa : false,
                     includeQiraah: settings.showQiraahDetails ? shareIncludeRiwayah : false,
                     shareArabicFont: font,
-                    cleanArabic: settings.cleanArabicText
+                    cleanArabic: settings.cleanArabicText,
+                    hideArabicDots: settings.removeArabicDots,
+                    showTajweed: settings.showTajweedColors
                 )
                 
                 actionMode = ActionMode(rawValue: storedActionModeRaw) ?? .image
@@ -363,7 +623,9 @@ struct ShareAyahSheet: View {
                     englishMustafa: shareSettings.englishMustafa,
                     includeQiraah: false,
                     shareArabicFont: shareSettings.shareArabicFont,
-                    cleanArabic: shareSettings.cleanArabic
+                    cleanArabic: shareSettings.cleanArabic,
+                    hideArabicDots: shareSettings.hideArabicDots,
+                    showTajweed: shareSettings.showTajweed
                 )
             }
             generatePreviewImage()
@@ -398,6 +660,9 @@ struct ShareAyahSheet: View {
     
     private func copyMenu(image: UIImage?) -> some View {
         Group {
+            Text("Copy")
+                .foregroundStyle(.secondary)
+
             Button { UIPasteboard.general.string = shareText }  label: { Label("Copy Text", systemImage: "doc.on.doc") }
             if let image {
                 Button {
@@ -466,12 +731,17 @@ struct ShareAyahSheet: View {
     }
     
     private func generatePreviewImage(completion: @escaping (UIImage) -> Void = { _ in }) {
+        let snapshot = shareSettings
+        let generationID = imageGenerationID + 1
+        imageGenerationID = generationID
+        generatedImage = nil
         DispatchQueue.main.async {
             self.isGeneratingImage = true
         }
         Self.shareImageQueue.async { [self] in
-            let img: UIImage = autoreleasepool { self.drawImage() }
+            let img: UIImage = autoreleasepool { self.drawImage(shareSettings: snapshot) }
             DispatchQueue.main.async {
+                guard self.imageGenerationID == generationID else { return }
                 withAnimation {
                     self.generatedImage = img
                     self.isGeneratingImage = false
@@ -484,12 +754,15 @@ struct ShareAyahSheet: View {
         }
     }
     
-    private func drawImage() -> UIImage {
+    private func drawImage(shareSettings: ShareSettings) -> UIImage {
         guard let surah = surah, let ayah = ayah else { return UIImage() }
 
         let bodyFont   = UIFont.preferredFont(forTextStyle: .body)
         let arabicFontName = shareSettings.shareArabicFont.isEmpty ? settings.fontArabic : shareSettings.shareArabicFont
-        let arabicFont = UIFont(name: arabicFontName, size: bodyFont.pointSize * 1.15) ?? bodyFont
+        let arabicFont = shareSettings.hideArabicDots
+            ? bodyFont.withSize(bodyFont.pointSize * 1.15)
+            : (UIFont(name: arabicFontName, size: bodyFont.pointSize * 1.15) ?? bodyFont)
+        let arabicNumberFont = UIFont(name: "KFGQPCQUMBULUthmanicScript-Regu", size: bodyFont.pointSize * 1.15) ?? arabicFont
         let captionFont = UIFont.preferredFont(forTextStyle: .caption2)
         
         let textColor      = UIColor.white
@@ -510,6 +783,7 @@ struct ShareAyahSheet: View {
         // Attr dictionaries
         let bodyAttr = [NSAttributedString.Key.font: bodyFont, .foregroundColor: textColor] as [NSAttributedString.Key: Any]
         let arAttr = [NSAttributedString.Key.font: arabicFont, .foregroundColor: textColor, .paragraphStyle: right]
+        let arNumberAttr = [NSAttributedString.Key.font: arabicNumberFont, .foregroundColor: textColor, .paragraphStyle: right]
         let accentAttr = [NSAttributedString.Key.font: bodyFont, .foregroundColor: accent,    .paragraphStyle: left]
         let arAccent = [NSAttributedString.Key.font: arabicFont, .foregroundColor: accent,    .paragraphStyle: right]
         let centAccent = [NSAttributedString.Key.font: bodyFont, .foregroundColor: accent,    .paragraphStyle: cent]
@@ -518,22 +792,48 @@ struct ShareAyahSheet: View {
         
         // --- Compose full attributed text once
         let text = NSMutableAttributedString()
-        func append(_ str: String, _ attrs: [NSAttributedString.Key: Any]) { text.append(NSAttributedString(string: str, attributes: attrs)) }
-        func sepIfNeeded() { if text.length > 0 { append("\n\n", bodyAttr) } }
+        func append(_ str: String, _ attrs: [NSAttributedString.Key: Any], highlightAllah: Bool = true) {
+            text.append(Self.allahHighlightedAttributedString(str, attributes: attrs, enabled: highlightAllah && settings.highlightAllahNames))
+        }
+        func appendAttributed(_ attributed: NSAttributedString) { text.append(attributed) }
+        func sepIfNeeded() { if text.length > 0 { append("\n\n", bodyAttr, highlightAllah: false) } }
         
         // Arabic
         if shareSettings.arabic {
-            var arabicText = ayah.displayArabicText(surahId: surah.id, clean: shareSettings.cleanArabic)
+            let arabicText = Self.shareArabicText(
+                surah: surah,
+                ayah: ayah,
+                cleanArabic: effectiveCleanArabic,
+                hideArabicDots: effectiveHideArabicDots,
+                qiraahOverride: settings.displayQiraahForArabic
+            )
 
             if settings.showAyahInformation {
-                append("[\(surah.nameArabic) ", arAccent)
-                append("\(surah.idArabic):\(ayah.idArabic)]", accentAttr)
-                append("\n", bodyAttr)
+                append("[\(surah.nameArabic) ", arAccent, highlightAllah: false)
+                append("\(surah.idArabic):\(ayah.idArabic)]", accentAttr, highlightAllah: false)
+                append("\n", bodyAttr, highlightAllah: false)
             } else {
-                arabicText += " \(ayah.idArabic)"
             }
-            
-            append(arabicText, arAttr)
+
+            if let tajweedText = Self.shareArabicImageAttributedText(
+                surah: surah,
+                ayah: ayah,
+                shareSettings: shareSettings,
+                settings: settings,
+                font: arabicFont,
+                paragraphStyle: right,
+                textColor: textColor
+            ) {
+                appendAttributed(tajweedText)
+                if !settings.showAyahInformation {
+                    append(" \(ayah.idArabic)", arNumberAttr, highlightAllah: false)
+                }
+            } else {
+                append(arabicText, arAttr)
+                if !settings.showAyahInformation {
+                    append(" \(ayah.idArabic)", arNumberAttr, highlightAllah: false)
+                }
+            }
         }
         
         // Transliteration (Hafs only)
@@ -545,8 +845,8 @@ struct ShareAyahSheet: View {
             sepIfNeeded()
             
             if settings.showAyahInformation {
-                append("[\(trLabelName) \(surah.id):\(ayah.id)]", accentAttr)
-                append("\n", bodyAttr)
+                append("[\(trLabelName) \(surah.id):\(ayah.id)]", accentAttr, highlightAllah: false)
+                append("\n", bodyAttr, highlightAllah: false)
             }
             
             append(settings.showAyahInformation ? ayah.textTransliteration : "\(ayah.textTransliteration) (\(ayah.id))", bodyAttr)
@@ -561,24 +861,24 @@ struct ShareAyahSheet: View {
             sepIfNeeded()
 
             if settings.showAyahInformation {
-                append("[\(enHeaderName) \(surah.id):\(ayah.id)]", accentAttr)
-                append("\n", bodyAttr)
+                append("[\(enHeaderName) \(surah.id):\(ayah.id)]", accentAttr, highlightAllah: false)
+                append("\n", bodyAttr, highlightAllah: false)
             }
 
             if shareSettings.englishSaheeh {
                 if settings.showAyahInformation {
-                    append("— Saheeh International", captionAttr)
-                    append("\n", bodyAttr)
+                    append("— Saheeh International", captionAttr, highlightAllah: false)
+                    append("\n", bodyAttr, highlightAllah: false)
                 }
                 append(settings.showAyahInformation ? ayah.textEnglishSaheeh : "\(ayah.textEnglishSaheeh) (\(ayah.id))", bodyAttr)
             }
 
             if shareSettings.englishMustafa {
-                if shareSettings.englishSaheeh { append("\n\n", bodyAttr) }
+                if shareSettings.englishSaheeh { append("\n\n", bodyAttr, highlightAllah: false) }
 
                 if settings.showAyahInformation {
-                    append("— Clear Quran (Mustafa Khattab)", captionAttr)
-                    append("\n", bodyAttr)
+                    append("— Clear Quran (Mustafa Khattab)", captionAttr, highlightAllah: false)
+                    append("\n", bodyAttr, highlightAllah: false)
                 }
                 append(settings.showAyahInformation ? ayah.textEnglishMustafa : "\(ayah.textEnglishMustafa) (\(ayah.id))", bodyAttr)
             }
@@ -586,19 +886,19 @@ struct ShareAyahSheet: View {
         
         if includeNote, let note = noteText {
             sepIfNeeded()
-            append("— Note", captionAttr)
-            append("\n", bodyAttr)
+            append("— Note", captionAttr, highlightAllah: false)
+            append("\n", bodyAttr, highlightAllah: false)
             append(note, bodyAttr)
         }
 
         if shareSettings.includeQiraah {
             sepIfNeeded()
             let labels = Self.qiraahLabels(displayQiraah: settings.displayQiraah)
-            append("Riwayah: \(labels.english) – \(labels.arabic)", captionCentAttr)
+            append("Riwayah: \(labels.english) – \(labels.arabic)", captionCentAttr, highlightAllah: false)
         }
         if settings.showSurahInformation {
-            if shareSettings.includeQiraah { append("\n", bodyAttr) } else { sepIfNeeded() }
-            append("\(surah.ayahCountLabel()) – \(surah.pageCountLabel) – \(surah.type.capitalized) \(surah.type == "makkan" ? "🕋" : "🕌")", captionCentAttr)
+            if shareSettings.includeQiraah { append("\n", bodyAttr, highlightAllah: false) } else { sepIfNeeded() }
+            append("\(surah.ayahCountLabel()) – \(surah.pageCountLabel) – \(surah.type.capitalized) \(surah.type == "makkan" ? "🕋" : "🕌")", captionCentAttr, highlightAllah: false)
         }
         // --- Watermark
         let wmString = AppIdentifiers.appFullName
@@ -666,7 +966,9 @@ extension ShareAyahSheet {
             englishMustafa: settings.showEnglishMustafa,
             includeQiraah: includeRiwayah,
             shareArabicFont: shareFont.isEmpty ? settings.fontArabic : shareFont,
-            cleanArabic: settings.cleanArabicText
+            cleanArabic: settings.cleanArabicText,
+            hideArabicDots: settings.removeArabicDots,
+            showTajweed: settings.showTajweedColors
         )
         let noteText: String? = {
             guard let idx = settings.bookmarkedAyahs.firstIndex(where: { $0.surah == surahNumber && $0.ayah == ayahNumber }) else { return nil }
@@ -697,6 +999,14 @@ extension ShareAyahSheet {
         return "\(translit) | \(english)"
     }
 
+    private static func effectiveCleanArabic(_ shareSettings: ShareSettings) -> Bool {
+        shareSettings.cleanArabic
+    }
+
+    private static func effectiveHideArabicDots(_ shareSettings: ShareSettings) -> Bool {
+        shareSettings.hideArabicDots
+    }
+
     private static func buildShareText(surah: Surah, ayah: Ayah, shareSettings: ShareSettings, settings: Settings, includeNote: Bool, noteText: String?) -> String {
         var s = ""
         func sepIfNeeded() { if !s.isEmpty { s += "\n\n" } }
@@ -708,7 +1018,13 @@ extension ShareAyahSheet {
         }
         if shareSettings.arabic {
             let header: String? = settings.showAyahInformation ? "[\(surah.nameArabic) \(surah.idArabic):\(ayah.idArabic)]" : nil
-            let arabicText = ayah.displayArabicText(surahId: surah.id, clean: shareSettings.cleanArabic)
+            let arabicText = Self.shareArabicText(
+                surah: surah,
+                ayah: ayah,
+                cleanArabic: effectiveCleanArabic(shareSettings),
+                hideArabicDots: effectiveHideArabicDots(shareSettings),
+                qiraahOverride: settings.displayQiraahForArabic
+            )
             appendBlock(label: header, text: settings.showAyahInformation ? arabicText : "\(arabicText) \(ayah.idArabic)")
         }
         if shareSettings.transliteration, settings.isHafsDisplay {
@@ -726,7 +1042,7 @@ extension ShareAyahSheet {
                 s += settings.showAyahInformation ? ayah.textEnglishSaheeh : "\(ayah.textEnglishSaheeh) (\(ayah.id))"
             }
             if shareSettings.englishMustafa {
-                if shareSettings.englishSaheeh { s += "\n\n" } else if settings.showAyahInformation { s += "\n" }
+                if shareSettings.englishSaheeh { s += "\n\n" }
                 if settings.showAyahInformation { s += "— Mustafa Khattab\n" }
                 s += settings.showAyahInformation ? ayah.textEnglishMustafa : "\(ayah.textEnglishMustafa) (\(ayah.id))"
             }
@@ -746,7 +1062,10 @@ extension ShareAyahSheet {
     private static func buildShareImage(surah: Surah, ayah: Ayah, shareSettings: ShareSettings, settings: Settings, includeNote: Bool, noteText: String?) -> UIImage {
         let bodyFont = UIFont.preferredFont(forTextStyle: .body)
         let arabicFontName = shareSettings.shareArabicFont.isEmpty ? settings.fontArabic : shareSettings.shareArabicFont
-        let arabicFont = UIFont(name: arabicFontName, size: bodyFont.pointSize * 1.15) ?? bodyFont
+        let arabicFont = shareSettings.hideArabicDots
+            ? bodyFont.withSize(bodyFont.pointSize * 1.15)
+            : (UIFont(name: arabicFontName, size: bodyFont.pointSize * 1.15) ?? bodyFont)
+        let arabicNumberFont = UIFont(name: "KFGQPCQUMBULUthmanicScript-Regu", size: bodyFont.pointSize * 1.15) ?? arabicFont
         let captionFont = UIFont.preferredFont(forTextStyle: .caption2)
         let textColor = UIColor.white
         let secondaryColor = UIColor.secondaryLabel
@@ -760,53 +1079,86 @@ extension ShareAyahSheet {
         let cent = NSMutableParagraphStyle(); cent.alignment = .center
         let bodyAttr = [NSAttributedString.Key.font: bodyFont, .foregroundColor: textColor] as [NSAttributedString.Key: Any]
         let arAttr = [NSAttributedString.Key.font: arabicFont, .foregroundColor: textColor, .paragraphStyle: right] as [NSAttributedString.Key: Any]
+        let arNumberAttr = [NSAttributedString.Key.font: arabicNumberFont, .foregroundColor: textColor, .paragraphStyle: right] as [NSAttributedString.Key: Any]
         let accentAttr = [NSAttributedString.Key.font: bodyFont, .foregroundColor: accent, .paragraphStyle: left] as [NSAttributedString.Key: Any]
-        let arAccent = [NSAttributedString.Key.font: arabicFont, .foregroundColor: accent, .paragraphStyle: right] as [NSAttributedString.Key: Any]
+        let _ = [NSAttributedString.Key.font: arabicFont, .foregroundColor: accent, .paragraphStyle: right] as [NSAttributedString.Key: Any]
         let centAccent = [NSAttributedString.Key.font: bodyFont, .foregroundColor: accent, .paragraphStyle: cent] as [NSAttributedString.Key: Any]
         let captionAttr = [NSAttributedString.Key.font: captionFont, .foregroundColor: secondaryColor, .paragraphStyle: left] as [NSAttributedString.Key: Any]
         let captionCentAttr = [NSAttributedString.Key.font: captionFont, .foregroundColor: secondaryColor, .paragraphStyle: cent] as [NSAttributedString.Key: Any]
         let text = NSMutableAttributedString()
-        func append(_ str: String, _ attrs: [NSAttributedString.Key: Any]) { text.append(NSAttributedString(string: str, attributes: attrs)) }
-        func sepIfNeeded() { if text.length > 0 { append("\n\n", bodyAttr) } }
+        func append(_ str: String, _ attrs: [NSAttributedString.Key: Any], highlightAllah: Bool = true) {
+            text.append(Self.allahHighlightedAttributedString(str, attributes: attrs, enabled: highlightAllah && settings.highlightAllahNames))
+        }
+        func appendAttributed(_ attributed: NSAttributedString) { text.append(attributed) }
+        func sepIfNeeded() { if text.length > 0 { append("\n\n", bodyAttr, highlightAllah: false) } }
         if shareSettings.arabic {
-            var arabicText = ayah.displayArabicText(surahId: surah.id, clean: shareSettings.cleanArabic)
+            let arabicText = Self.shareArabicText(
+                surah: surah,
+                ayah: ayah,
+                cleanArabic: effectiveCleanArabic(shareSettings),
+                hideArabicDots: effectiveHideArabicDots(shareSettings),
+                qiraahOverride: settings.displayQiraahForArabic
+            )
             if settings.showAyahInformation {
-                append("[\(surah.nameArabic) ", arAccent)
-                append("\(surah.idArabic):\(ayah.idArabic)]", accentAttr)
-                append("\n", bodyAttr)
-            } else { arabicText += " \(ayah.idArabic)" }
-            append(arabicText, arAttr)
+            } else {
+            }
+
+            if let tajweedText = Self.shareArabicImageAttributedText(
+                surah: surah,
+                ayah: ayah,
+                shareSettings: shareSettings,
+                settings: settings,
+                font: arabicFont,
+                paragraphStyle: right,
+                textColor: textColor
+            ) {
+                if settings.showAyahInformation {
+                    append("[\(surah.nameArabic) \(surah.idArabic):\(ayah.idArabic)]\n", arAttr, highlightAllah: false)
+                }
+                appendAttributed(tajweedText)
+                if !settings.showAyahInformation {
+                    append(" \(ayah.idArabic)", arNumberAttr, highlightAllah: false)
+                }
+            } else {
+                if settings.showAyahInformation {
+                    append("[\(surah.nameArabic) \(surah.idArabic):\(ayah.idArabic)]\n", arAttr, highlightAllah: false)
+                }
+                append(arabicText, arAttr)
+                if !settings.showAyahInformation {
+                    append(" \(ayah.idArabic)", arNumberAttr, highlightAllah: false)
+                }
+            }
         }
         if shareSettings.transliteration, settings.isHafsDisplay {
             let trLabelName = (!shareSettings.englishSaheeh && !shareSettings.englishMustafa) ? combinedName(translit: surah.nameTransliteration, english: surah.nameEnglish) : surah.nameTransliteration
             sepIfNeeded()
-            if settings.showAyahInformation { append("[\(trLabelName) \(surah.id):\(ayah.id)]", accentAttr); append("\n", bodyAttr) }
+            if settings.showAyahInformation { append("[\(trLabelName) \(surah.id):\(ayah.id)]", accentAttr, highlightAllah: false); append("\n", bodyAttr, highlightAllah: false) }
             append(settings.showAyahInformation ? ayah.textTransliteration : "\(ayah.textTransliteration) (\(ayah.id))", bodyAttr)
         }
         let wantsAnyEnglish = shareSettings.englishSaheeh || shareSettings.englishMustafa
         if wantsAnyEnglish, settings.isHafsDisplay {
             let enHeaderName = (!shareSettings.transliteration) ? combinedName(translit: surah.nameTransliteration, english: surah.nameEnglish) : surah.nameEnglish
             sepIfNeeded()
-            if settings.showAyahInformation { append("[\(enHeaderName) \(surah.id):\(ayah.id)]", accentAttr); append("\n", bodyAttr) }
+            if settings.showAyahInformation { append("[\(enHeaderName) \(surah.id):\(ayah.id)]", accentAttr, highlightAllah: false); append("\n", bodyAttr, highlightAllah: false) }
             if shareSettings.englishSaheeh {
-                if settings.showAyahInformation { append("— Saheeh International", captionAttr); append("\n", bodyAttr) }
+                if settings.showAyahInformation { append("— Saheeh International", captionAttr, highlightAllah: false); append("\n", bodyAttr, highlightAllah: false) }
                 append(settings.showAyahInformation ? ayah.textEnglishSaheeh : "\(ayah.textEnglishSaheeh) (\(ayah.id))", bodyAttr)
             }
             if shareSettings.englishMustafa {
-                if shareSettings.englishSaheeh { append("\n\n", bodyAttr) }
-                if settings.showAyahInformation { append("— Clear Quran (Mustafa Khattab)", captionAttr); append("\n", bodyAttr) }
+                if shareSettings.englishSaheeh { append("\n\n", bodyAttr, highlightAllah: false) }
+                if settings.showAyahInformation { append("— Clear Quran (Mustafa Khattab)", captionAttr, highlightAllah: false); append("\n", bodyAttr, highlightAllah: false) }
                 append(settings.showAyahInformation ? ayah.textEnglishMustafa : "\(ayah.textEnglishMustafa) (\(ayah.id))", bodyAttr)
             }
         }
-        if includeNote, let note = noteText { sepIfNeeded(); append("— Note", captionAttr); append("\n", bodyAttr); append(note, bodyAttr) }
+        if includeNote, let note = noteText { sepIfNeeded(); append("— Note", captionAttr, highlightAllah: false); append("\n", bodyAttr, highlightAllah: false); append(note, bodyAttr) }
         if shareSettings.includeQiraah {
             sepIfNeeded()
             let labels = qiraahLabels(displayQiraah: settings.displayQiraah)
-            append("Riwayah: \(labels.english) – \(labels.arabic)", captionCentAttr)
+            append("Riwayah: \(labels.english) – \(labels.arabic)", captionCentAttr, highlightAllah: false)
         }
         if settings.showSurahInformation {
-            if shareSettings.includeQiraah { append("\n", bodyAttr) } else { sepIfNeeded() }
-            append("\(surah.ayahCountLabel()) – \(surah.pageCountLabel) – \(surah.type.capitalized) \(surah.type == "makkan" ? "🕋" : "🕌")", captionCentAttr)
+            if shareSettings.includeQiraah { append("\n", bodyAttr, highlightAllah: false) } else { sepIfNeeded() }
+            append("\(surah.ayahCountLabel()) – \(surah.pageCountLabel) – \(surah.type.capitalized) \(surah.type == "makkan" ? "🕋" : "🕌")", captionCentAttr, highlightAllah: false)
         }
         let wmString = AppIdentifiers.appFullName
         let wmText = NSAttributedString(string: wmString, attributes: centAccent)
@@ -847,6 +1199,7 @@ extension ShareAyahSheet {
             blackCard.draw(at: .zero)
         }
     }
+
 }
 
 struct ActivityView: UIViewControllerRepresentable {
@@ -861,6 +1214,21 @@ struct ActivityView: UIViewControllerRepresentable {
 }
 
 extension Color { var uiColor: UIColor { UIColor(self) } }
+
+private extension UIColor {
+    func isVisuallyEqual(to other: UIColor) -> Bool {
+        var r1: CGFloat = 0, g1: CGFloat = 0, b1: CGFloat = 0, a1: CGFloat = 0
+        var r2: CGFloat = 0, g2: CGFloat = 0, b2: CGFloat = 0, a2: CGFloat = 0
+        guard getRed(&r1, green: &g1, blue: &b1, alpha: &a1),
+              other.getRed(&r2, green: &g2, blue: &b2, alpha: &a2) else {
+            return false
+        }
+        return abs(r1 - r2) < 0.01
+            && abs(g1 - g2) < 0.01
+            && abs(b1 - b2) < 0.01
+            && abs(a1 - a2) < 0.01
+    }
+}
 
 #Preview {
     AlIslamPreviewContainer(embedInNavigation: false) {

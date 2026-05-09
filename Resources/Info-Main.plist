@@ -6,6 +6,7 @@
 	<false/>
 	<key>UIAppFonts</key>
 	<array>
+		<string>Qiraat.ttf</string>
 		<string>Uthmani.ttf</string>
 		<string>Indopak.ttf</string>
 	</array>

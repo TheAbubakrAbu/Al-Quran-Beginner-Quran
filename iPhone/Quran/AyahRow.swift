@@ -48,8 +48,26 @@ struct AyahRow: View, Equatable {
         return cache
     }()
 
-    private static let uthmaniFontName = "KFGQPCQUMBULUthmanicScript-Regu"
-    private static let qiraatFontName = "Qiraat"
+    private final class MatchSources {
+        let arabic: String
+        let transliteration: String
+        let saheeh: String
+        let mustafa: String
+
+        init(arabic: String, transliteration: String, saheeh: String, mustafa: String) {
+            self.arabic = arabic
+            self.transliteration = transliteration
+            self.saheeh = saheeh
+            self.mustafa = mustafa
+        }
+    }
+
+    private static let matchSourcesCache: NSCache<NSString, MatchSources> = {
+        let cache = NSCache<NSString, MatchSources>()
+        cache.countLimit = 5000
+        return cache
+    }()
+
     
     func containsProfanity(_ text: String) -> Bool {
         let t = text.folding(options: [.diacriticInsensitive, .widthInsensitive], locale: .current).lowercased()
@@ -116,13 +134,46 @@ struct AyahRow: View, Equatable {
         return spaced
     }
 
-    private func ayahArabicFontName(for qiraah: String?) -> String {
-        guard settings.fontArabic == Self.uthmaniFontName else {
-            return settings.fontArabic
+    static func prewarmArabicDisplay(surah: Surah, settings: Settings, limit: Int? = nil) {
+        let clean = settings.cleanArabicText
+        let beginner = settings.beginnerMode
+        let qiraah = settings.displayQiraahForArabic
+        let qiraahKey = qiraah ?? "Hafs"
+        let ayahs = limit.map { Array(surah.ayahs.prefix($0)) } ?? surah.ayahs
+
+        for ayah in ayahs where ayah.existsInQiraah(qiraah) {
+            let key = "\(surah.id):\(ayah.id)|\(clean ? 1 : 0)|\(beginner ? 1 : 0)|\(qiraahKey)" as NSString
+            if Self.arabicDisplayCache.object(forKey: key) != nil { continue }
+
+            let baseText = ayah.displayArabicText(surahId: surah.id, clean: clean, qiraahOverride: qiraah)
+            let displayText = beginner ? baseText.map { "\($0) " }.joined() : baseText
+            Self.arabicDisplayCache.setObject(displayText as NSString, forKey: key)
+        }
+    }
+
+    private func normalizedMatchSources() -> MatchSources {
+        let qiraahKey = comparisonQiraahOverride ?? (settings.displayQiraahForArabic ?? "Hafs")
+        let key = "\(surah.id):\(ayah.id)|\(qiraahKey)" as NSString
+
+        if let cached = Self.matchSourcesCache.object(forKey: key) {
+            return cached
         }
 
-        let normalizedQiraah = Settings.normalizeLegacyRiwayahTag(qiraah ?? Settings.Riwayah.hafsTag)
-        return normalizedQiraah.isEmpty ? Self.uthmaniFontName : Self.qiraatFontName
+        let sources = MatchSources(
+            arabic: settings.cleanSearch(
+                ayah.textArabic(for: comparisonQiraahOverride ?? settings.displayQiraahForArabic),
+                whitespace: false
+            ).removingArabicDiacriticsAndSigns,
+            transliteration: settings.cleanSearch(ayah.textTransliteration, whitespace: false).removingArabicDiacriticsAndSigns,
+            saheeh: settings.cleanSearch(ayah.textEnglishSaheeh, whitespace: false).removingArabicDiacriticsAndSigns,
+            mustafa: settings.cleanSearch(ayah.textEnglishMustafa, whitespace: false).removingArabicDiacriticsAndSigns
+        )
+        Self.matchSourcesCache.setObject(sources, forKey: key)
+        return sources
+    }
+
+    private func ayahArabicFontName(for qiraah: String?) -> String {
+        settings.quranArabicFontName(for: qiraah)
     }
 
     private func queryForInlineHighlight(_ query: String) -> String {
@@ -197,19 +248,16 @@ struct AyahRow: View, Equatable {
         } else {
             settings.isHafsDisplay
         }
-        let normalizedQuery = settings.cleanSearch(searchText, whitespace: true).removingArabicDiacriticsAndSigns
-        let arabicSourceForMatch = settings.cleanSearch(
-            ayah.textArabic(for: comparisonQiraahOverride ?? settings.displayQiraahForArabic),
-            whitespace: false
-        ).removingArabicDiacriticsAndSigns
-        let translitSourceForMatch = settings.cleanSearch(ayah.textTransliteration, whitespace: false).removingArabicDiacriticsAndSigns
-        let saheehSourceForMatch = settings.cleanSearch(ayah.textEnglishSaheeh, whitespace: false).removingArabicDiacriticsAndSigns
-        let mustafaSourceForMatch = settings.cleanSearch(ayah.textEnglishMustafa, whitespace: false).removingArabicDiacriticsAndSigns
+        let hasSearch = !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let normalizedQuery = hasSearch
+            ? settings.cleanSearch(searchText, whitespace: true).removingArabicDiacriticsAndSigns
+            : ""
+        let matchSources = hasSearch ? normalizedMatchSources() : nil
 
-        let mArabic = !normalizedQuery.isEmpty && arabicSourceForMatch.contains(normalizedQuery)
-        let mTranslit = !normalizedQuery.isEmpty && translitSourceForMatch.contains(normalizedQuery)
-        let mSaheeh = !normalizedQuery.isEmpty && saheehSourceForMatch.contains(normalizedQuery)
-        let mMustafa = !normalizedQuery.isEmpty && mustafaSourceForMatch.contains(normalizedQuery)
+        let mArabic = matchSources?.arabic.contains(normalizedQuery) ?? false
+        let mTranslit = matchSources?.transliteration.contains(normalizedQuery) ?? false
+        let mSaheeh = matchSources?.saheeh.contains(normalizedQuery) ?? false
+        let mMustafa = matchSources?.mustafa.contains(normalizedQuery) ?? false
 
         let showArabic = settings.showArabicText || mArabic
         let showTranslit = hafsOnly && (settings.showTransliteration || mTranslit)
@@ -554,7 +602,7 @@ struct AyahRow: View, Equatable {
                         ayahArabicFontName(for: comparisonQiraahOverride ?? settings.displayQiraahForArabic),
                         size: settings.fontArabicSize
                     )
-                let suffixFont: Font = .custom("KFGQPCQUMBULUthmanicScript-Regu", size: settings.fontArabicSize)
+                let suffixFont: Font = .custom(Settings.hafsUthmaniFontName, size: settings.fontArabicSize)
 
                 HighlightedSnippet(
                     source: arabicDisplayText(),
@@ -570,7 +618,6 @@ struct AyahRow: View, Equatable {
                     highlightAllahNames: settings.highlightAllahNames
                 )
                 .id(tajweedAnimationKey)
-                .animation(.easeInOut, value: tajweedAnimationKey)
                 .multilineTextAlignment(.trailing)
                 .frame(maxWidth: .infinity, alignment: .trailing)
                 .lineLimit(nil)

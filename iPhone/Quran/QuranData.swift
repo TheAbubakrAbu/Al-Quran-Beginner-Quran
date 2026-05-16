@@ -30,6 +30,9 @@ struct Surah: Codable, Identifiable, Equatable {
     let juzs: [Int]?
     let juzChangesWithinSurah: Bool
 
+    let wordCount: Int
+    let letterCount: Int
+
     let ayahs: [Ayah]
 
     enum CodingKeys: String, CodingKey {
@@ -37,6 +40,7 @@ struct Surah: Codable, Identifiable, Equatable {
         case revelationOrder, revelationExceptions
         case pageStart, pageEnd, numberOfPages, isLessThanOnePage
         case firstJuz, lastJuz, juzs, juzChangesWithinSurah
+        case wordCount, letterCount
         case ayahs
     }
 
@@ -50,7 +54,6 @@ struct Surah: Codable, Identifiable, Equatable {
         similarNames = try c.decodeIfPresent([String].self, forKey: .similarNames) ?? []
         type = try c.decode(String.self, forKey: .type)
         numberOfAyahs = try c.decode(Int.self, forKey: .numberOfAyahs)
-        ayahs = try c.decode([Ayah].self, forKey: .ayahs)
 
         revelationOrder = try c.decodeIfPresent(Int.self, forKey: .revelationOrder)
         revelationExceptions = try c.decodeIfPresent(String.self, forKey: .revelationExceptions)
@@ -65,6 +68,11 @@ struct Surah: Codable, Identifiable, Equatable {
         juzs = try c.decodeIfPresent([Int].self, forKey: .juzs)
         juzChangesWithinSurah = try c.decodeIfPresent(Bool.self, forKey: .juzChangesWithinSurah)
             ?? ((juzs?.count ?? 0) > 1 || (firstJuz != nil && lastJuz != nil && firstJuz != lastJuz))
+
+        let decodedAyahs = try c.decode([Ayah].self, forKey: .ayahs)
+        ayahs = decodedAyahs
+        wordCount = (try? c.decodeIfPresent(Int.self, forKey: .wordCount)) ?? decodedAyahs.reduce(0) { $0 + $1.wordCount }
+        letterCount = (try? c.decodeIfPresent(Int.self, forKey: .letterCount)) ?? decodedAyahs.reduce(0) { $0 + $1.letterCount }
 
         idArabic = arabicNumberString(from: id)
     }
@@ -112,7 +120,12 @@ struct Surah: Codable, Identifiable, Equatable {
         self.juzChangesWithinSurah = juzChangesWithinSurah
 
         self.ayahs = ayahs
+        self.wordCount = ayahs.reduce(0) { $0 + $1.wordCount }
+        self.letterCount = ayahs.reduce(0) { $0 + $1.letterCount }
     }
+
+    var wordCountLabel: String { "\(wordCount) Words" }
+    var letterCountLabel: String { "\(letterCount) Letters" }
 
     var pageCount: Int {
         if let n = numberOfPages, n > 0 { return n }
@@ -154,7 +167,10 @@ struct Surah: Codable, Identifiable, Equatable {
 
     /// Ayah count for the given qiraah (e.g. Baqarah has 286 in Hafs but 285 in Warsh). Use for display and range selection.
     func numberOfAyahs(for displayQiraah: String?) -> Int {
-        ayahs.filter { $0.existsInQiraah(displayQiraah) }.count
+        guard let qIn = displayQiraah, !qIn.isEmpty else { return numberOfAyahs }
+        let q = Settings.normalizeLegacyRiwayahTag(qIn)
+        guard !q.isEmpty, q != Settings.Riwayah.hafsTag, q != "Hafs" else { return numberOfAyahs }
+        return ayahs.filter { $0.existsInQiraah(displayQiraah) }.count
     }
 }
 
@@ -177,9 +193,12 @@ struct Ayah: Codable, Identifiable, Equatable {
     
     let textWarsh: String?
     let textQaloon: String?
-    
+
     let textDuri: String?
     let textSusi: String?
+
+    let wordCount: Int
+    let letterCount: Int
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -187,6 +206,7 @@ struct Ayah: Codable, Identifiable, Equatable {
         case textTransliteration, textEnglishSaheeh, textEnglishMustafa
         case juz, page
         case textWarsh, textQaloon, textDuri, textBuzzi, textQunbul, textShubah, textSusi
+        case wordCount, letterCount
     }
 
     /// Raw Arabic for the given display qiraah. Nil = Hafs.
@@ -278,6 +298,10 @@ struct Ayah: Codable, Identifiable, Equatable {
         textShubah = try c.decodeIfPresent(String.self, forKey: .textShubah)
         textSusi = try c.decodeIfPresent(String.self, forKey: .textSusi)
         idArabic = arabicNumberString(from: id)
+        wordCount = (try? c.decodeIfPresent(Int.self, forKey: .wordCount)) ?? textHafs.split(separator: " ").filter { !$0.isEmpty }.count
+        letterCount = (try? c.decodeIfPresent(Int.self, forKey: .letterCount)) ?? textHafs.unicodeScalars.filter {
+            ($0.value >= 0x0621 && $0.value <= 0x063A) || ($0.value >= 0x0641 && $0.value <= 0x064A) || $0.value == 0x0671
+        }.count
     }
 
     init(id: Int, idArabic: String, textHafs: String, textTransliteration: String, textEnglishSaheeh: String, textEnglishMustafa: String, juz: Int? = nil, page: Int? = nil, textWarsh: String?, textQaloon: String?, textDuri: String?, textBuzzi: String?, textQunbul: String?, textShubah: String?, textSusi: String?) {
@@ -296,6 +320,10 @@ struct Ayah: Codable, Identifiable, Equatable {
         self.textQunbul = textQunbul
         self.textShubah = textShubah
         self.textSusi = textSusi
+        self.wordCount = textHafs.split(separator: " ").filter { !$0.isEmpty }.count
+        self.letterCount = textHafs.unicodeScalars.filter {
+            ($0.value >= 0x0621 && $0.value <= 0x063A) || ($0.value >= 0x0641 && $0.value <= 0x064A) || $0.value == 0x0671
+        }.count
     }
 
     /// Arabic to display; pass qiraah and whether to strip diacritics.
@@ -312,6 +340,9 @@ final class TajweedStore {
     private static let dammatayn = UnicodeScalar(0x064C)!
     private static let kasra = UnicodeScalar(0x0650)!
     private static let kasratayn = UnicodeScalar(0x064D)!
+    private static let specialFathatayn = UnicodeScalar(0x0657)!
+    private static let specialDammatayn = UnicodeScalar(0x065E)!
+    private static let specialKasratayn = UnicodeScalar(0x0656)!
     private static let sukoon = UnicodeScalar(0x0652)!
     private static let sukoonUthmani = UnicodeScalar(0x06E1)!
     private static let shadda = UnicodeScalar(0x0651)!
@@ -340,6 +371,7 @@ final class TajweedStore {
         static let iqlaab = 8
         static let idghamBilaGhunnah = 9
         static let generalGhunnah = 10
+        static let tinyMeemIqlaab = 51
         static let maddNatural2 = 12
         /// Miniature madd scalars (U+06E5, U+06E6, U+0670) use same category as natural madd; slightly higher priority than letter-body natural madd.
         static let maddNatural2MiniatureScalars = 13
@@ -498,15 +530,19 @@ final class TajweedStore {
                 //    let secondLamRange = secondLamScalarRange(in: clusters[index]) {
                 //     ops.append(PaintOp(range: secondLamRange, priority: PaintPriority.tafkhim, category: .tafkhim))
                 // } else {
-                    appendTafkhimPaintOps(cluster: clusters[index], into: &ops)
+                    appendTafkhimPaintOps(clusters: clusters, index: index, into: &ops)
                 // }
             }
         }
 
         if settings.isTajweedCategoryVisible(.droppedLetter) {
-            for cluster in clusters where hasStandardSukoon(cluster) {
+            for index in clusters.indices where hasStandardSukoon(clusters[index]) {
+                let cluster = clusters[index]
                 guard let base = cluster.primaryArabicLetter, isArabicLetterBase(base) else { continue }
                 if TajweedRules.qalqalahLetters.contains(base), settings.isTajweedCategoryVisible(.qalqalah) {
+                    continue
+                }
+                if shouldUseHeavyColor(clusters: clusters, index: index) {
                     continue
                 }
                 ops.append(PaintOp(range: nsRange(for: cluster), priority: PaintPriority.droppedLetter, category: .droppedLetter))
@@ -529,14 +565,24 @@ final class TajweedStore {
                 let uthmaniHere = hasUthmaniSukoon(cluster)
                 let splitUthmani = !uthmaniHere && idx + 1 < clusters.count
                     && clusterIsOnlyUthmaniSukoonMark(clusters[idx + 1])
-                if uthmaniHere || splitUthmani || hasStandardSukoon(cluster) {
-                    let r = expandedQalqalahNSRange(clusters: clusters, index: idx)
-                    ops.append(PaintOp(range: r, priority: PaintPriority.qalqalah, category: .qalqalah))
+                if uthmaniHere || hasStandardSukoon(cluster) {
+                    // Letter + the specific diacritic scalar only (no NSUnionRange).
+                    appendQalqalahClusterPaintOps(clusters: clusters, index: idx, priority: PaintPriority.qalqalah, into: &ops)
+                    continue
+                }
+                if splitUthmani {
+                    // Sukoon is in the next cluster — emit letter here, sukoon scalar there.
+                    let letterRange = primaryArabicLetterScalarRange(in: cluster) ?? nsRange(for: cluster)
+                    ops.append(PaintOp(range: letterRange, priority: PaintPriority.qalqalah, category: .qalqalah))
+                    if let sRange = scalarRange(in: clusters[idx + 1], scalar: Self.sukoonUthmani) {
+                        ops.append(PaintOp(range: sRange, priority: PaintPriority.qalqalah, category: .qalqalah))
+                    }
                     continue
                 }
                 guard verseFinalQalqalahIndex == idx else { continue }
-                let r = qalqalahLetterNSRange(clusters: clusters, index: idx)
-                ops.append(PaintOp(range: r, priority: PaintPriority.qalqalah, category: .qalqalah))
+                // Verse-final: letter only.
+                let letterRange = primaryArabicLetterScalarRange(in: cluster) ?? nsRange(for: cluster)
+                ops.append(PaintOp(range: letterRange, priority: PaintPriority.qalqalah, category: .qalqalah))
             }
         }
 
@@ -576,6 +622,9 @@ final class TajweedStore {
         guard anyPainted else { return nil }
 
         let result = AttributedString(attributed)
+        if attributedCache.count > AppPerformance.tajweedAttributedCacheLimit {
+            attributedCache.removeAll(keepingCapacity: true)
+        }
         attributedCache[cacheKey] = result
         return result
     }
@@ -816,7 +865,7 @@ final class TajweedStore {
         if settings.isTajweedCategoryVisible(.maddNecessary) {
             for index in clusters.indices where isLazimCombinedAlifCluster(clusters[index]) {
                 if index == finalAaridCarrier { continue }
-                if hasMiniatureMaddMark(clusters[index]) { continue }
+                if hasMiniatureMaddScalar(clusters[index]) { continue }
                 if strongerMaddRuleCovers(range: nsRange(for: clusters[index]), ops: ops) { continue }
                 ops.append(PaintOp(range: nsRange(for: clusters[index]), priority: PaintPriority.maddNecessary6, category: .maddNecessary))
             }
@@ -824,7 +873,7 @@ final class TajweedStore {
             for i in clusters.indices where i > 0 {
                 let cur = clusters[i]
                 if i == finalAaridCarrier { continue }
-                if hasMiniatureMaddMark(cur) { continue }
+                if hasMiniatureMaddScalar(cur) { continue }
                 guard isBareAlifForMadd(cur), hasMaddah(cur) else { continue }
                 if isLazimCombinedAlifCluster(cur) { continue }
                 if strongerMaddRuleCovers(range: nsRange(for: cur), ops: ops) { continue }
@@ -834,7 +883,7 @@ final class TajweedStore {
             }
             for i in clusters.indices where isLazimWawThenAlifSukoon(clusters: clusters, wawIndex: i) {
                 if i == finalAaridCarrier || i + 1 == finalAaridCarrier { continue }
-                if hasMiniatureMaddMark(clusters[i]) || hasMiniatureMaddMark(clusters[i + 1]) { continue }
+                if hasMiniatureMaddScalar(clusters[i]) || hasMiniatureMaddScalar(clusters[i + 1]) { continue }
                 if strongerMaddRuleCovers(range: nsRange(for: clusters[i]), ops: ops) { continue }
                 ops.append(PaintOp(range: nsRange(for: clusters[i]), priority: PaintPriority.maddNecessary6, category: .maddNecessary))
                 ops.append(PaintOp(range: nsRange(for: clusters[i + 1]), priority: PaintPriority.maddNecessary6, category: .maddNecessary))
@@ -842,7 +891,7 @@ final class TajweedStore {
             if ayah == 1, TajweedRules.surahsOpeningMuqattaat.contains(surah) {
                 for i in clusters.indices {
                     if i == finalAaridCarrier { continue }
-                    if hasMiniatureMaddMark(clusters[i]) { continue }
+                    if hasMiniatureMaddScalar(clusters[i]) { continue }
                     guard hasMaddah(clusters[i]) else { continue }
                     if isLazimCombinedAlifCluster(clusters[i]) { continue }
                     if isLazimWawThenAlifSukoon(clusters: clusters, wawIndex: i) { continue }
@@ -858,7 +907,7 @@ final class TajweedStore {
                 guard hi - lo >= 3 else { continue }
                 for i in lo..<(hi - 1) {
                     if isLastMeaningfulWord(w, in: words, clusters: clusters) { continue }
-                    if hasMiniatureMaddMark(clusters[i]) { continue }
+                    if hasMiniatureMaddScalar(clusters[i]) { continue }
                     if isLazimWawThenAlifSukoon(clusters: clusters, wawIndex: i) { continue }
                     if isLazimCombinedAlifCluster(clusters[i]) { continue }
                     guard isNaturalMaddCarrier(clusters: clusters, index: i, wordStart: lo) else { continue }
@@ -888,7 +937,7 @@ final class TajweedStore {
                 guard w1.upperBound - w1.lowerBound >= 2 else { continue }
                 let pen = w1.upperBound - 2
                 let last = w1.upperBound - 1
-                if hasMiniatureMaddMark(clusters[pen]) || hasMiniatureMaddMark(clusters[last]) { continue }
+                if hasMiniatureMaddScalar(clusters[pen]) || hasMiniatureMaddScalar(clusters[last]) { continue }
                 if isLazimWawThenAlifSukoon(clusters: clusters, wawIndex: pen) { continue }
                 if isLazimCombinedAlifCluster(clusters[last]) { continue }
                 guard isNaturalMaddCarrier(clusters: clusters, index: pen, wordStart: w1.lowerBound) else { continue }
@@ -910,7 +959,7 @@ final class TajweedStore {
         if settings.isTajweedCategoryVisible(.maddNecessary) {
             for i in clusters.indices where hasMaddah(clusters[i]) {
                 if i == finalAaridCarrier { continue }
-                if hasMiniatureMaddMark(clusters[i]) { continue }
+                if hasMiniatureMaddScalar(clusters[i]) { continue }
                 if strongerMaddRuleCoversCluster(index: i, ops: ops, clusters: clusters) { continue }
                 appendSpecialMaddPaintOps(
                     text: text,
@@ -924,7 +973,6 @@ final class TajweedStore {
 
         if settings.isTajweedCategoryVisible(.maddSukoon),
            let finalCarrier = finalAaridCarrier,
-           !hasMiniatureMaddMark(clusters[finalCarrier]),
            !strongerMaddRuleCoversCluster(index: finalCarrier, ops: ops, clusters: clusters) {
             appendAaridMaddPaintOps(
                 clusters: clusters,
@@ -940,6 +988,17 @@ final class TajweedStore {
                 let lo = w.lowerBound, hi = w.upperBound
                 for i in lo..<hi {
                     if i == finalAaridCarrier { continue }
+                    if isFinalFathataynSilentAlifMadd(clusters: clusters, index: i) {
+                        if strongerMaddRuleCoversCluster(index: i, ops: ops, clusters: clusters) { continue }
+                        appendLetterOnlyMaddPaintOps(
+                            clusters: clusters,
+                            index: i,
+                            priority: PaintPriority.maddNatural2,
+                            category: .maddNatural,
+                            into: &ops
+                        )
+                        continue
+                    }
                     guard shouldOfferNaturalMadd2(clusters: clusters, index: i, wordStart: lo) else { continue }
                     if strongerMaddRuleCoversCluster(index: i, ops: ops, clusters: clusters) { continue }
                     appendNaturalMaddPaintOps(
@@ -1020,6 +1079,10 @@ final class TajweedStore {
         clusters: [CharacterClusterInfo],
         index: Int
     ) -> (category: TajweedLegendCategory, priority: Int) {
+        let hasTashkeelMaddCarrier = scalarRange(in: clusters[index], scalar: Self.daggerAlif) != nil ||
+            scalarRange(in: clusters[index], scalar: Self.smallWaw) != nil ||
+            scalarRange(in: clusters[index], scalar: Self.smallYeh) != nil
+
         if index + 1 < clusters.count,
            !isWhitespaceOnly(clusters[index + 1]),
            hasShadda(clusters[index + 1]) {
@@ -1039,22 +1102,33 @@ final class TajweedStore {
                 scanIndex += 1
                 continue
             }
-            guard cluster.primaryArabicLetter != nil else {
-                scanIndex += 1
-                continue
-            }
+            // Check hamza before the Arabic-letter guard so tatweel+hamza (e.g. ـَٔ) is caught as muttasil.
             if isHamzaCarrier(cluster) {
                 return sawWordBreak
                     ? (.maddSeparated, PaintPriority.explicitMaddSeparated)
                     : (.maddConnected, PaintPriority.explicitMaddConnected)
             }
+            guard cluster.primaryArabicLetter != nil else {
+                scanIndex += 1
+                continue
+            }
             break
+        }
+
+        if hasTashkeelMaddCarrier {
+            return (.maddNaturalMiniature, PaintPriority.maddNatural2MiniatureScalars)
         }
 
         return (.maddNecessary, PaintPriority.explicitMaddNecessary)
     }
 
     private func hasMiniatureMaddMark(_ cluster: CharacterClusterInfo) -> Bool {
+        // If the miniature mark carries an explicit maddah (U+0653), treat it as explicit madd — not natural.
+        guard !cluster.contains(Self.maddah) else { return false }
+        return hasMiniatureMaddScalar(cluster)
+    }
+
+    private func hasMiniatureMaddScalar(_ cluster: CharacterClusterInfo) -> Bool {
         cluster.contains(Self.daggerAlif) || cluster.contains(Self.smallWaw) || cluster.contains(Self.smallYeh)
     }
 
@@ -1072,28 +1146,60 @@ final class TajweedStore {
         return false
     }
 
-    private func appendTafkhimPaintOps(cluster: CharacterClusterInfo, into ops: inout [PaintOp]) {
-        let tanweenScalars: Set<UInt32> = [Self.fathatayn.value, Self.dammatayn.value, Self.kasratayn.value]
-        var offset = cluster.utf16Range.lowerBound
-        var paintedAny = false
+    private func appendTafkhimPaintOps(clusters: [CharacterClusterInfo], index: Int, into ops: inout [PaintOp]) {
+        let cluster = clusters[index]
+        let tanweenScalars: Set<UInt32> = [
+            Self.fathatayn.value,
+            Self.dammatayn.value,
+            Self.kasratayn.value,
+            Self.specialFathatayn.value,
+            Self.specialDammatayn.value,
+            Self.specialKasratayn.value,
+        ]
 
+        // Always color the Arabic base letter.
+        var letterRange: NSRange?
+        var offset = cluster.utf16Range.lowerBound
         for scalar in cluster.text.unicodeScalars {
             let length = utf16Length(of: scalar)
-            defer { offset += length }
-            if tanweenScalars.contains(scalar.value) { continue }
-            ops.append(
-                PaintOp(
+            let v = scalar.value
+            if (0x0621...0x063A).contains(v) || (0x0641...0x064A).contains(v) || v == 0x0671 {
+                letterRange = NSRange(location: offset, length: length)
+                break
+            }
+            offset += length
+        }
+        guard let letterRange else { return }
+        ops.append(PaintOp(range: letterRange, priority: PaintPriority.tafkhim, category: .tafkhim))
+
+        // Ayah-final pronounced heavy letter → letter only (tashkeel is silent at waqf).
+        if indexOfFinalPronouncedArabicLetterCluster(clusters: clusters) == index { return }
+
+        // Otherwise: color all non-tanween tashkeel scalars on this cluster too.
+        offset = cluster.utf16Range.lowerBound
+        for scalar in cluster.text.unicodeScalars {
+            let length = utf16Length(of: scalar)
+            if TajweedRules.tashkeelScalars.contains(scalar.value) && !tanweenScalars.contains(scalar.value) {
+                ops.append(PaintOp(
                     range: NSRange(location: offset, length: length),
                     priority: PaintPriority.tafkhim,
                     category: .tafkhim
-                )
-            )
-            paintedAny = true
+                ))
+            }
+            offset += length
         }
+    }
 
-        if !paintedAny {
-            ops.append(PaintOp(range: nsRange(for: cluster), priority: PaintPriority.tafkhim, category: .tafkhim))
+    /// True when no Arabic letter follows in the same word (next non-decoration, non-whitespace is whitespace or end of ayah).
+    private func isClusterWordFinal(clusters: [CharacterClusterInfo], index: Int) -> Bool {
+        var next = index + 1
+        while next < clusters.count {
+            let cl = clusters[next]
+            if isWhitespaceOnly(cl) { return true }
+            if cl.primaryArabicLetter != nil { return false }
+            next += 1
         }
+        return true // end of ayah
     }
 
     private func appendNaturalMaddPaintOps(
@@ -1115,6 +1221,18 @@ final class TajweedStore {
         }
     }
 
+    private func appendLetterOnlyMaddPaintOps(
+        clusters: [CharacterClusterInfo],
+        index: Int,
+        priority: Int,
+        category: TajweedLegendCategory,
+        into ops: inout [PaintOp]
+    ) {
+        let cluster = clusters[index]
+        let range = primaryArabicLetterScalarRange(in: cluster) ?? nsRange(for: cluster)
+        ops.append(PaintOp(range: range, priority: priority, category: category))
+    }
+
     private func appendAaridMaddPaintOps(
         clusters: [CharacterClusterInfo],
         index: Int,
@@ -1122,7 +1240,14 @@ final class TajweedStore {
         category: TajweedLegendCategory,
         into ops: inout [PaintOp]
     ) {
-        ops.append(PaintOp(range: nsRange(for: clusters[index]), priority: priority, category: category))
+        let cluster = clusters[index]
+        if hasMiniatureMaddScalar(cluster) {
+            for range in specialMaddScalarRanges(in: cluster) {
+                ops.append(PaintOp(range: range, priority: priority, category: category))
+            }
+        } else {
+            ops.append(PaintOp(range: nsRange(for: cluster), priority: priority, category: category))
+        }
     }
 
     private func utf16Length(of scalar: UnicodeScalar) -> Int {
@@ -1176,23 +1301,32 @@ final class TajweedStore {
         return found
     }
 
-    /// UTF-16 range for qalqalah coloring: letter cluster plus a following standalone U+06E1 grapheme when the font splits them.
-    private func expandedQalqalahNSRange(clusters: [CharacterClusterInfo], index i: Int) -> NSRange {
+    /// Appends qalqalah PaintOps for one cluster using separate scalar-level ops (never NSUnionRange).
+    /// - Sukoon case: letter op + sukoon scalar op
+    /// - Shaddah case: letter op + shaddah scalar op  (nothing else between them)
+    /// - Verse-final / no mark: letter op only
+    private func appendQalqalahClusterPaintOps(
+        clusters: [CharacterClusterInfo],
+        index i: Int,
+        priority: Int,
+        into ops: inout [PaintOp]
+    ) {
         let cl = clusters[i]
-        let lo = cl.utf16Range.lowerBound
-        var hi = cl.utf16Range.upperBound
-        if !hasUthmaniSukoon(cl), i + 1 < clusters.count, clusterIsOnlyUthmaniSukoonMark(clusters[i + 1]) {
-            hi = clusters[i + 1].utf16Range.upperBound
-        }
-        return NSRange(location: lo, length: hi - lo)
-    }
 
-    /// Only the qalqalah letter itself, used for ayah-final letters so tashkeel does not change color.
-    private func qalqalahLetterNSRange(clusters: [CharacterClusterInfo], index i: Int) -> NSRange {
-        let cl = clusters[i]
-        let lo = cl.utf16Range.lowerBound
-        let len = String(cl.base ?? Character(" ")).utf16.count
-        return NSRange(location: lo, length: max(1, len))
+        // Always color the Arabic letter scalar itself.
+        let letterRange = primaryArabicLetterScalarRange(in: cl) ?? NSRange(location: cl.utf16Range.lowerBound, length: 1)
+        ops.append(PaintOp(range: letterRange, priority: priority, category: .qalqalah))
+
+        // Standard sukoon (U+0652) or Uthmani sukoon (U+06E1) → also color that scalar.
+        if let r = scalarRange(in: cl, scalar: Self.sukoon) {
+            ops.append(PaintOp(range: r, priority: priority, category: .qalqalah))
+        } else if let r = scalarRange(in: cl, scalar: Self.sukoonUthmani) {
+            ops.append(PaintOp(range: r, priority: priority, category: .qalqalah))
+        } else if let r = scalarRange(in: cl, scalar: Self.shadda) {
+            // Shaddah → also color only the shaddah scalar (nothing in between).
+            ops.append(PaintOp(range: r, priority: priority, category: .qalqalah))
+        }
+        // Verse-final / no explicit mark → letter only (already emitted above).
     }
 
     /// Last qalqalah letter of the ayah (waqf implies sukun), skipping trailing space and ۝.
@@ -1209,6 +1343,13 @@ final class TajweedStore {
                 continue
             }
             guard let p = cl.primaryArabicLetter else {
+                i -= 1
+                continue
+            }
+            if isSilentFinalLetter(clusters: clusters, index: i) {
+                if isFinalFathataynSilentAlifMadd(clusters: clusters, index: i) {
+                    return nil
+                }
                 i -= 1
                 continue
             }
@@ -1237,6 +1378,51 @@ final class TajweedStore {
             i -= 1
         }
         return nil
+    }
+
+    private func indexOfFinalPronouncedArabicLetterCluster(clusters: [CharacterClusterInfo]) -> Int? {
+        var i = clusters.count - 1
+        while i >= 0 {
+            let cl = clusters[i]
+            if isWhitespaceOnly(cl) || isAyahEndOrDecorativeCluster(cl) {
+                i -= 1
+                continue
+            }
+            guard cl.primaryArabicLetter != nil else {
+                i -= 1
+                continue
+            }
+            if isSilentFinalLetter(clusters: clusters, index: i) {
+                i -= 1
+                continue
+            }
+            return i
+        }
+        return nil
+    }
+
+    private func isSilentFinalLetter(clusters: [CharacterClusterInfo], index: Int) -> Bool {
+        guard clusters.indices.contains(index), let base = clusters[index].primaryArabicLetter else { return false }
+        if base == "ا" || base == "ى" {
+            guard !hasAnyTashkeel(clusters[index]) || clusters[index].contains(Self.smallHighUprightRectangularZero) else {
+                return false
+            }
+            if let previous = previousArabicLetterClusterIndex(clusters: clusters, before: index) {
+                return hasFathatayn(clusters[previous])
+            }
+        }
+        if base == "و" || isYaBase(clusters[index]) {
+            return clusters[index].contains(Self.smallHighUprightRectangularZero)
+        }
+        return false
+    }
+
+    private func isFinalFathataynSilentAlifMadd(clusters: [CharacterClusterInfo], index: Int) -> Bool {
+        guard clusters.indices.contains(index), isSilentFinalLetter(clusters: clusters, index: index) else { return false }
+        guard let base = clusters[index].primaryArabicLetter, base == "ا" || base == "ى" else { return false }
+        guard indexOfFinalArabicLetterCluster(clusters: clusters) == index else { return false }
+        guard let previous = previousArabicLetterClusterIndex(clusters: clusters, before: index) else { return false }
+        return hasFathatayn(clusters[previous])
     }
 
     private func wordClusterRanges(clusters: [CharacterClusterInfo]) -> [Range<Int>] {
@@ -1269,27 +1455,128 @@ final class TajweedStore {
 
     private func finalWordMaddAaridCarrierIndex(words: [Range<Int>], clusters: [CharacterClusterInfo]) -> Int? {
         guard let finalWord = words.last else { return nil }
+        let pronouncedLetters = effectivePronouncedArabicLetterIndices(in: finalWord, clusters: clusters)
+        guard pronouncedLetters.count >= 2 else { return nil }
+        let requiredCarrierIndex = pronouncedLetters[pronouncedLetters.count - 2]
+
         var candidate: Int?
         for index in finalWord {
-            guard isAaridMaddCarrier(clusters: clusters, index: index, wordStart: finalWord.lowerBound) else { continue }
+            guard index == requiredCarrierIndex else { continue }
+            guard isAaridMaddCarrier(
+                clusters: clusters,
+                index: index,
+                wordStart: finalWord.lowerBound,
+                finalPronouncedIndex: pronouncedLetters.last
+            ) else { continue }
             candidate = index
         }
+        
         return candidate
     }
 
-    private func isAaridMaddCarrier(clusters: [CharacterClusterInfo], index: Int, wordStart: Int) -> Bool {
+    private func effectivePronouncedArabicLetterIndices(in word: Range<Int>, clusters: [CharacterClusterInfo]) -> [Int] {
+        var indices = word.filter { clusters.indices.contains($0) && clusters[$0].primaryArabicLetter != nil }
+        while let last = indices.last, isSilentFinalLetter(clusters: clusters, index: last) {
+            indices.removeLast()
+        }
+        return indices
+    }
+
+    private func isAaridMaddCarrier(
+        clusters: [CharacterClusterInfo],
+        index: Int,
+        wordStart: Int,
+        finalPronouncedIndex: Int?
+    ) -> Bool {
         guard clusters.indices.contains(index), index > wordStart else { return false }
         let cluster = clusters[index]
+
+        if isLeenMaddCarrier(clusters: clusters, index: index, finalPronouncedIndex: finalPronouncedIndex) {
+            return true
+        }
+        
+        // Check for clusters with miniature madd marks (dagger alif, small waw, small yeh)
+        // These should also be recognized as madd arid carriers
+        if hasMiniatureMaddScalar(cluster) {
+            guard let base = cluster.primaryArabicLetter else { return false }
+            // Miniature marks should be on actual letter bases
+            if base == "ا" || base == "و" || base == "ي" || base == "ى" {
+                // Verify previous letter has appropriate vowel
+                if index > 0 {
+                    let previous = clusters[index - 1]
+                    // For miniature marks, check if previous has any vowel or is appropriate carrier
+                    if hasFathaFamily(previous) || hasDammaFamily(previous) || hasKasraFamily(previous) {
+                        return !hasFathatayn(previous)
+                    }
+                }
+            }
+            return false
+        }
+        
         if cluster.primaryArabicLetter == "ى" {
             if isAlifMaqsurahWithDaggerAlif(cluster) { return false }
             guard !hasStandardSukoon(cluster), !cluster.contains(Self.hamzatWasl), !cluster.contains(Self.smallHighUprightRectangularZero) else {
                 return false
             }
             let previous = clusters[index - 1]
-            guard hasFathaFamily(previous), !previous.contains(Self.fathatayn) else { return false }
+            guard hasFathaFamily(previous), !hasFathatayn(previous) else { return false }
             return true
         }
         return shouldOfferNaturalMadd2(clusters: clusters, index: index, wordStart: wordStart)
+    }
+
+    private func isLeenMaddCarrier(
+        clusters: [CharacterClusterInfo],
+        index: Int,
+        finalPronouncedIndex: Int?
+    ) -> Bool {
+        guard clusters.indices.contains(index),
+              index > 0,
+              let finalPronouncedIndex,
+              clusters.indices.contains(finalPronouncedIndex),
+              finalPronouncedIndex > index,
+              indexOfFinalPronouncedArabicLetterCluster(clusters: clusters) == finalPronouncedIndex,
+              clusters[finalPronouncedIndex].primaryArabicLetter != nil,
+              !isSilentFinalLetter(clusters: clusters, index: finalPronouncedIndex) else {
+            return false
+        }
+        let cluster = clusters[index]
+        guard cluster.primaryArabicLetter == "و" || isYaBase(cluster) else { return false }
+        guard hasUthmaniSukoon(cluster), !hasStandardSukoon(cluster) else { return false }
+        guard !hasUnmarkedVowelLetterAfter(clusters: clusters, index: index) else { return false }
+        let previous = clusters[index - 1]
+        guard !isWhitespaceOnly(previous), hasFathaFamily(previous), !hasFathatayn(previous) else { return false }
+        return true
+    }
+
+    private func hasUnmarkedVowelLetterAfter(clusters: [CharacterClusterInfo], index: Int) -> Bool {
+        var nextIndex = index + 1
+        while nextIndex < clusters.count {
+            let cluster = clusters[nextIndex]
+            if isWhitespaceOnly(cluster) { break }
+            if isUnmarkedVowelLetterCluster(cluster) { return true }
+            nextIndex += 1
+        }
+        return false
+    }
+
+    private func isUnmarkedVowelLetterCluster(_ cluster: CharacterClusterInfo) -> Bool {
+        guard let base = cluster.primaryArabicLetter,
+              base == "ا" || base == "ى" || base == "و" || base == "ي" else {
+            return false
+        }
+        return !cluster.text.unicodeScalars.contains { isArabicMarkScalar($0) }
+    }
+
+    private func isArabicMarkScalar(_ scalar: UnicodeScalar) -> Bool {
+        switch scalar.value {
+        case 0x064B...0x065F,
+             0x0670,
+             0x06D6...0x06ED:
+            return true
+        default:
+            return false
+        }
     }
 
     private func utf16StartOfFirstNonWhitespace(clusters: [CharacterClusterInfo]) -> Int? {
@@ -1324,11 +1611,15 @@ final class TajweedStore {
     }
 
     private func hasFathaFamily(_ cluster: CharacterClusterInfo) -> Bool {
-        cluster.contains(Self.fatha) || cluster.contains(Self.fathatayn)
+        cluster.contains(Self.fatha) ||
+        cluster.contains(Self.fathatayn) ||
+        cluster.contains(Self.specialFathatayn)
     }
 
     private func hasDammaFamily(_ cluster: CharacterClusterInfo) -> Bool {
-        cluster.contains(Self.damma) || cluster.contains(Self.dammatayn)
+        cluster.contains(Self.damma) ||
+        cluster.contains(Self.dammatayn) ||
+        cluster.contains(Self.specialDammatayn)
     }
 
     private func isYaBase(_ cluster: CharacterClusterInfo) -> Bool {
@@ -1450,7 +1741,7 @@ final class TajweedStore {
         for index in protectedIndices where clusters.indices.contains(index) {
             let cluster = clusters[index]
             guard isBareMuqattaatHeavyRaa(cluster) else { continue }
-            appendTafkhimPaintOps(cluster: cluster, into: &ops)
+            appendTafkhimPaintOps(clusters: clusters, index: index, into: &ops)
         }
     }
 
@@ -1491,7 +1782,7 @@ final class TajweedStore {
     }
 
     private func isBareSilentException(_ base: Character, cluster: CharacterClusterInfo) -> Bool {
-        if base == "ن" || base == "م" || base == "و" || base == "ا" {
+        if base == "ن" || base == "م" || base == "و" || base == "ا" || base == "ى" {
             return true
         }
         if isYaBase(cluster) {
@@ -1605,8 +1896,8 @@ final class TajweedStore {
             if cur.contains(Self.hamzatWasl) { return false }
             if cur.contains(Self.smallHighUprightRectangularZero) { return false }
             guard hasFathaFamily(prev) else { return false }
-            // Tanwin fath (ً U+064B on previous letter) + following alif: not colored as natural madd.
-            if prev.contains(Self.fathatayn) { return false }
+            // Tanwin fath (regular ً or Uthmani ٗ on previous letter) + following alif: not colored as natural madd.
+            if hasFathatayn(prev) { return false }
             return !nextClusterIsHamzatWasl(clusters: clusters, after: i)
         }
         if cur.primaryArabicLetter == "و" {
@@ -1832,6 +2123,10 @@ final class TajweedStore {
         var paintedTanween = false
         for cluster in clusters {
             guard utf16RangesOverlap(cluster.utf16Range, range) else { continue }
+            if category == .iqlaab, clusterHasTinyMeemIqlaabMark(cluster) {
+                paintedTanween = true
+                continue
+            }
             guard let tanweenRange = tanweenScalarRange(in: cluster) else { continue }
             ops.append(PaintOp(range: tanweenRange, priority: priority, category: category, color: category.color))
             paintedTanween = true
@@ -1854,23 +2149,25 @@ final class TajweedStore {
             let cluster = clusters[idx]
             guard utf16RangesOverlap(cluster.utf16Range, range) else { continue }
             guard let base = cluster.primaryArabicLetter, TajweedRules.qalqalahLetters.contains(base) else { continue }
-            let qalqalahRange = (hasStandardSukoon(cluster) || hasUthmaniSukoon(cluster))
-                ? expandedQalqalahNSRange(clusters: clusters, index: idx)
-                : qalqalahLetterNSRange(clusters: clusters, index: idx)
-            ops.append(PaintOp(range: qalqalahRange, priority: priority, category: .qalqalah, color: TajweedLegendCategory.qalqalah.color))
+            guard isQalqalahEligible(clusters: clusters, index: idx) else { continue }
+            // Use scalar-level ops (letter + specific diacritic) — never NSUnionRange.
+            appendQalqalahClusterPaintOps(clusters: clusters, index: idx, priority: priority, into: &ops)
             painted = true
         }
 
-        if !painted {
-            ops.append(PaintOp(range: range, priority: priority, category: .qalqalah, color: TajweedLegendCategory.qalqalah.color))
-        }
+        _ = painted
     }
 
     private func tanweenScalarRange(in cluster: CharacterClusterInfo) -> NSRange? {
         var offset = cluster.utf16Range.lowerBound
         for scalar in cluster.text.unicodeScalars {
             let length = utf16Length(of: scalar)
-            if scalar == Self.fathatayn || scalar == Self.dammatayn || scalar == Self.kasratayn {
+            if scalar == Self.fathatayn ||
+                scalar == Self.dammatayn ||
+                scalar == Self.kasratayn ||
+                scalar == Self.specialFathatayn ||
+                scalar == Self.specialDammatayn ||
+                scalar == Self.specialKasratayn {
                 return NSRange(location: offset, length: length)
             }
             offset += length
@@ -1885,8 +2182,90 @@ final class TajweedStore {
         return nsRange(for: cluster)
     }
 
+    private func clusterHasTinyMeemIqlaabMark(_ cluster: CharacterClusterInfo) -> Bool {
+        cluster.contains(Self.smallHighMeem) || cluster.contains(Self.smallLowMeem)
+    }
+
+    private func shouldSuppressTinyMeemIqlaab(clusters: [CharacterClusterInfo], index: Int) -> Bool {
+        guard clusters.indices.contains(index) else { return false }
+        let cluster = clusters[index]
+        let suppressesAtFinalSound = cluster.contains(Self.smallHighMeem) || cluster.contains(Self.smallLowMeem) || hasFathatayn(cluster)
+        guard suppressesAtFinalSound else { return false }
+
+        var next = index + 1
+        while next < clusters.count {
+            let cluster = clusters[next]
+            if isWhitespaceOnly(cluster) || isAyahEndOrDecorativeCluster(cluster) {
+                next += 1
+                continue
+            }
+            guard cluster.primaryArabicLetter != nil else {
+                next += 1
+                continue
+            }
+            if isSilentFinalLetter(clusters: clusters, index: next) ||
+                isSilentFinalLetterAfterTinyMeem(clusters: clusters, index: next, previousIndex: index) {
+                next += 1
+                continue
+            }
+            return false
+        }
+        return true
+    }
+
+    private func isSilentFinalLetterAfterTinyMeem(clusters: [CharacterClusterInfo], index: Int, previousIndex: Int) -> Bool {
+        guard clusters.indices.contains(index),
+              clusters.indices.contains(previousIndex),
+              clusterHasTinyMeemIqlaabMark(clusters[previousIndex]),
+              let base = clusters[index].primaryArabicLetter,
+              base == "ا" || base == "ى" else {
+            return false
+        }
+        return !hasAnyTashkeel(clusters[index]) || clusters[index].contains(Self.smallHighUprightRectangularZero)
+    }
+
+    private func tinyMeemPaintRanges(in cluster: CharacterClusterInfo) -> [NSRange] {
+        if cluster.contains(Self.smallLowMeem) {
+            return [nsRange(for: cluster)]
+        }
+        if let highMeemRange = scalarRange(in: cluster, scalar: Self.smallHighMeem) {
+            return [highMeemRange]
+        }
+        return []
+    }
+
     private func hasFathatayn(_ cluster: CharacterClusterInfo) -> Bool {
-        cluster.contains(Self.fathatayn)
+        cluster.contains(Self.fathatayn) || cluster.contains(Self.specialFathatayn)
+    }
+
+    private func isQalqalahEligible(clusters: [CharacterClusterInfo], index: Int) -> Bool {
+        guard clusters.indices.contains(index) else { return false }
+        let cluster = clusters[index]
+        if hasUthmaniSukoon(cluster) || hasStandardSukoon(cluster) {
+            return true
+        }
+        return indexOfVerseFinalQalqalahCluster(clusters: clusters) == index
+    }
+
+    private func isEffectiveWordFinalCluster(clusters: [CharacterClusterInfo], index: Int) -> Bool {
+        guard clusters.indices.contains(index), clusters[index].primaryArabicLetter != nil else { return false }
+        var next = index + 1
+        while next < clusters.count {
+            let cluster = clusters[next]
+            if isWhitespaceOnly(cluster) || isAyahEndOrDecorativeCluster(cluster) {
+                return true
+            }
+            guard cluster.primaryArabicLetter != nil else {
+                next += 1
+                continue
+            }
+            if isSilentFinalLetter(clusters: clusters, index: next) {
+                next += 1
+                continue
+            }
+            return false
+        }
+        return true
     }
 
     private func sourceRangeForSpecialNoonProxyMark(in cluster: CharacterClusterInfo) -> NSRange {
@@ -1931,6 +2310,10 @@ final class TajweedStore {
         into ops: inout [PaintOp]
     ) {
         let clusters = characterClusters(in: text)
+        if category == .maddNatural,
+           rangeContainsTanweenFathAlifMaddCarrier(range, clusters: clusters) {
+            return
+        }
         var paintedSpecialMark = false
 
         for cluster in clusters {
@@ -1953,6 +2336,21 @@ final class TajweedStore {
         if !paintedSpecialMark {
             ops.append(PaintOp(range: range, priority: priority, category: category, color: category.color))
         }
+    }
+
+    private func rangeContainsTanweenFathAlifMaddCarrier(_ range: NSRange, clusters: [CharacterClusterInfo]) -> Bool {
+        for index in clusters.indices {
+            let cluster = clusters[index]
+            guard utf16RangesOverlap(cluster.utf16Range, range) else { continue }
+            guard isBareAlifForMadd(cluster),
+                  let previous = previousArabicLetterClusterIndex(clusters: clusters, before: index) else {
+                continue
+            }
+            if hasFathatayn(clusters[previous]) {
+                return true
+            }
+        }
+        return false
     }
 
     private func utf16RangesOverlap(_ lhs: Range<Int>, _ rhs: NSRange) -> Bool {
@@ -1994,16 +2392,14 @@ final class TajweedStore {
 
     private func appendNuunMeemGhunnahHeuristicPaintOps(text: String, into ops: inout [PaintOp]) {
         let clusters = characterClusters(in: text)
-        let finalArabicLetterIndex = indexOfFinalArabicLetterCluster(clusters: clusters)
         for idx in clusters.indices {
             let cluster = clusters[idx]
 
-            // Tiny high/low meem (e.g. ۢ / ۭ): color the tiny mark only as light ikhfaa, unless it is on the final ayah letter.
-            if finalArabicLetterIndex != idx {
-                for meemScalar in [Self.smallHighMeem, Self.smallLowMeem] {
-                    if let tinyMeemRange = scalarRange(in: cluster, scalar: meemScalar) {
-                        appendPaintOpIfVisible(range: tinyMeemRange, priority: PaintPriority.ikhfaa, category: .ikhfaaLight, into: &ops)
-                    }
+            // Tiny high meem (ۢ): color only the mark. Tiny low meem (ۭ): color the full cluster.
+            if clusterHasTinyMeemIqlaabMark(cluster),
+               !shouldSuppressTinyMeemIqlaab(clusters: clusters, index: idx) {
+                for range in tinyMeemPaintRanges(in: cluster) {
+                    appendPaintOpIfVisible(range: range, priority: PaintPriority.tinyMeemIqlaab, category: .iqlaab, into: &ops)
                 }
             }
 
@@ -2018,6 +2414,7 @@ final class TajweedStore {
 
             // Tanween follows noon-sound rules; color source as tanween mark only.
             if tanweenScalarRange(in: cluster) != nil {
+                if clusterHasTinyMeemIqlaabMark(cluster) { continue }
                 let skipFollower = hasFathatayn(cluster)
                 guard let nextIndex = nextArabicLetterClusterIndex(
                     clusters: clusters,
@@ -2144,7 +2541,11 @@ final class TajweedStore {
         // Uthmani typesetting often leaves this lam bare (no vowel/sukun on the ل itself); ٱ + ل + sun letter is still lam shamsiyyah.
         if hasShadda(clusters[index]) { return false }
         if isLamInAllahWord(clusters: clusters, index: index) { return false }
-        guard index >= 1, isAlifLike(clusters[index - 1].primaryArabicLetter) else { return false }
+        // Lam shamsiyyah only applies after the definite-article alif: ا (U+0627) or ٱ (U+0671 hamzat wasl).
+        // Other alif-like letters (أ, إ, ئ, ؤ, آ) are NOT the definite article and must not trigger this rule.
+        guard index >= 1 else { return false }
+        let prevLetter = clusters[index - 1].primaryArabicLetter
+        guard prevLetter == "ا" || prevLetter == "\u{671}" else { return false }
         guard index + 1 < clusters.count, let next = clusters[index + 1].primaryArabicLetter, TajweedRules.sunLetters.contains(next) else {
             return false
         }
@@ -2156,15 +2557,50 @@ final class TajweedStore {
         return clusters[index - 1]
     }
 
+    private func previousArabicLetterClusterIndex(clusters: [CharacterClusterInfo], before index: Int) -> Int? {
+        var i = index - 1
+        while i >= 0 {
+            let cluster = clusters[i]
+            if isWhitespaceOnly(cluster) { return nil }
+            if cluster.primaryArabicLetter != nil {
+                return i
+            }
+            i -= 1
+        }
+        return nil
+    }
+
+    private func previousPronouncedArabicLetterClusterIndex(clusters: [CharacterClusterInfo], before index: Int) -> Int? {
+        var i = index - 1
+        while i >= 0 {
+            let cluster = clusters[i]
+            if isWhitespaceOnly(cluster) { return nil }
+            guard cluster.primaryArabicLetter != nil else {
+                i -= 1
+                continue
+            }
+            if isSilentFinalLetter(clusters: clusters, index: i) {
+                i -= 1
+                continue
+            }
+            return i
+        }
+        return nil
+    }
+
     private func hasHeavyOpenVowel(_ cluster: CharacterClusterInfo) -> Bool {
         cluster.contains(Self.fatha) ||
         cluster.contains(Self.damma) ||
         cluster.contains(Self.fathatayn) ||
-        cluster.contains(Self.dammatayn)
+        cluster.contains(Self.dammatayn) ||
+        cluster.contains(Self.specialFathatayn) ||
+        cluster.contains(Self.specialDammatayn)
     }
 
     private func hasKasraFamily(_ cluster: CharacterClusterInfo) -> Bool {
-        cluster.contains(Self.kasra) || cluster.contains(Self.kasratayn)
+        cluster.contains(Self.kasra) ||
+        cluster.contains(Self.kasratayn) ||
+        cluster.contains(Self.specialKasratayn)
     }
 
     private func hasSukoon(_ cluster: CharacterClusterInfo) -> Bool {
@@ -2242,7 +2678,17 @@ final class TajweedStore {
         //     return shouldUseHeavyAllahLam(clusters: clusters, index: index)
         // }
 
+        // Alif maqsuurah (ى) should NOT inherit heaviness from previous letters
+        if base == "ى" {
+            return false
+        }
+
         if TajweedRules.alifFollowerLetters.contains(base), index > 0 {
+            if let previous = previousArabicLetterClusterIndex(clusters: clusters, before: index),
+               hasFathatayn(clusters[previous]),
+               isSilentFinalLetter(clusters: clusters, index: index) {
+                return false
+            }
             return isHeavyCarrier(clusters: clusters, index: index - 1)
         }
 
@@ -2260,18 +2706,51 @@ final class TajweedStore {
         return false
     }
 
-    /// Heavy ra: kasrah/kasratayn -> light; fathah/dammah/tanwin open vowel on the ra -> heavy; Uthmani sukun -> light here; shaddah -> heavy; else heavy if preceding cluster has kasrah or madd ya.
+    /// Heavy ra: normal connected reading follows local vowels; ayah-final raa follows the stopped sound.
     private func isHeavyRaa(clusters: [CharacterClusterInfo], index: Int) -> Bool {
         guard clusters[index].primaryArabicLetter == "ر" else { return false }
         let current = clusters[index]
+        if indexOfFinalPronouncedArabicLetterCluster(clusters: clusters) == index {
+            guard let previousIndex = previousPronouncedArabicLetterClusterIndex(clusters: clusters, before: index) else { return false }
+            let previous = finalRaaVowelContextCluster(clusters: clusters, previousIndex: previousIndex)
+            if hasKasraFamily(previous) { return false }
+            if previous.primaryArabicLetter == "و" {
+                return !hasAnyTashkeel(previous) || hasDammaFamily(previous)
+            }
+            if previous.primaryArabicLetter == "ا" || previous.primaryArabicLetter == "ى" {
+                return !hasAnyTashkeel(previous)
+            }
+            return hasFathaFamily(previous) || hasDammaFamily(previous)
+        }
         if hasKasraFamily(current) { return false }
         if hasHeavyOpenVowel(current) { return true }
-        if hasUthmaniSukoon(current) { return false }
+        if hasSukoon(current) {
+            guard let previousIndex = previousPronouncedArabicLetterClusterIndex(clusters: clusters, before: index) else { return false }
+            let previous = clusters[previousIndex]
+            if hasKasraFamily(previous) { return false }
+            if hasFathaFamily(previous) || hasDammaFamily(previous) { return true }
+            if previous.primaryArabicLetter == "و" {
+                return !hasAnyTashkeel(previous)
+            }
+            if previous.primaryArabicLetter == "ا" || previous.primaryArabicLetter == "ى" {
+                return !hasAnyTashkeel(previous)
+            }
+            return false
+        }
         if hasShadda(current) { return true }
         guard let prev = previousCluster(in: clusters, before: index) else { return false }
         if hasKasraFamily(prev) { return true }
         if isYaaMaddLetterCluster(clusters: clusters, yaIndex: index - 1) { return true }
         return false
+    }
+
+    private func finalRaaVowelContextCluster(clusters: [CharacterClusterInfo], previousIndex: Int) -> CharacterClusterInfo {
+        let previous = clusters[previousIndex]
+        guard hasSukoon(previous),
+              let beforeSukoonIndex = previousPronouncedArabicLetterClusterIndex(clusters: clusters, before: previousIndex) else {
+            return previous
+        }
+        return clusters[beforeSukoonIndex]
     }
 
 }
@@ -2390,7 +2869,7 @@ final class QuranData: ObservableObject {
     }
 
     private struct QuranDynamicCache: Codable {
-        static let version = 1
+        static let version = 2
 
         let version: Int
         let resourceSignature: String
@@ -2398,6 +2877,8 @@ final class QuranData: ObservableObject {
         let verseIndex: [VerseIndexEntry]
         let arabicTokenIndex: [String: [Int]]
         let arabicPrefix2Index: [String: [Int]]
+        let silentArabicTokenIndex: [String: [Int]]
+        let silentArabicPrefix2Index: [String: [Int]]
         let englishTokenIndex: [String: [Int]]
         let englishPrefix3Index: [String: [Int]]
         let allVerseIndices: [Int]
@@ -2420,6 +2901,7 @@ final class QuranData: ObservableObject {
     @Published private(set) var juzSections: [JuzSectionData] = []
     @Published private(set) var revelationOrderSurahIDs: [Int] = []
     @Published private(set) var surahSearchIndex: [SurahSearchIndexEntry] = []
+    @Published private(set) var isVerseSearchReady = false
     private(set) var verseIndex: [VerseIndexEntry] = []
 
     private var surahIndex = [Int:Int]()
@@ -2439,6 +2921,8 @@ final class QuranData: ObservableObject {
     /// Preprocessed English indexes to reduce scoring to a small candidate set.
     private var englishTokenIndex = [String: [Int]]()
     private var englishPrefix3Index = [String: [Int]]()
+    private var silentArabicTokenIndex = [String: [Int]]()
+    private var silentArabicPrefix2Index = [String: [Int]]()
     /// Cached contiguous index list to avoid reallocating Array(verseIndex.indices) on every query.
     private var allVerseIndices: [Int] = []
     private var searchResultIndexCache = [SearchResultCacheKey: [Int]]()
@@ -2446,8 +2930,11 @@ final class QuranData: ObservableObject {
     private var surahIDsByPageCount = [Int: [Int]]()
     private var surahIDsByJuz = [Int: [Int]]()
     private var juzSearchIndex: [JuzSearchIndexEntry] = []
+    private var cachedSajdahAyahResults: [(surah: Surah, ayah: Ayah)]?
+    private var cachedMuqattaatAyahResults: [(surah: Surah, ayah: Ayah)]?
 
     private var loadTask: Task<Void, Never>?
+    private var searchIndexBuildTask: Task<Void, Never>?
     private var loadErrorDescription: String? = nil
 
     private init() {}
@@ -2461,7 +2948,353 @@ final class QuranData: ObservableObject {
     private struct SearchResultCacheKey: Hashable {
         let qiraahKey: String
         let cleanedQuery: String
+        let silentQuery: String?
         let useArabic: Bool
+        let ignoreSilentLetters: Bool
+    }
+
+    struct VerseSearchSnapshot {
+        let qiraahKey: String
+        let verseIndex: [VerseIndexEntry]
+        let arabicTokenIndex: [String: [Int]]
+        let arabicPrefix2Index: [String: [Int]]
+        let silentArabicTokenIndex: [String: [Int]]
+        let silentArabicPrefix2Index: [String: [Int]]
+        let englishTokenIndex: [String: [Int]]
+        let englishPrefix3Index: [String: [Int]]
+        let allVerseIndices: [Int]
+
+        private struct BooleanAyahTerm {
+            enum MatchMode {
+                case contains
+                case startsWith
+                case endsWith
+                case exact
+            }
+
+            let value: String
+            let isNegated: Bool
+            let matchMode: MatchMode
+            let requiresTashkeelMatch: Bool
+            let tashkeelPattern: String
+            let requiresExactEnglishMatch: Bool
+            let exactEnglishPhrase: String
+        }
+
+        func search(term raw: String, limit: Int = 10, offset: Int = 0) -> [VerseIndexEntry] {
+            guard !verseIndex.isEmpty else { return [] }
+
+            let q = Settings.shared.cleanSearch(raw, whitespace: true)
+            guard !q.isEmpty else { return [] }
+            if q.rangeOfCharacter(from: .decimalDigits) != nil { return [] }
+
+            let booleanGroups = booleanAyahSearchGroups(from: raw)
+            if let booleanGroups, booleanGroups.isEmpty { return [] }
+
+            let useArabic = raw.containsArabicLetters
+
+            if let booleanGroups {
+                var filtered: [VerseIndexEntry] = []
+                filtered.reserveCapacity(limit == .max ? 64 : min(limit, 64))
+
+                var skipped = 0
+                for entry in verseIndex {
+                    guard matchesBooleanAyahSearch(entry: entry, useArabic: useArabic, groups: booleanGroups) else { continue }
+                    if skipped < offset { skipped += 1; continue }
+                    filtered.append(entry)
+                    if limit != .max, filtered.count >= limit { break }
+                }
+                return filtered
+            }
+
+            let silentQuery = useArabic && Settings.shared.ignoreSilentLettersInQuranSearch
+                ? Settings.shared.cleanSearchIgnoringSilentArabicLetters(raw, whitespace: true)
+                : nil
+            return regularSearchResults(
+                for: q,
+                silentQuery: silentQuery,
+                useArabic: useArabic,
+                limit: limit,
+                offset: offset
+            )
+        }
+
+        private func regularSearchResults(
+            for cleanedQuery: String,
+            silentQuery: String?,
+            useArabic: Bool,
+            limit: Int,
+            offset: Int
+        ) -> [VerseIndexEntry] {
+            var results: [VerseIndexEntry] = []
+            results.reserveCapacity(limit == .max ? 64 : min(limit, 64))
+
+            var skipped = 0
+            for index in candidateVerseIndices(for: cleanedQuery, silentQuery: silentQuery, useArabic: useArabic) {
+                guard verseIndex.indices.contains(index) else { continue }
+                let entry = verseIndex[index]
+                guard regularSearchEntryMatches(entry, cleanedQuery: cleanedQuery, silentQuery: silentQuery, useArabic: useArabic) else { continue }
+                if skipped < offset {
+                    skipped += 1
+                    continue
+                }
+                results.append(entry)
+                if limit != .max, results.count >= limit { break }
+            }
+            return results
+        }
+
+        private func regularSearchEntryMatches(
+            _ entry: VerseIndexEntry,
+            cleanedQuery: String,
+            silentQuery: String?,
+            useArabic: Bool
+        ) -> Bool {
+            if useArabic {
+                if entry.arabicBlob.contains(cleanedQuery) || phrasePrefixMatch(entry.arabicTokens, query: searchTokens(from: cleanedQuery)) {
+                    return true
+                }
+                guard let silentQuery, !silentQuery.isEmpty else { return false }
+                return entry.silentArabicBlob.contains(silentQuery)
+                    || phrasePrefixMatch(entry.silentArabicTokens, query: searchTokens(from: silentQuery))
+            }
+
+            return entry.englishBlob.contains(cleanedQuery)
+                || phrasePrefixMatch(entry.englishTokens, query: searchTokens(from: cleanedQuery))
+        }
+
+        private func phrasePrefixMatch(_ haystack: [String], query: [String]) -> Bool {
+            guard !query.isEmpty, haystack.count >= query.count else { return false }
+
+            for start in 0...(haystack.count - query.count) {
+                var matched = true
+                for offset in query.indices {
+                    let word = haystack[start + offset]
+                    let term = query[offset]
+                    if offset == query.count - 1 {
+                        if !word.hasPrefix(term) { matched = false; break }
+                    } else if word != term {
+                        matched = false
+                        break
+                    }
+                }
+                if matched { return true }
+            }
+
+            return false
+        }
+
+        private func candidateVerseIndices(for cleanedQuery: String, silentQuery: String?, useArabic: Bool) -> [Int] {
+            var tokens = searchTokens(from: cleanedQuery)
+            if useArabic, let silentQuery {
+                tokens.append(contentsOf: searchTokens(from: silentQuery))
+            }
+            guard !tokens.isEmpty else { return allVerseIndices }
+
+            let minimumPrefixLength = useArabic ? 2 : 3
+
+            var candidates: Set<Int>? = nil
+            var matchedAnyIndexedToken = false
+
+            for token in tokens {
+                var tokenMatches = Set<Int>()
+                let tokenIndex = useArabic ? arabicTokenIndex : englishTokenIndex
+                let prefixIndex = useArabic ? arabicPrefix2Index : englishPrefix3Index
+
+                if let exactMatches = tokenIndex[token] {
+                    tokenMatches.formUnion(exactMatches)
+                }
+
+                if token.count >= minimumPrefixLength {
+                    let prefix = String(token.prefix(minimumPrefixLength))
+                    if let prefixMatches = prefixIndex[prefix] {
+                        tokenMatches.formUnion(prefixMatches)
+                    }
+                }
+
+                if useArabic {
+                    if let exactMatches = silentArabicTokenIndex[token] {
+                        tokenMatches.formUnion(exactMatches)
+                    }
+
+                    if token.count >= minimumPrefixLength {
+                        let prefix = String(token.prefix(minimumPrefixLength))
+                        if let prefixMatches = silentArabicPrefix2Index[prefix] {
+                            tokenMatches.formUnion(prefixMatches)
+                        }
+                    }
+                }
+
+                guard !tokenMatches.isEmpty else { continue }
+
+                matchedAnyIndexedToken = true
+                if let existing = candidates {
+                    candidates = existing.intersection(tokenMatches)
+                } else {
+                    candidates = tokenMatches
+                }
+
+                if candidates?.isEmpty == true {
+                    return []
+                }
+            }
+
+            guard matchedAnyIndexedToken, let candidates else {
+                return allVerseIndices
+            }
+
+            return candidates.sorted()
+        }
+
+        private func booleanAyahSearchGroups(from rawQuery: String) -> [[BooleanAyahTerm]]? {
+            let normalized = rawQuery
+                .replacingOccurrences(of: "&&", with: "&")
+                .replacingOccurrences(of: "||", with: "|")
+
+            guard normalized.contains("&") || normalized.contains("|") || normalized.contains("!") || normalized.contains("#") || normalized.contains("^") || normalized.contains("%") || normalized.contains("$") else {
+                return nil
+            }
+
+            return normalized
+                .split(separator: "|", omittingEmptySubsequences: false)
+                .map { part in
+                    part
+                        .split(separator: "&", omittingEmptySubsequences: false)
+                        .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
+                        .compactMap(booleanAyahSearchTerm(from:))
+                }
+                .filter { !$0.isEmpty }
+        }
+
+        private func booleanAyahSearchTerm(from rawTerm: String) -> BooleanAyahTerm? {
+            var term = rawTerm.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !term.isEmpty else { return nil }
+
+            var isNegated = false
+            while term.hasPrefix("!") {
+                isNegated.toggle()
+                term.removeFirst()
+                term = term.trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+
+            var requiresTashkeelMatch = false
+            while term.hasPrefix("#") {
+                requiresTashkeelMatch = true
+                term.removeFirst()
+                term = term.trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+
+            var startsWithMatch = false
+            if term.hasPrefix("^") {
+                startsWithMatch = true
+                term.removeFirst()
+                term = term.trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+
+            var endsWithMatch = false
+            if term.hasSuffix("%") || term.hasSuffix("$") {
+                endsWithMatch = true
+                term.removeLast()
+                term = term.trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+
+            guard !term.isEmpty else { return nil }
+            let cleaned = Settings.shared.cleanSearch(term, whitespace: true)
+            guard !cleaned.isEmpty else { return nil }
+
+            let matchMode: BooleanAyahTerm.MatchMode
+            if startsWithMatch && endsWithMatch {
+                matchMode = .exact
+            } else if startsWithMatch {
+                matchMode = .startsWith
+            } else if endsWithMatch {
+                matchMode = .endsWith
+            } else {
+                matchMode = .contains
+            }
+
+            return BooleanAyahTerm(
+                value: cleaned,
+                isNegated: isNegated,
+                matchMode: matchMode,
+                requiresTashkeelMatch: requiresTashkeelMatch && term.containsArabicLetters,
+                tashkeelPattern: arabicTashkeelBlob(term),
+                requiresExactEnglishMatch: requiresTashkeelMatch && !term.containsArabicLetters,
+                exactEnglishPhrase: exactPhraseBlob(term)
+            )
+        }
+
+        private func ayahTermMatch(haystack: String, tokens: [String], term: String, mode: BooleanAyahTerm.MatchMode) -> Bool {
+            switch mode {
+            case .contains:
+                return haystack.contains(term)
+            case .startsWith:
+                return haystack.hasPrefix(term) || tokens.contains(where: { $0.hasPrefix(term) })
+            case .endsWith:
+                return haystack.hasSuffix(term) || tokens.contains(where: { $0.hasSuffix(term) })
+            case .exact:
+                return haystack == term || tokens.contains(term)
+            }
+        }
+
+        private func matchesBooleanAyahSearch(entry: VerseIndexEntry, useArabic: Bool, groups: [[BooleanAyahTerm]]) -> Bool {
+            groups.contains { andTerms in
+                andTerms.allSatisfy { term in
+                    let containsTerm: Bool
+                    if useArabic, term.requiresTashkeelMatch {
+                        let lettersMatch = ayahTermMatch(
+                            haystack: entry.arabicBlob,
+                            tokens: entry.arabicTokens,
+                            term: term.value,
+                            mode: term.matchMode
+                        )
+                        let tashkeelMatch = term.tashkeelPattern.isEmpty || entry.arabicTashkeelBlob.contains(term.tashkeelPattern)
+                        containsTerm = lettersMatch && tashkeelMatch
+                    } else if !useArabic, term.requiresExactEnglishMatch {
+                        let exactTokens = searchTokens(from: term.exactEnglishPhrase)
+                        containsTerm = !term.exactEnglishPhrase.isEmpty && ayahTermMatch(
+                            haystack: entry.englishExactBlob,
+                            tokens: exactTokens,
+                            term: term.exactEnglishPhrase,
+                            mode: term.matchMode
+                        )
+                    } else {
+                        let haystack = useArabic ? entry.arabicBlob : entry.englishBlob
+                        let tokens = useArabic ? entry.arabicTokens : entry.englishTokens
+                        containsTerm = ayahTermMatch(haystack: haystack, tokens: tokens, term: term.value, mode: term.matchMode)
+                    }
+                    return term.isNegated ? !containsTerm : containsTerm
+                }
+            }
+        }
+
+        private func searchTokens(from cleanedText: String) -> [String] {
+            cleanedText
+                .split(separator: " ")
+                .map(String.init)
+                .filter { !$0.isEmpty }
+        }
+
+        private func exactPhraseBlob(_ text: String) -> String {
+            text
+                .lowercased()
+                .components(separatedBy: .whitespacesAndNewlines)
+                .filter { !$0.isEmpty }
+                .joined(separator: " ")
+        }
+
+        private func arabicTashkeelBlob(_ text: String) -> String {
+            String(text.unicodeScalars.filter { Self.arabicTashkeelCharacterSet.contains($0) })
+        }
+
+        private static let arabicTashkeelCharacterSet: CharacterSet = {
+            var set = CharacterSet()
+            set.insert(charactersIn: "\u{0610}"..."\u{061A}")
+            set.insert(charactersIn: "\u{064B}"..."\u{065F}")
+            set.insert(charactersIn: "\u{0670}"..."\u{0670}")
+            set.insert(charactersIn: "\u{06D6}"..."\u{06ED}")
+            return set
+        }()
     }
 
     private func arabicToEnglishNumber(_ arabicNumber: String) -> Int? {
@@ -2615,6 +3448,8 @@ final class QuranData: ObservableObject {
         verseIndex: [VerseIndexEntry],
         arabicTokenIndex: [String: [Int]],
         arabicPrefix2Index: [String: [Int]],
+        silentArabicTokenIndex: [String: [Int]],
+        silentArabicPrefix2Index: [String: [Int]],
         englishTokenIndex: [String: [Int]],
         englishPrefix3Index: [String: [Int]],
         allVerseIndices: [Int],
@@ -2631,6 +3466,8 @@ final class QuranData: ObservableObject {
             verseIndex: verseIndex,
             arabicTokenIndex: arabicTokenIndex,
             arabicPrefix2Index: arabicPrefix2Index,
+            silentArabicTokenIndex: silentArabicTokenIndex,
+            silentArabicPrefix2Index: silentArabicPrefix2Index,
             englishTokenIndex: englishTokenIndex,
             englishPrefix3Index: englishPrefix3Index,
             allVerseIndices: allVerseIndices,
@@ -2673,6 +3510,7 @@ final class QuranData: ObservableObject {
     @MainActor
     private func applyStaticCache(_ cache: QuranStaticCache) {
         self.quran = cache.quran
+        invalidateDerivedResultCaches()
         let (sIndex, aIndex) = buildIndexes(for: cache.quran)
         self.surahIndex = sIndex
         self.ayahIndex = aIndex
@@ -2692,6 +3530,8 @@ final class QuranData: ObservableObject {
         self.verseIndex = cache.verseIndex
         self.arabicTokenIndex = cache.arabicTokenIndex
         self.arabicPrefix2Index = cache.arabicPrefix2Index
+        self.silentArabicTokenIndex = cache.silentArabicTokenIndex
+        self.silentArabicPrefix2Index = cache.silentArabicPrefix2Index
         self.englishTokenIndex = cache.englishTokenIndex
         self.englishPrefix3Index = cache.englishPrefix3Index
         self.allVerseIndices = cache.allVerseIndices
@@ -2702,7 +3542,97 @@ final class QuranData: ObservableObject {
         self.cachedBoundaryQiraah = cache.qiraahKey
         self.cachedFirstAyahLookupQiraah = cache.qiraahKey
         self.searchResultIndexCache.removeAll()
+        self.isVerseSearchReady = true
         self.loadState = .ready
+    }
+
+    private func scheduleVerseSearchIndexBuild(
+        resourceSignature: String,
+        qiraahKey: String,
+        surahs: [Surah],
+        boundaryModels: [Int: SurahBoundaryModel],
+        firstAyahByPage: [Int: (surah: Int, ayah: Int)],
+        firstAyahByJuz: [Int: (surah: Int, ayah: Int)]
+    ) {
+        #if os(watchOS)
+        return
+        #else
+        searchIndexBuildTask?.cancel()
+
+        searchIndexBuildTask = Task(priority: .utility) { [weak self] in
+            guard let self else { return }
+
+            // Give first render a chance to settle before building the heavier global ayah index.
+            try? await Task.sleep(nanoseconds: 250_000_000)
+            if Task.isCancelled { return }
+
+            let displayQiraah = qiraahKey.isEmpty ? nil : qiraahKey
+            var vIndex: [VerseIndexEntry] = []
+            let estimatedVerseCount = surahs.reduce(0) { $0 + $1.ayahs.count }
+            vIndex.reserveCapacity(estimatedVerseCount)
+
+            for surah in surahs {
+                for ayah in surah.ayahs {
+                    if Task.isCancelled { return }
+                    let raw = ayah.textArabic(for: displayQiraah)
+                    let clean = ayah.textCleanArabic(for: displayQiraah)
+                    vIndex.append(
+                        self.makeVerseIndexEntry(
+                            surahID: surah.id,
+                            ayahID: ayah.id,
+                            rawArabic: raw,
+                            cleanArabic: clean,
+                            englishSaheeh: ayah.textEnglishSaheeh,
+                            englishMustafa: ayah.textEnglishMustafa,
+                            transliteration: ayah.textTransliteration
+                        )
+                    )
+                }
+                await Task.yield()
+            }
+
+            let arabicIndexes = self.buildArabicSearchIndexes(for: vIndex)
+            let silentArabicIndexes = self.buildSilentArabicSearchIndexes(for: vIndex)
+            if Task.isCancelled { return }
+            let englishIndexes = self.buildEnglishSearchIndexes(for: vIndex)
+            if Task.isCancelled { return }
+
+            let finalizedVerseIndex = vIndex
+            let finalizedAllVerseIndices = Array(finalizedVerseIndex.indices)
+            let currentQiraahKey = await MainActor.run { self.settings.displayQiraahForArabic ?? "" }
+            guard currentQiraahKey == qiraahKey else { return }
+
+            await MainActor.run {
+                self.verseIndex = finalizedVerseIndex
+                self.arabicTokenIndex = arabicIndexes.token
+                self.arabicPrefix2Index = arabicIndexes.prefix2
+                self.silentArabicTokenIndex = silentArabicIndexes.token
+                self.silentArabicPrefix2Index = silentArabicIndexes.prefix2
+                self.englishTokenIndex = englishIndexes.token
+                self.englishPrefix3Index = englishIndexes.prefix3
+                self.allVerseIndices = finalizedAllVerseIndices
+                self.cachedVerseIndexQiraah = qiraahKey
+                self.searchResultIndexCache.removeAll()
+                self.isVerseSearchReady = true
+            }
+
+            self.saveDynamicCache(
+                resourceSignature: resourceSignature,
+                qiraahKey: qiraahKey,
+                verseIndex: finalizedVerseIndex,
+                arabicTokenIndex: arabicIndexes.token,
+                arabicPrefix2Index: arabicIndexes.prefix2,
+                silentArabicTokenIndex: silentArabicIndexes.token,
+                silentArabicPrefix2Index: silentArabicIndexes.prefix2,
+                englishTokenIndex: englishIndexes.token,
+                englishPrefix3Index: englishIndexes.prefix3,
+                allVerseIndices: finalizedAllVerseIndices,
+                surahBoundaryModels: boundaryModels,
+                firstAyahByPage: firstAyahByPage,
+                firstAyahByJuz: firstAyahByJuz
+            )
+        }
+        #endif
     }
 
     private func startLoading() {
@@ -2710,6 +3640,11 @@ final class QuranData: ObservableObject {
         loadTask = Task(priority: .userInitiated) { [weak self] in
             await self?.load()
         }
+    }
+
+    private func invalidateDerivedResultCaches() {
+        cachedSajdahAyahResults = nil
+        cachedMuqattaatAyahResults = nil
     }
 
     private func searchTokens(from cleanedText: String) -> [String] {
@@ -2752,10 +3687,14 @@ final class QuranData: ObservableObject {
         let arabicBlob = [rawArabic, cleanArabic]
             .map { settings.cleanSearch($0) }
             .joined(separator: " ")
+        let silentArabicBlob = [rawArabic, cleanArabic]
+            .map { settings.cleanSearchIgnoringSilentArabicLetters($0) }
+            .joined(separator: " ")
         let englishBlob = [englishSaheeh, englishMustafa, transliteration]
             .map { settings.cleanSearch($0) }
             .joined(separator: " ")
         let arabicTokens = searchTokens(from: arabicBlob)
+        let silentArabicTokens = searchTokens(from: silentArabicBlob)
         let englishTokens = searchTokens(from: englishBlob)
 
         return VerseIndexEntry(
@@ -2765,8 +3704,10 @@ final class QuranData: ObservableObject {
             arabicTashkeelBlob: arabicTashkeelBlob(rawArabic),
             englishExactBlob: exactPhraseBlob([englishSaheeh, englishMustafa, transliteration].joined(separator: " ")),
             arabicBlob: arabicBlob,
+            silentArabicBlob: silentArabicBlob,
             englishBlob: englishBlob,
             arabicTokens: arabicTokens,
+            silentArabicTokens: silentArabicTokens,
             englishTokens: englishTokens
         )
     }
@@ -2804,13 +3745,30 @@ final class QuranData: ObservableObject {
         token: [String: [Int]],
         prefix2: [String: [Int]]
     ) {
+        buildArabicSearchIndexes(for: entries, tokenProvider: \.arabicTokens)
+    }
+
+    private func buildSilentArabicSearchIndexes(for entries: [VerseIndexEntry]) -> (
+        token: [String: [Int]],
+        prefix2: [String: [Int]]
+    ) {
+        buildArabicSearchIndexes(for: entries, tokenProvider: \.silentArabicTokens)
+    }
+
+    private func buildArabicSearchIndexes(
+        for entries: [VerseIndexEntry],
+        tokenProvider: KeyPath<VerseIndexEntry, [String]>
+    ) -> (
+        token: [String: [Int]],
+        prefix2: [String: [Int]]
+    ) {
         var tokenIndex = [String: [Int]]()
         var prefix2Index = [String: [Int]]()
         tokenIndex.reserveCapacity(9000)
         prefix2Index.reserveCapacity(3000)
 
         for (idx, entry) in entries.enumerated() {
-            let uniqueTokens = Set(entry.arabicTokens)
+            let uniqueTokens = Set(entry[keyPath: tokenProvider])
             for token in uniqueTokens {
                 guard !token.isEmpty else { continue }
                 tokenIndex[token, default: []].append(idx)
@@ -2864,7 +3822,11 @@ final class QuranData: ObservableObject {
     }
 
     var shouldWaitForFullLaunchReadiness: Bool {
+        #if os(watchOS)
+        false
+        #else
         true
+        #endif
     }
 
     var hasLoadFailed: Bool {
@@ -2914,6 +3876,7 @@ final class QuranData: ObservableObject {
         await MainActor.run {
             self.loadState = .loadingCore
             self.loadErrorDescription = nil
+            self.isVerseSearchReady = false
         }
 
         defer {
@@ -2967,71 +3930,46 @@ final class QuranData: ObservableObject {
                 applyStaticCache(staticCache)
             }
 
+            #if !os(watchOS)
             if let cachedDynamic = loadDynamicCache(resourceSignature: cacheSignature, qiraahKey: qiraahKey) {
                 await MainActor.run {
                     applyDynamicCache(cachedDynamic)
                 }
                 return
             }
+            #endif
 
             let currentQiraah = await MainActor.run { settings.displayQiraahForArabic }
             let surahsToPublish = await MainActor.run { self.quran }
 
             let displayQiraah = currentQiraah
-            var vIndex: [VerseIndexEntry] = []
-            let estimatedVerseCount = surahsToPublish.reduce(0) { $0 + $1.ayahs.count }
-            vIndex.reserveCapacity(estimatedVerseCount)
-            for surah in surahsToPublish {
-                for ayah in surah.ayahs {
-                    let raw = ayah.textArabic(for: displayQiraah)
-                    let clean = ayah.textCleanArabic(for: displayQiraah)
-                    vIndex.append(
-                        makeVerseIndexEntry(
-                            surahID: surah.id,
-                            ayahID: ayah.id,
-                            rawArabic: raw,
-                            cleanArabic: clean,
-                            englishSaheeh: ayah.textEnglishSaheeh,
-                            englishMustafa: ayah.textEnglishMustafa,
-                            transliteration: ayah.textTransliteration
-                        )
-                    )
-                }
-            }
-
-            let arabicIndexes = buildArabicSearchIndexes(for: vIndex)
-            let englishIndexes = buildEnglishSearchIndexes(for: vIndex)
             let boundaryModels = buildBoundaryModels(for: surahsToPublish, displayQiraah: displayQiraah)
             let firstAyahLookups = buildFirstAyahLookups(for: surahsToPublish, displayQiraah: displayQiraah)
-            let finalizedVerseIndex = vIndex
-            let finalizedAllVerseIndices = Array(finalizedVerseIndex.indices)
             let finalizedQiraahKey = displayQiraah ?? ""
 
             await MainActor.run {
-                self.verseIndex = finalizedVerseIndex
-                self.arabicTokenIndex = arabicIndexes.token
-                self.arabicPrefix2Index = arabicIndexes.prefix2
-                self.englishTokenIndex = englishIndexes.token
-                self.englishPrefix3Index = englishIndexes.prefix3
-                self.allVerseIndices = finalizedAllVerseIndices
+                self.verseIndex = []
+                self.arabicTokenIndex = [:]
+                self.arabicPrefix2Index = [:]
+                self.silentArabicTokenIndex = [:]
+                self.silentArabicPrefix2Index = [:]
+                self.englishTokenIndex = [:]
+                self.englishPrefix3Index = [:]
+                self.allVerseIndices = []
                 self.cachedVerseIndexQiraah = finalizedQiraahKey
                 self.surahBoundaryModels = boundaryModels
                 self.cachedBoundaryQiraah = finalizedQiraahKey
                 self.firstAyahByPage = firstAyahLookups.page
                 self.firstAyahByJuz = firstAyahLookups.juz
                 self.cachedFirstAyahLookupQiraah = finalizedQiraahKey
+                self.isVerseSearchReady = false
             }
 
-            saveDynamicCache(
+            scheduleVerseSearchIndexBuild(
                 resourceSignature: cacheSignature,
                 qiraahKey: finalizedQiraahKey,
-                verseIndex: finalizedVerseIndex,
-                arabicTokenIndex: arabicIndexes.token,
-                arabicPrefix2Index: arabicIndexes.prefix2,
-                englishTokenIndex: englishIndexes.token,
-                englishPrefix3Index: englishIndexes.prefix3,
-                allVerseIndices: finalizedAllVerseIndices,
-                surahBoundaryModels: boundaryModels,
+                surahs: surahsToPublish,
+                boundaryModels: boundaryModels,
                 firstAyahByPage: firstAyahLookups.page,
                 firstAyahByJuz: firstAyahLookups.juz
             )
@@ -3115,6 +4053,7 @@ final class QuranData: ObservableObject {
 
         await MainActor.run {
             self.quran = surahsToPublish
+            self.invalidateDerivedResultCaches()
         }
 
         await MainActor.run {
@@ -3133,48 +4072,26 @@ final class QuranData: ObservableObject {
 
         let displayQiraah = await MainActor.run { settings.displayQiraahForArabic }
 
-        var vIndex: [VerseIndexEntry] = []
-        let estimatedVerseCount = surahsToPublish.reduce(0) { $0 + $1.ayahs.count }
-        vIndex.reserveCapacity(estimatedVerseCount)
-        for surah in surahsToPublish {
-            for ayah in surah.ayahs {
-                let raw = ayah.textArabic(for: displayQiraah)
-                let clean = ayah.textCleanArabic(for: displayQiraah)
-                vIndex.append(
-                    makeVerseIndexEntry(
-                        surahID: surah.id,
-                        ayahID: ayah.id,
-                        rawArabic: raw,
-                        cleanArabic: clean,
-                        englishSaheeh: ayah.textEnglishSaheeh,
-                        englishMustafa: ayah.textEnglishMustafa,
-                        transliteration: ayah.textTransliteration
-                    )
-                )
-            }
-        }
-
-        let arabicIndexes = buildArabicSearchIndexes(for: vIndex)
-        let englishIndexes = buildEnglishSearchIndexes(for: vIndex)
         let boundaryModels = buildBoundaryModels(for: surahsToPublish, displayQiraah: displayQiraah)
         let firstAyahLookups = buildFirstAyahLookups(for: surahsToPublish, displayQiraah: displayQiraah)
-        let finalizedVerseIndex = vIndex
-        let finalizedAllVerseIndices = Array(finalizedVerseIndex.indices)
         let finalizedQiraahKey = displayQiraah ?? ""
 
         await MainActor.run {
-            self.verseIndex = finalizedVerseIndex
-            self.arabicTokenIndex = arabicIndexes.token
-            self.arabicPrefix2Index = arabicIndexes.prefix2
-            self.englishTokenIndex = englishIndexes.token
-            self.englishPrefix3Index = englishIndexes.prefix3
-            self.allVerseIndices = finalizedAllVerseIndices
+            self.verseIndex = []
+            self.arabicTokenIndex = [:]
+            self.arabicPrefix2Index = [:]
+            self.silentArabicTokenIndex = [:]
+            self.silentArabicPrefix2Index = [:]
+            self.englishTokenIndex = [:]
+            self.englishPrefix3Index = [:]
+            self.allVerseIndices = []
             self.cachedVerseIndexQiraah = finalizedQiraahKey
             self.surahBoundaryModels = boundaryModels
             self.cachedBoundaryQiraah = finalizedQiraahKey
             self.firstAyahByPage = firstAyahLookups.page
             self.firstAyahByJuz = firstAyahLookups.juz
             self.cachedFirstAyahLookupQiraah = finalizedQiraahKey
+            self.isVerseSearchReady = false
         }
 
         saveStaticCache(
@@ -3190,16 +4107,11 @@ final class QuranData: ObservableObject {
             juzSearchIndex: juzSearchIndex
         )
 
-        saveDynamicCache(
+        scheduleVerseSearchIndexBuild(
             resourceSignature: cacheSignature,
             qiraahKey: finalizedQiraahKey,
-            verseIndex: finalizedVerseIndex,
-            arabicTokenIndex: arabicIndexes.token,
-            arabicPrefix2Index: arabicIndexes.prefix2,
-            englishTokenIndex: englishIndexes.token,
-            englishPrefix3Index: englishIndexes.prefix3,
-            allVerseIndices: finalizedAllVerseIndices,
-            surahBoundaryModels: boundaryModels,
+            surahs: surahsToPublish,
+            boundaryModels: boundaryModels,
             firstAyahByPage: firstAyahLookups.page,
             firstAyahByJuz: firstAyahLookups.juz
         )
@@ -3276,9 +4188,12 @@ final class QuranData: ObservableObject {
             }
         }
         let arabicIndexes = buildArabicSearchIndexes(for: verseIndex)
+        let silentArabicIndexes = buildSilentArabicSearchIndexes(for: verseIndex)
         let englishIndexes = buildEnglishSearchIndexes(for: verseIndex)
         arabicTokenIndex = arabicIndexes.token
         arabicPrefix2Index = arabicIndexes.prefix2
+        silentArabicTokenIndex = silentArabicIndexes.token
+        silentArabicPrefix2Index = silentArabicIndexes.prefix2
         englishTokenIndex = englishIndexes.token
         englishPrefix3Index = englishIndexes.prefix3
         allVerseIndices = Array(verseIndex.indices)
@@ -3733,6 +4648,42 @@ final class QuranData: ObservableObject {
         return quran.filter { selectedIDs.contains($0.id) }
     }
 
+    func sajdahAyahResults() -> [(surah: Surah, ayah: Ayah)] {
+        if let cachedSajdahAyahResults {
+            return cachedSajdahAyahResults
+        }
+
+        let results = quran.flatMap { surah in
+            surah.ayahs.compactMap { ayah in
+                ayah.textHafs.contains("۩") ? (surah: surah, ayah: ayah) : nil
+            }
+        }
+        cachedSajdahAyahResults = results
+        return results
+    }
+
+    func muqattaatAyahResults() -> [(surah: Surah, ayah: Ayah)] {
+        if let cachedMuqattaatAyahResults {
+            return cachedMuqattaatAyahResults
+        }
+
+        let openingSurahs = TajweedRules.surahsOpeningMuqattaat
+        let results = quran
+            .filter { openingSurahs.contains($0.id) }
+            .flatMap { surah -> [(surah: Surah, ayah: Ayah)] in
+                if surah.id == 42 {
+                    return surah.ayahs
+                        .filter { (1...2).contains($0.id) }
+                        .map { (surah: surah, ayah: $0) }
+                }
+
+                guard let firstAyah = surah.ayahs.first(where: { $0.id == 1 }) else { return [] }
+                return [(surah: surah, ayah: firstAyah)]
+            }
+        cachedMuqattaatAyahResults = results
+        return results
+    }
+
     func filteredSurahs(query rawQuery: String) -> [Surah] {
         let trimmed = rawQuery.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return quran }
@@ -3824,10 +4775,15 @@ final class QuranData: ObservableObject {
     }
 
     func searchVerses(term raw: String, limit: Int = 10, offset: Int = 0) -> [VerseIndexEntry] {
+        #if os(watchOS)
+        return []
+        #else
+        guard isVerseSearchReady else { return [] }
         let currentKey = settings.displayQiraahForArabic ?? ""
         if cachedVerseIndexQiraah != currentKey {
             rebuildVerseIndex()
             cachedVerseIndexQiraah = currentKey
+            isVerseSearchReady = true
         }
         guard !verseIndex.isEmpty else { return [] }
 
@@ -3853,53 +4809,157 @@ final class QuranData: ObservableObject {
             return filtered
         }
 
-        let matchingIndices = regularSearchMatchingIndices(for: q, useArabic: useArabic, qiraahKey: currentKey)
+        let silentQuery = useArabic && settings.ignoreSilentLettersInQuranSearch
+            ? settings.cleanSearchIgnoringSilentArabicLetters(raw, whitespace: true)
+            : nil
+        return regularSearchResults(for: q, silentQuery: silentQuery, useArabic: useArabic, qiraahKey: currentKey, limit: limit, offset: offset)
+        #endif
+    }
+
+    func verseSearchSnapshot() -> VerseSearchSnapshot? {
+        #if os(watchOS)
+        return nil
+        #else
+        guard isVerseSearchReady else { return nil }
+        let currentKey = settings.displayQiraahForArabic ?? ""
+        if cachedVerseIndexQiraah != currentKey {
+            rebuildVerseIndex()
+            cachedVerseIndexQiraah = currentKey
+            isVerseSearchReady = true
+        }
+        guard !verseIndex.isEmpty else { return nil }
+
+        return VerseSearchSnapshot(
+            qiraahKey: currentKey,
+            verseIndex: verseIndex,
+            arabicTokenIndex: arabicTokenIndex,
+            arabicPrefix2Index: arabicPrefix2Index,
+            silentArabicTokenIndex: silentArabicTokenIndex,
+            silentArabicPrefix2Index: silentArabicPrefix2Index,
+            englishTokenIndex: englishTokenIndex,
+            englishPrefix3Index: englishPrefix3Index,
+            allVerseIndices: allVerseIndices
+        )
+        #endif
+    }
+
+    private func regularSearchResults(
+        for cleanedQuery: String,
+        silentQuery: String?,
+        useArabic: Bool,
+        qiraahKey: String,
+        limit: Int,
+        offset: Int
+    ) -> [VerseIndexEntry] {
+        let cacheKey = SearchResultCacheKey(
+            qiraahKey: qiraahKey,
+            cleanedQuery: cleanedQuery,
+            silentQuery: silentQuery,
+            useArabic: useArabic,
+            ignoreSilentLetters: useArabic && settings.ignoreSilentLettersInQuranSearch
+        )
+
+        if let cached = searchResultIndexCache[cacheKey] {
+            var results: [VerseIndexEntry] = []
+            results.reserveCapacity(limit == .max ? 64 : min(limit, 64))
+            var skipped = 0
+
+            for index in cached {
+                guard verseIndex.indices.contains(index) else { continue }
+                if skipped < offset {
+                    skipped += 1
+                    continue
+                }
+                results.append(verseIndex[index])
+                if limit != .max, results.count >= limit { break }
+            }
+            return results
+        }
 
         var results: [VerseIndexEntry] = []
         results.reserveCapacity(limit == .max ? 64 : min(limit, 64))
 
         var skipped = 0
-        for index in matchingIndices {
+        var matchingIndices: [Int] = []
+        if limit == .max {
+            matchingIndices.reserveCapacity(64)
+        }
+
+        for index in candidateVerseIndices(for: cleanedQuery, silentQuery: silentQuery, useArabic: useArabic) {
             guard verseIndex.indices.contains(index) else { continue }
             let entry = verseIndex[index]
-            if skipped < offset { skipped += 1; continue }
+            guard regularSearchEntryMatches(entry, cleanedQuery: cleanedQuery, silentQuery: silentQuery, useArabic: useArabic) else { continue }
+
+            if limit == .max {
+                matchingIndices.append(index)
+            }
+
+            if skipped < offset {
+                skipped += 1
+                continue
+            }
+
             results.append(entry)
             if limit != .max, results.count >= limit { break }
+        }
+
+        if limit == .max {
+            if searchResultIndexCache.count > 64 {
+                searchResultIndexCache.removeAll(keepingCapacity: true)
+            }
+            searchResultIndexCache[cacheKey] = matchingIndices
         }
 
         return results
     }
 
-    private func regularSearchMatchingIndices(for cleanedQuery: String, useArabic: Bool, qiraahKey: String) -> [Int] {
-        let cacheKey = SearchResultCacheKey(
-            qiraahKey: qiraahKey,
-            cleanedQuery: cleanedQuery,
-            useArabic: useArabic
-        )
-        if let cached = searchResultIndexCache[cacheKey] {
-            return cached
+    private func regularSearchEntryMatches(
+        _ entry: VerseIndexEntry,
+        cleanedQuery: String,
+        silentQuery: String?,
+        useArabic: Bool
+    ) -> Bool {
+        if useArabic {
+            if entry.arabicBlob.contains(cleanedQuery) || phrasePrefixMatch(entry.arabicTokens, query: searchTokens(from: cleanedQuery)) {
+                return true
+            }
+            guard let silentQuery, !silentQuery.isEmpty else { return false }
+            return entry.silentArabicBlob.contains(silentQuery)
+                || phrasePrefixMatch(entry.silentArabicTokens, query: searchTokens(from: silentQuery))
         }
 
-        let matches = candidateVerseIndices(for: cleanedQuery, useArabic: useArabic).filter { index in
-            guard verseIndex.indices.contains(index) else { return false }
-            let entry = verseIndex[index]
-            let haystack = useArabic ? entry.arabicBlob : entry.englishBlob
-            return haystack.contains(cleanedQuery)
-        }
-
-        if searchResultIndexCache.count > 64 {
-            searchResultIndexCache.removeAll(keepingCapacity: true)
-        }
-        searchResultIndexCache[cacheKey] = matches
-        return matches
+        return entry.englishBlob.contains(cleanedQuery)
+            || phrasePrefixMatch(entry.englishTokens, query: searchTokens(from: cleanedQuery))
     }
 
-    private func candidateVerseIndices(for cleanedQuery: String, useArabic: Bool) -> [Int] {
-        let tokens = searchTokens(from: cleanedQuery)
+    private func phrasePrefixMatch(_ haystack: [String], query: [String]) -> Bool {
+        guard !query.isEmpty, haystack.count >= query.count else { return false }
+
+        for start in 0...(haystack.count - query.count) {
+            var matched = true
+            for offset in query.indices {
+                let word = haystack[start + offset]
+                let term = query[offset]
+                if offset == query.count - 1 {
+                    if !word.hasPrefix(term) { matched = false; break }
+                } else if word != term {
+                    matched = false
+                    break
+                }
+            }
+            if matched { return true }
+        }
+
+        return false
+    }
+
+    private func candidateVerseIndices(for cleanedQuery: String, silentQuery: String?, useArabic: Bool) -> [Int] {
+        var tokens = searchTokens(from: cleanedQuery)
+        if useArabic, let silentQuery {
+            tokens.append(contentsOf: searchTokens(from: silentQuery))
+        }
         guard !tokens.isEmpty else { return allVerseIndices }
 
-        let tokenIndex = useArabic ? arabicTokenIndex : englishTokenIndex
-        let prefixIndex = useArabic ? arabicPrefix2Index : englishPrefix3Index
         let minimumPrefixLength = useArabic ? 2 : 3
 
         var candidates: Set<Int>? = nil
@@ -3907,6 +4967,8 @@ final class QuranData: ObservableObject {
 
         for token in tokens {
             var tokenMatches = Set<Int>()
+            let tokenIndex = useArabic ? arabicTokenIndex : englishTokenIndex
+            let prefixIndex = useArabic ? arabicPrefix2Index : englishPrefix3Index
 
             if let exactMatches = tokenIndex[token] {
                 tokenMatches.formUnion(exactMatches)
@@ -3916,6 +4978,19 @@ final class QuranData: ObservableObject {
                 let prefix = String(token.prefix(minimumPrefixLength))
                 if let prefixMatches = prefixIndex[prefix] {
                     tokenMatches.formUnion(prefixMatches)
+                }
+            }
+
+            if useArabic {
+                if let exactMatches = silentArabicTokenIndex[token] {
+                    tokenMatches.formUnion(exactMatches)
+                }
+
+                if token.count >= minimumPrefixLength {
+                    let prefix = String(token.prefix(minimumPrefixLength))
+                    if let prefixMatches = silentArabicPrefix2Index[prefix] {
+                        tokenMatches.formUnion(prefixMatches)
+                    }
                 }
             }
 

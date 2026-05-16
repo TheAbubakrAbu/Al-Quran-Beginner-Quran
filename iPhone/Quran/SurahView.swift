@@ -26,10 +26,13 @@ struct SurahView: View {
     @State private var showCustomRangeSheet = false
     @State private var showReciterPickerSheet = false
     @State private var showSurahPickerSheet = false
+    @State private var confirmConvertQiraahToHafs = false
     @State private var isAyahSearchFocused = false
     @State private var selectedSurahNavigation: Int? = nil
     @State private var dividerInfo: DividerInfo? = nil
     @State private var surahInfoDialog: SurahInfoDialog? = nil
+    @State private var khatmOverviewPercent: Int = 0
+    @State private var khatmOverviewLastSignature: Int = 0
     let surah: Surah
     var ayah: Int? = nil
     var onSelectSurah: ((Int) -> Void)? = nil
@@ -37,27 +40,40 @@ struct SurahView: View {
     private final class PreparedSurahCache {
         let ayahs: [Ayah]
         let ayahByID: [Int: Ayah]
-        let searchBlobByAyahID: [Int: String]
         let overlayDividerByAyahID: [Int: BoundaryDividerModel]
 
         init(
             ayahs: [Ayah],
             ayahByID: [Int: Ayah],
-            searchBlobByAyahID: [Int: String],
             overlayDividerByAyahID: [Int: BoundaryDividerModel]
         ) {
             self.ayahs = ayahs
             self.ayahByID = ayahByID
-            self.searchBlobByAyahID = searchBlobByAyahID
             self.overlayDividerByAyahID = overlayDividerByAyahID
+        }
+    }
+
+    private final class PreparedSurahSearchCache {
+        let searchBlobByAyahID: [Int: String]
+
+        init(searchBlobByAyahID: [Int: String]) {
+            self.searchBlobByAyahID = searchBlobByAyahID
         }
     }
 
     private static let preparedSurahCache: NSCache<NSString, PreparedSurahCache> = {
         let cache = NSCache<NSString, PreparedSurahCache>()
-        cache.countLimit = 160
+        cache.countLimit = AppPerformance.preparedSurahCacheLimit
         return cache
     }()
+
+    private static let preparedSurahSearchCache: NSCache<NSString, PreparedSurahSearchCache> = {
+        let cache = NSCache<NSString, PreparedSurahSearchCache>()
+        cache.countLimit = AppPerformance.preparedSurahCacheLimit
+        return cache
+    }()
+
+    @MainActor private static var visibleAyahMemoryByRoute: [String: Int] = [:]
 
     private struct DividerInfo: Identifiable {
         let id = UUID()
@@ -403,7 +419,11 @@ struct SurahView: View {
 
     static func prewarm(surah: Surah, settings: Settings) {
         _ = preparedCache(for: surah, settings: settings)
-        AyahRow.prewarmArabicDisplay(surah: surah, settings: settings)
+        AyahRow.prewarmArabicDisplay(
+            surah: surah,
+            settings: settings,
+            limit: AppPerformance.prewarmArabicAyahLimit
+        )
     }
 
     private static func preparedCache(for surah: Surah, settings: Settings) -> PreparedSurahCache {
@@ -415,16 +435,13 @@ struct SurahView: View {
 
         let ayahs = surah.ayahs.filter { $0.existsInQiraah(settings.displayQiraahForArabic) }
         let ayahByID = Dictionary(uniqueKeysWithValues: ayahs.map { ($0.id, $0) })
-        let displayQiraah = settings.displayQiraahForArabic
         let shouldBuildFullOverlayMap = surah.pageOrJuzChangesWithinSurah
 
         var overlayMap: [Int: BoundaryDividerModel] = [:]
-        var searchBlobMap: [Int: String] = [:]
 
         if shouldBuildFullOverlayMap {
             overlayMap.reserveCapacity(ayahs.count)
         }
-        searchBlobMap.reserveCapacity(ayahs.count)
 
         for (index, ayah) in ayahs.enumerated() {
             if shouldBuildFullOverlayMap || index == 0 {
@@ -445,7 +462,33 @@ struct SurahView: View {
                     style: .allAccent
                 )
             }
+        }
 
+        let prepared = PreparedSurahCache(
+            ayahs: ayahs,
+            ayahByID: ayahByID,
+            overlayDividerByAyahID: overlayMap
+        )
+        preparedSurahCache.setObject(prepared, forKey: cacheKey)
+        return prepared
+    }
+
+    private static func preparedSearchCache(
+        for surah: Surah,
+        settings: Settings,
+        ayahs: [Ayah]
+    ) -> PreparedSurahSearchCache {
+        let qiraahKey = settings.displayQiraahForArabic ?? ""
+        let cacheKey = "\(surah.id)|\(qiraahKey)" as NSString
+        if let cached = preparedSurahSearchCache.object(forKey: cacheKey) {
+            return cached
+        }
+
+        let displayQiraah = settings.displayQiraahForArabic
+        var searchBlobMap: [Int: String] = [:]
+        searchBlobMap.reserveCapacity(ayahs.count)
+
+        for ayah in ayahs {
             let searchBlob = [
                 ayah.textArabic(for: displayQiraah),
                 ayah.textCleanArabic(for: displayQiraah),
@@ -460,13 +503,8 @@ struct SurahView: View {
             searchBlobMap[ayah.id] = searchBlob
         }
 
-        let prepared = PreparedSurahCache(
-            ayahs: ayahs,
-            ayahByID: ayahByID,
-            searchBlobByAyahID: searchBlobMap,
-            overlayDividerByAyahID: overlayMap
-        )
-        preparedSurahCache.setObject(prepared, forKey: cacheKey)
+        let prepared = PreparedSurahSearchCache(searchBlobByAyahID: searchBlobMap)
+        preparedSurahSearchCache.setObject(prepared, forKey: cacheKey)
         return prepared
     }
 
@@ -495,7 +533,7 @@ struct SurahView: View {
         cachedAyahsForQiraah = ayahs
         cachedAyahByID = prepared.ayahByID
         overlayDividerByAyahID = prepared.overlayDividerByAyahID
-        cachedSearchBlobByAyahID = prepared.searchBlobByAyahID
+        cachedSearchBlobByAyahID = [:]
         cacheQiraahKey = key
         qiraahCacheSurahID = surah.id
 
@@ -507,6 +545,24 @@ struct SurahView: View {
         } else {
             self.firstVisibleAyahID = fallbackID
         }
+    }
+
+    private var visibleAyahMemoryRouteKey: String {
+        "\(surah.id)|\(ayah ?? 0)|\(settings.displayQiraahForArabic ?? "")"
+    }
+
+    @MainActor
+    private func rememberedVisibleAyahID() -> Int? {
+        guard let remembered = Self.visibleAyahMemoryByRoute[visibleAyahMemoryRouteKey],
+              cachedAyahByID[remembered] != nil else {
+            return nil
+        }
+        return remembered
+    }
+
+    @MainActor
+    private func rememberVisibleAyahID(_ ayahID: Int) {
+        Self.visibleAyahMemoryByRoute[visibleAyahMemoryRouteKey] = ayahID
     }
 
     private func scrollToAyah(_ ayahID: Int, proxy: ScrollViewProxy, animated: Bool = false) {
@@ -648,7 +704,10 @@ struct SurahView: View {
         }
         .environmentObject(quranPlayer)
         .onDisappear(perform: saveLastRead)
-        .onChange(of: scenePhase) { _ in saveLastRead() }
+        .onChange(of: scenePhase) { phase in
+            guard phase != .active else { return }
+            saveLastRead()
+        }
         #if os(iOS)
         .toolbar {
             ToolbarItem(placement: .principal) {
@@ -803,49 +862,57 @@ struct SurahView: View {
         let ayahByID = cachedAyahByID.isEmpty
             ? (prepared?.ayahByID ?? [:])
             : cachedAyahByID
-        let filteredAyahs = ayahsForQiraah.filter { a in
-            guard !cleanQuery.isEmpty else { return true }
+        let shouldUseTextSearchBlobs = !cleanQuery.isEmpty
+            && !isDividerKeywordSearch
+            && !isPageOrJuzSearch
+            && ayahNumberQuery == nil
+        let searchBlobByAyahID = shouldUseTextSearchBlobs
+            ? (cachedSearchBlobByAyahID.isEmpty
+                ? Self.preparedSearchCache(for: surah, settings: settings, ayahs: ayahsForQiraah).searchBlobByAyahID
+                : cachedSearchBlobByAyahID)
+            : [:]
+        let filteredAyahs: [Ayah] = {
+            guard !cleanQuery.isEmpty else { return ayahsForQiraah }
+            if isDividerKeywordSearch { return [] }
 
-            if isDividerKeywordSearch {
-                return false
-            }
+            return ayahsForQiraah.filter { a in
+                if isPageOrJuzSearch {
+                    let pageMatch = pageJuzQuery.page != nil && a.page == pageJuzQuery.page
+                    let juzMatch = pageJuzQuery.juz != nil && a.juz == pageJuzQuery.juz
+                    return pageMatch || juzMatch
+                }
 
-            if isPageOrJuzSearch {
-                let pageMatch = pageJuzQuery.page != nil && a.page == pageJuzQuery.page
-                let juzMatch = pageJuzQuery.juz != nil && a.juz == pageJuzQuery.juz
-                return pageMatch || juzMatch
-            }
+                if let ayahNumberQuery {
+                    return a.id == ayahNumberQuery
+                }
 
-            if let ayahNumberQuery {
-                return a.id == ayahNumberQuery
-            }
+                if let blob = searchBlobByAyahID[a.id] {
+                    if let booleanGroups {
+                        if booleanGroups.isEmpty { return false }
+                        return matchesBooleanAyahSearch(ayah: a, haystack: blob, groups: booleanGroups)
+                    }
+                    return blob.contains(cleanQuery)
+                }
 
-            if let blob = cachedSearchBlobByAyahID[a.id] ?? prepared?.searchBlobByAyahID[a.id] {
+                let fallbackBlob = [
+                    settings.cleanSearch(a.textArabic),
+                    settings.cleanSearch(a.textCleanArabic),
+                    settings.cleanSearch(a.textTransliteration),
+                    settings.cleanSearch(a.textEnglishSaheeh),
+                    settings.cleanSearch(a.textEnglishMustafa),
+                    settings.cleanSearch(String(a.id)),
+                    settings.cleanSearch(a.idArabic)
+                ]
+                .joined(separator: " ")
+
                 if let booleanGroups {
                     if booleanGroups.isEmpty { return false }
-                    return matchesBooleanAyahSearch(ayah: a, haystack: blob, groups: booleanGroups)
+                    return matchesBooleanAyahSearch(ayah: a, haystack: fallbackBlob, groups: booleanGroups)
                 }
-                return blob.contains(cleanQuery)
+
+                return fallbackBlob.contains(cleanQuery)
             }
-
-            let fallbackBlob = [
-                settings.cleanSearch(a.textArabic),
-                settings.cleanSearch(a.textCleanArabic),
-                settings.cleanSearch(a.textTransliteration),
-                settings.cleanSearch(a.textEnglishSaheeh),
-                settings.cleanSearch(a.textEnglishMustafa),
-                settings.cleanSearch(String(a.id)),
-                settings.cleanSearch(a.idArabic)
-            ]
-            .joined(separator: " ")
-
-            if let booleanGroups {
-                if booleanGroups.isEmpty { return false }
-                return matchesBooleanAyahSearch(ayah: a, haystack: fallbackBlob, groups: booleanGroups)
-            }
-
-            return fallbackBlob.contains(cleanQuery)
-        }
+        }()
         let boundaryModel = showBoundaryDividers ? quranData.boundaryModel(forSurah: surah.id) : nil
         let trailingSearchBoundaryDivider: BoundaryDividerModel? = {
             guard showBoundaryDividers, isPageOrJuzSearch, !isDividerKeywordSearch else { return nil }
@@ -944,15 +1011,8 @@ struct SurahView: View {
         }()
         let searchCount = isDividerKeywordSearch ? keywordDividerModels.count : filteredAyahs.count
         let syncVisibleAyahAnchor: () -> Void = {
-            guard shouldUpdateFloatingPageJuzOverlay else { return }
-
-            let nextVisibleAyahID: Int?
-            if let topVisibleAyahID = (visibleAyahIDs.union(visibleBoundaryAyahIDs)).min() {
-                nextVisibleAyahID = topVisibleAyahID
-            } else if let sel = ayah, ayahByID[sel] != nil {
-                nextVisibleAyahID = sel
-            } else {
-                nextVisibleAyahID = ayahsForQiraah.first?.id
+            guard let nextVisibleAyahID = (visibleAyahIDs.union(visibleBoundaryAyahIDs)).min() else {
+                return
             }
 
             guard nextVisibleAyahID != firstVisibleAyahID else { return }
@@ -962,6 +1022,7 @@ struct SurahView: View {
         return
             List {
                 khatmProgressSection()
+                qiraahNoticeSection()
 
                 Section {
                     /*SurahRow(surah: surah, hideInfo: true).equatable()
@@ -1112,16 +1173,12 @@ struct SurahView: View {
                         }
                         .id(ayah.id)
                         .onAppear {
-                            if shouldUpdateFloatingPageJuzOverlay {
-                                visibleAyahIDs.insert(ayah.id)
-                            }
+                            visibleAyahIDs.insert(ayah.id)
                             markKhatmViewedIfNeeded(ayah.id)
                             syncVisibleAyahAnchor()
                         }
                         .onDisappear {
-                            if shouldUpdateFloatingPageJuzOverlay {
-                                visibleAyahIDs.remove(ayah.id)
-                            }
+                            visibleAyahIDs.remove(ayah.id)
                             syncVisibleAyahAnchor()
                         }
                         #if os(watchOS)
@@ -1181,15 +1238,19 @@ struct SurahView: View {
             #endif
             .onAppear {
                 rebuildQiraahCaches()
-                visibleAyahIDs.removeAll()
-                visibleBoundaryAyahIDs.removeAll()
-                if let sel = ayah, ayahByID[sel] != nil {
+                let restoreTarget = rememberedVisibleAyahID()
+                if let restoreTarget {
+                    firstVisibleAyahID = restoreTarget
+                } else if let sel = ayah, ayahByID[sel] != nil {
                     firstVisibleAyahID = sel
                 } else if firstVisibleAyahID == nil {
                     firstVisibleAyahID = ayahsForQiraah.first?.id
                 }
 
-                if let sel = ayah, !didScrollDown {
+                if let restoreTarget, !didScrollDown {
+                    didScrollDown = true
+                    scrollToAyah(restoreTarget, proxy: proxy)
+                } else if let sel = ayah, !didScrollDown {
                     didScrollDown = true
                     scrollToAyah(sel, proxy: proxy)
                 }
@@ -1250,6 +1311,35 @@ struct SurahView: View {
             .adaptiveSafeArea(edge: .bottom) {
                 bottomInsetContent(proxy: proxy)
             }
+            .confirmationDialog("Convert Qiraah to Hafs an Asim?", isPresented: $confirmConvertQiraahToHafs, titleVisibility: .visible) {
+                Button("Yes") {
+                    settings.hapticFeedback()
+                    withAnimation(.easeInOut) {
+                        settings.displayQiraah = Settings.Riwayah.hafsTag
+                    }
+                }
+
+                Button("No") {
+                    settings.hapticFeedback()
+                }
+            } message: {
+                Text("Are you sure? This will convert the qiraah back to Hafs an Asim.")
+            }
+            #else
+            .confirmationDialog("Convert Qiraah to Hafs an Asim?", isPresented: $confirmConvertQiraahToHafs, titleVisibility: .visible) {
+                Button("Yes") {
+                    settings.hapticFeedback()
+                    withAnimation(.easeInOut) {
+                        settings.displayQiraah = Settings.Riwayah.hafsTag
+                    }
+                }
+
+                Button("No") {
+                    settings.hapticFeedback()
+                }
+            } message: {
+                Text("Are you sure? This will convert the qiraah back to Hafs an Asim.")
+            }
             #endif
     }
 
@@ -1258,6 +1348,8 @@ struct SurahView: View {
         if shouldShowKhatmProgress {
             Section {
                 VStack(alignment: .leading, spacing: 10) {
+                    Color.clear.frame(height: 0).onAppear { computeKhatmOverviewIfNeeded(force: false) }
+
                     HStack(alignment: .firstTextBaseline) {
                         Label("\(khatmCompletedAyahCount)/\(surah.numberOfAyahs) ayahs", systemImage: khatmCompletedAyahCount >= surah.numberOfAyahs ? "checkmark.circle.fill" : "circle.dashed")
                             .font(.subheadline.weight(.semibold))
@@ -1272,13 +1364,91 @@ struct SurahView: View {
 
                     ProgressView(value: Double(khatmCompletedAyahCount), total: Double(max(surah.numberOfAyahs, 1)))
                         .tint(settings.accentColor.color)
+                    
+                    HStack {
+                        Text("Overall: \(khatmOverviewPercent)% completed")
+                            .font(.subheadline)
+                            .foregroundStyle(settings.accentColor.color)
+                        Spacer()
+                    }
                 }
                 .padding(.vertical, 4)
             } header: {
                 Text("KHATM PROGRESS")
             }
+            .onReceive(settings.objectWillChange) { _ in computeKhatmOverviewIfNeeded(force: false) }
         }
     }
+
+    @ViewBuilder
+    private func qiraahNoticeSection() -> some View {
+        if !settings.isHafsDisplay {
+            let option = Settings.Riwayah.option(for: settings.displayQiraah)
+            Section {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(alignment: .center, spacing: 12) {
+                        Image(systemName: "character.book.closed.fill.ar")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(settings.accentColor.color)
+                            .frame(width: 34, height: 34)
+                            .background(settings.accentColor.color.opacity(0.12), in: Circle())
+                        
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("Current Riwayah")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                            
+                            HStack {
+                                Text(option.label)
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(.primary)
+                                
+                                Text(option.arabic)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(2)
+                                    .minimumScaleFactor(0.8)
+                            }
+                        }
+                        
+                        Spacer(minLength: 0)
+                    }
+                    
+                    Button {
+                        settings.hapticFeedback()
+                        confirmConvertQiraahToHafs = true
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: "arrow.uturn.backward")
+                            Text("Use Default Hafs an Asim")
+                            Spacer(minLength: 0)
+                            Image(systemName: "chevron.right")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                        }
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(settings.accentColor.color)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 10)
+                        .background(settings.accentColor.color.opacity(0.11), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.vertical, 6)
+            }
+        }
+    }
+
+    private func computeKhatmOverviewIfNeeded(force: Bool = false) {
+        let totalCompleted = settings.khatmTotalCompleted(in: quranData.quran)
+        guard force || totalCompleted != khatmOverviewLastSignature else { return }
+        khatmOverviewLastSignature = totalCompleted
+
+        let totalAyahs = quranData.quran.reduce(0) { $0 + $1.numberOfAyahs }
+        khatmOverviewPercent = totalAyahs > 0 ? Int((Double(totalCompleted) / Double(totalAyahs) * 100).rounded()) : 0
+    }
+
+    
 
     private func floatingHeaderOverlay(
         floatingDividerModel: BoundaryDividerModel?,
@@ -1616,7 +1786,6 @@ struct SurahView: View {
         if let targetID = selectedSurahNavigation,
            let targetSurah = quranData.surah(targetID) {
             SurahView(surah: targetSurah)
-                .id("ayahs-selected-\(targetSurah.id)")
         } else {
             EmptyView()
         }
@@ -1635,15 +1804,14 @@ struct SurahView: View {
             ?? cachedAyahsForQiraah.first?.id
 
         guard let targetAyah else { return }
+        rememberVisibleAyahID(targetAyah)
 
         if settings.lastReadSurah == surah.id, settings.lastReadAyah == targetAyah {
             return
         }
 
-        withAnimation {
-            settings.lastReadSurah = surah.id
-            settings.lastReadAyah = targetAyah
-        }
+        settings.lastReadSurah = surah.id
+        settings.lastReadAyah = targetAyah
     }
 
     private func neighboringSurah(before currentSurahID: Int) -> Surah? {

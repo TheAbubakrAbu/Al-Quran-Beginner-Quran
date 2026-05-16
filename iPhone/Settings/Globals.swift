@@ -24,6 +24,52 @@ enum AppIdentifiers {
     static let reciterDownloadDedupeQueueLabel = "\(bundleIdentifier).reciter-dedupe"
 }
 
+enum AppPerformance {
+    static var isLowMemoryDevice: Bool {
+        ProcessInfo.processInfo.physicalMemory < 3_000_000_000
+    }
+
+    static var shouldAvoidBroadPrewarm: Bool {
+        #if os(watchOS)
+        true
+        #else
+        isLowMemoryDevice
+        #endif
+    }
+
+    static var ayahRowCacheLimit: Int {
+        #if os(watchOS)
+        900
+        #else
+        isLowMemoryDevice ? 1800 : 5000
+        #endif
+    }
+
+    static var preparedSurahCacheLimit: Int {
+        #if os(watchOS)
+        24
+        #else
+        isLowMemoryDevice ? 60 : 160
+        #endif
+    }
+
+    static var tajweedAttributedCacheLimit: Int {
+        #if os(watchOS)
+        180
+        #else
+        isLowMemoryDevice ? 700 : 1800
+        #endif
+    }
+
+    static var prewarmArabicAyahLimit: Int? {
+        #if os(watchOS)
+        20
+        #else
+        isLowMemoryDevice ? 32 : nil
+        #endif
+    }
+}
+
 enum AccentColor: String, CaseIterable, Identifiable {
     var id: String { self.rawValue }
 
@@ -74,7 +120,7 @@ private let quranStripScalars: Set<UnicodeScalar> = {
     // Quranic annotation signs  U+06D6…U+06ED
     for v in 0x06D6...0x06ED { if let u = UnicodeScalar(v) { s.insert(u) } }
 
-    // Extras: short alif, madda, open ta-marbuta, dagger alif
+    // Extras: short alif, madda, open taa marbuutah, dagger alif
     [0x0670, 0x0657, 0x0674, 0x0656].forEach { v in
         if let u = UnicodeScalar(v) { s.insert(u) }
     }
@@ -129,11 +175,59 @@ extension String {
         }
         return String(out)
     }
-    
+
     var removingArabicSukoon: String {
         String(unicodeScalars.filter { $0.value != 0x0652 })
     }
-    
+
+    var removingSilentArabicLettersForSearch: String {
+        var out = ""
+        out.reserveCapacity(count)
+
+        for cluster in self {
+            let scalars = Array(String(cluster).unicodeScalars)
+            guard let base = scalars.first(where: { (0x0621...0x064A).contains($0.value) || $0.value == 0x0671 }) else {
+                out.append(cluster)
+                continue
+            }
+
+            if base.value == 0x0671 {
+                continue
+            }
+
+            let hasStandardSukoon = scalars.contains { $0.value == 0x0652 }
+            let hasDaggerAlif = scalars.contains { $0.value == 0x0670 }
+            let hasShadda = scalars.contains { $0.value == 0x0651 }
+            let hasUthmaniSukoon = scalars.contains { $0.value == 0x06E1 }
+            let hasArabicVowel = scalars.contains {
+                $0.value == 0x064E || $0.value == 0x064F || $0.value == 0x0650 ||
+                $0.value == 0x064B || $0.value == 0x064C || $0.value == 0x064D ||
+                $0.value == 0x0656 || $0.value == 0x0657 || $0.value == 0x065A
+            }
+
+            switch base.value {
+            case 0x0627, 0x0648, 0x064A, 0x0649:
+                if hasStandardSukoon && !hasUthmaniSukoon {
+                    continue
+                }
+            case 0x0644:
+                if hasStandardSukoon {
+                    continue
+                }
+            default:
+                break
+            }
+
+            if base.value == 0x0648, hasDaggerAlif, !hasArabicVowel, !hasShadda, !hasStandardSukoon, !hasUthmaniSukoon {
+                continue
+            }
+
+            out.append(cluster)
+        }
+
+        return out
+    }
+
     var removingArabicDots: String {
         let dotlessMap: [Character: Character] = [
             "أ": "ا", "إ": "ا", "ؤ": "ء", "ئ": "ء",

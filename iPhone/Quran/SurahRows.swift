@@ -65,6 +65,21 @@ struct SurahRow: View, Equatable {
         "\(surah.numberOfAyahs) Ayahs \(revelationEmoji)"
     }
 
+    private var sortedMetricLine: String? {
+        switch settings.quranSortMode {
+        case .ayahs:
+            return surah.ayahCountLabel(for: settings.displayQiraahForArabic)
+        case .page:
+            return pageCountLabel
+        case .words:
+            return "Words: \(surah.wordCount)"
+        case .letters:
+            return "Letters: \(surah.letterCount)"
+        default:
+            return nil
+        }
+    }
+
     private var pageLine: String {
         "Page \(startPageNumber) • \(pageCountLabel)"
     }
@@ -175,8 +190,19 @@ struct SurahRow: View, Equatable {
                     Text(pageLine)
                         .font(.caption2)
                         .foregroundColor(.secondary)
-                    
+
                     Text(ayahAndRevelationLine)
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+
+                    if let sortedMetricLine,
+                       settings.quranSortMode == .words || settings.quranSortMode == .letters {
+                        Text(sortedMetricLine)
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                } else if let sortedMetricLine {
+                    Text(sortedMetricLine)
                         .font(.caption2)
                         .foregroundColor(.secondary)
                 }
@@ -184,6 +210,7 @@ struct SurahRow: View, Equatable {
                 khatmProgressLine
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            .lineLimit(1)
 
             HStack {
                 HighlightedSnippet(
@@ -266,7 +293,7 @@ struct SurahAyahRow: View {
     private func arabicDisplayText() -> String {
         let clean = settings.cleanArabicText
         let text = ayah.displayArabicText(surahId: surah.id, clean: clean)
-        return settings.beginnerMode ? text.map { "\($0) " }.joined() : text
+        return settings.beginnerMode ? text.map { String($0) }.joined(separator: " ") : text
     }
 
     private var shouldShowTajweedColors: Bool {
@@ -280,7 +307,7 @@ struct SurahAyahRow: View {
         guard shouldShowTajweedColors else { return nil }
         let text = ayah.displayArabicText(surahId: surah.id, clean: false)
         let displayText = settings.cleanArabicText ? ayah.displayArabicText(surahId: surah.id, clean: true) : text
-        let renderedDisplayText = settings.beginnerMode ? displayText.map { "\($0) " }.joined() : displayText
+        let renderedDisplayText = settings.beginnerMode ? displayText.map { String($0) }.joined(separator: " ") : displayText
         return TajweedStore.shared.attributedText(
             surah: surah.id,
             ayah: ayah.id,
@@ -908,6 +935,7 @@ struct AyahSearchResultRow: View {
         .rightSwipeActions(
             surahID: surah.id,
             surahName: surah.nameTransliteration,
+            ayahID: ayah.id,
             searchText: $searchText,
             scrollToSurahID: $scrollToSurahID
         )
@@ -1068,13 +1096,17 @@ struct AyahSearchRow: View, Equatable {
         settings.quranArabicFontName(for: settings.displayQiraahForArabic)
     }
 
+    private func arabicDisplayText() -> String {
+        settings.beginnerMode ? arabic.map { String($0) }.joined(separator: " ") : arabic
+    }
+
     private func arabicTajweedText() -> AttributedString? {
         guard shouldShowTajweedColors else { return nil }
         return TajweedStore.shared.attributedText(
             surah: surah,
             ayah: ayah,
             text: arabic,
-            displayText: arabic,
+            displayText: arabicDisplayText(),
             cleanDisplayText: settings.cleanArabicText,
             beginnerSpacing: settings.beginnerMode
         )
@@ -1155,7 +1187,7 @@ struct AyahSearchRow: View, Equatable {
 
                 if visibility.showArabicLine {
                     HighlightedSnippet(
-                        source: arabic,
+                        source: arabicDisplayText(),
                         term: visibility.mArabic ? query : "",
                         font: .custom(searchArabicFontName, size: UIFont.preferredFont(forTextStyle: .body).pointSize),
                         accent: settings.accentColor.color,
@@ -1227,7 +1259,7 @@ struct AyahSearchRow: View, Equatable {
 
             if visibility.showArabicLine {
                 HighlightedSnippet(
-                    source: arabic,
+                    source: arabicDisplayText(),
                     term: visibility.mArabic ? query : "",
                     font: .custom(searchArabicFontName, size: UIFont.preferredFont(forTextStyle: .body).pointSize),
                     accent: settings.accentColor.color,

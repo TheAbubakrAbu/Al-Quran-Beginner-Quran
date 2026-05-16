@@ -11,11 +11,70 @@ extension Settings {
     enum QuranSortMode: String, CaseIterable, Identifiable {
         case surah
         case juz
-        case page
         case revelation
         case khatm
+        case page
+        case ayahs
+        case sajdah
+        case muqattaat
+        case words
+        case letters
 
         var id: String { rawValue }
+
+        var title: String {
+            switch self {
+            case .surah: return "Surah"
+            case .ayahs: return "Ayahs"
+            case .juz: return "Juz"
+            case .page: return "Pages"
+            case .revelation: return "Revelation"
+            case .khatm: return "Khatm"
+            case .sajdah: return "Sajdahs"
+            case .muqattaat: return "Broken Letters"
+            case .words: return "Words"
+            case .letters: return "Letters"
+            }
+        }
+
+        var systemImage: String {
+            switch self {
+            case .surah: return "list.number"
+            case .ayahs: return "number"
+            case .juz: return "square.grid.3x3"
+            case .page: return "doc.text"
+            case .revelation: return "sparkles"
+            case .khatm: return "checkmark.seal"
+            case .sajdah: return "moon.stars.fill"
+            case .muqattaat: return "character.book.closed.fill.ar"
+            case .words: return "textformat.abc"
+            case .letters: return "textformat"
+            }
+        }
+    }
+
+    enum QuranSortDirection: String, CaseIterable, Identifiable {
+        case surahOrder = "surah"
+        case ascending
+        case descending
+
+        var id: String { rawValue }
+
+        var title: String {
+            switch self {
+            case .surahOrder: return "Surah"
+            case .ascending: return "Asc"
+            case .descending: return "Desc"
+            }
+        }
+
+        var accessibilityTitle: String {
+            switch self {
+            case .surahOrder: return "Surah order"
+            case .ascending: return "Ascending"
+            case .descending: return "Descending"
+            }
+        }
     }
 
     enum Riwayah {
@@ -351,10 +410,12 @@ extension Settings {
     }
 
     func isKhatmAyahComplete(surah: Int, ayah: Int) -> Bool {
-        khatmCompletedAyahSetCache.contains(khatmKey(surah: surah, ayah: ayah))
+        guard isHafsDisplay else { return false }
+        return khatmCompletedAyahSetCache.contains(khatmKey(surah: surah, ayah: ayah))
     }
 
     func markKhatmAyahComplete(surah: Int, ayah: Int) {
+        guard isHafsDisplay else { return }
         let key = khatmKey(surah: surah, ayah: ayah)
         guard khatmCompletedAyahSetCache.insert(key).inserted else { return }
         khatmCompletedSurahCountsCache[surah, default: 0] += 1
@@ -362,7 +423,8 @@ extension Settings {
     }
 
     func khatmCompletedCount(for surah: Surah) -> Int {
-        min(khatmCompletedSurahCountsCache[surah.id, default: 0], surah.numberOfAyahs)
+        guard isHafsDisplay else { return 0 }
+        return min(khatmCompletedSurahCountsCache[surah.id, default: 0], surah.numberOfAyahs)
     }
 
     func resetKhatmProgress(for surah: Surah) {
@@ -381,7 +443,8 @@ extension Settings {
     }
 
     func khatmTotalCompleted(in surahs: [Surah]) -> Int {
-        khatmCompletedAyahSetCache.count
+        guard isHafsDisplay else { return 0 }
+        return khatmCompletedAyahSetCache.count
     }
 
     static let bookmarkNoteRemovalDialogTitle = "Remove bookmark and delete note?"

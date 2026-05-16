@@ -90,6 +90,45 @@ final class Settings: ObservableObject {
         }
     }
 
+    // Saved user flags: sajdah ayahs and broken-letter (muqatta'at) ayahs.
+    @AppStorage("savedSajdahAyahIDsData") private var savedSajdahAyahIDsData = Data()
+    var savedSajdahAyahIDs: Set<String> {
+        get {
+            (try? Self.decoder.decode([String].self, from: savedSajdahAyahIDsData)) .flatMap { Set($0) } ?? Set()
+        }
+        set {
+            let arr = Array(newValue)
+            savedSajdahAyahIDsData = (try? Self.encoder.encode(arr)) ?? Data()
+            objectWillChange.send()
+        }
+    }
+
+    @AppStorage("savedBrokenLetterAyahIDsData") private var savedBrokenLetterAyahIDsData = Data()
+    var savedBrokenLetterAyahIDs: Set<String> {
+        get {
+            (try? Self.decoder.decode([String].self, from: savedBrokenLetterAyahIDsData)) .flatMap { Set($0) } ?? Set()
+        }
+        set {
+            let arr = Array(newValue)
+            savedBrokenLetterAyahIDsData = (try? Self.encoder.encode(arr)) ?? Data()
+            objectWillChange.send()
+        }
+    }
+
+    func toggleSavedSajdah(surah: Int, ayah: Int) {
+        let key = "\(surah)-\(ayah)"
+        var s = savedSajdahAyahIDs
+        if s.contains(key) { s.remove(key) } else { s.insert(key) }
+        savedSajdahAyahIDs = s
+    }
+
+    func toggleSavedBrokenLetter(surah: Int, ayah: Int) {
+        let key = "\(surah)-\(ayah)"
+        var s = savedBrokenLetterAyahIDs
+        if s.contains(key) { s.remove(key) } else { s.insert(key) }
+        savedBrokenLetterAyahIDs = s
+    }
+
     @AppStorage("reciteType") var reciteType: String = "Continue to Next"
 
     @AppStorage("favoriteSurahsData") private var favoriteSurahsData = Data()
@@ -136,14 +175,21 @@ final class Settings: ObservableObject {
     @AppStorage("beginnerMode") var beginnerMode: Bool = false
 
     @AppStorage("quranSortMode") var quranSortModeRaw: String = QuranSortMode.surah.rawValue
+    @AppStorage("quranSortDirection") var quranSortDirectionRaw: String = QuranSortDirection.ascending.rawValue
 
     var quranSortMode: QuranSortMode {
         get { QuranSortMode(rawValue: quranSortModeRaw) ?? .surah }
         set { quranSortModeRaw = newValue.rawValue }
     }
 
+    var quranSortDirection: QuranSortDirection {
+        get { QuranSortDirection(rawValue: quranSortDirectionRaw) ?? .ascending }
+        set { quranSortDirectionRaw = newValue.rawValue }
+    }
+
     var groupBySurah: Bool { quranSortMode == .surah }
     @AppStorage("searchForSurahs") var searchForSurahs: Bool = true
+    @AppStorage("ignoreSilentLettersInQuranSearch") var ignoreSilentLettersInQuranSearch: Bool = false
 
     @AppStorage("lastReadSurah") var lastReadSurah: Int = 0
     @AppStorage("lastReadAyah") var lastReadAyah: Int = 0
@@ -171,7 +217,6 @@ final class Settings: ObservableObject {
             }
         }
     }
-
 
     /// Which qiraah/riwayah to show for Arabic text. Empty or "Hafs" = Hafs an Asim (default). Transliteration and translations only apply to Hafs.
     @AppStorage("displayQiraah") var displayQiraah: String = ""
@@ -316,6 +361,10 @@ final class Settings: ObservableObject {
 
         return cleaned
     }
+
+    func cleanSearchIgnoringSilentArabicLetters(_ text: String, whitespace: Bool = false) -> String {
+        cleanSearch(text.removingSilentArabicLettersForSearch, whitespace: whitespace)
+    }
     
     private func normalizedArabicForSearch(_ text: String) -> String {
         Self.canonicalArabicSearchMap.reduce(text) { partial, pair in
@@ -345,7 +394,7 @@ final class Settings: ObservableObject {
         "ۥ": "و",
         // Ya variants
         "ۦ": "ي",
-        "ى": "ي", // alif maqsurah -> ya
+        "ى": "ا", // alif maqsurah -> alif (matches both ى and ا forms in search)
         // Teh marbuta equivalence (broad)
         "ة": "ه"
     ]

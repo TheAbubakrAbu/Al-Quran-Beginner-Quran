@@ -49,7 +49,41 @@ struct HighlightedSnippet: View {
     }
 
     private static let englishHighlightStripSet: CharacterSet = {
-        CharacterSet.punctuationCharacters.union(.symbols)
+        CharacterSet.punctuationCharacters.union(.symbols).union(.nonBaseCharacters)
+    }()
+
+    // MARK: - Caches
+
+    private final class SourceNormEntry: NSObject {
+        let normalizedSource: String
+        let indexMap: [String.Index]
+        init(_ n: String, _ i: [String.Index]) { normalizedSource = n; indexMap = i }
+    }
+
+    private final class RangeEntry: NSObject {
+        let ranges: [Range<String.Index>]
+        init(_ r: [Range<String.Index>]) { ranges = r }
+    }
+
+    /// source → (normalizedSource, indexMap): amortises the O(n×k) per-character normalization.
+    private static let sourceNormCache: NSCache<NSString, SourceNormEntry> = {
+        let c = NSCache<NSString, SourceNormEntry>()
+        c.countLimit = 7_000
+        return c
+    }()
+
+    /// "source\0normalizedTerm" → matched ranges in original source: amortises the range search.
+    private static let matchRangeCache: NSCache<NSString, RangeEntry> = {
+        let c = NSCache<NSString, RangeEntry>()
+        c.countLimit = 10_000
+        return c
+    }()
+
+    /// source → Allah highlight ranges: amortises the O(n) per-render Allah scan.
+    private static let allahRangeCache: NSCache<NSString, RangeEntry> = {
+        let c = NSCache<NSString, RangeEntry>()
+        c.countLimit = 7_000
+        return c
     }()
 
     private func normalizeEnglishForHighlight(_ text: String, trimWhitespace: Bool) -> String {
@@ -90,32 +124,141 @@ struct HighlightedSnippet: View {
         var attributed = baseAttributed
 
         let normalizedTerm = normalizeForSearch(term, trimWhitespace: true)
+        guard !normalizedTerm.isEmpty else { return attributed }
 
-        guard !normalizedTerm.isEmpty else {
-            return attributed
+        // --- Step 1: normalizedSource + indexMap, cached per source string ---
+        let sourceKey = source as NSString
+        let normEntry: SourceNormEntry
+        if let cached = Self.sourceNormCache.object(forKey: sourceKey) {
+            normEntry = cached
+        } else {
+            let ns = normalizeForSearch(source, trimWhitespace: false)
+            let im = normalizedIndexMap(in: source, normalizedSource: ns)
+            normEntry = SourceNormEntry(ns, im)
+            Self.sourceNormCache.setObject(normEntry, forKey: sourceKey)
         }
 
-        let normalizedSource = normalizeForSearch(source, trimWhitespace: false)
-        let indexMap = normalizedIndexMap(in: source, normalizedSource: normalizedSource)
-        var searchStart = normalizedSource.startIndex
+        // --- Step 2: matched ranges in original source, cached per (source, normalizedTerm) ---
+        let matchKey = "\(source)\u{0000}\(normalizedTerm)" as NSString
+        let matchedRanges: [Range<String.Index>]
+        if let cached = Self.matchRangeCache.object(forKey: matchKey) {
+            matchedRanges = cached.ranges
+        } else {
+            var ranges: [Range<String.Index>] = []
+            var searchStart = normEntry.normalizedSource.startIndex
+            while searchStart < normEntry.normalizedSource.endIndex,
+                  let matchRange = normEntry.normalizedSource.range(of: normalizedTerm, range: searchStart..<normEntry.normalizedSource.endIndex) {
+                if let orig = originalRange(
+                    in: source,
+                    normalizedSource: normEntry.normalizedSource,
+                    matchRange: matchRange,
+                    indexMap: normEntry.indexMap
+                ) {
+                    ranges.append(orig)
+                }
+                searchStart = matchRange.upperBound
+            }
+            if ranges.isEmpty, source.containsArabicLetters {
+                ranges = arabicPhrasePrefixRanges(
+                    in: source,
+                    normalizedSource: normEntry.normalizedSource,
+                    normalizedTerm: normalizedTerm,
+                    indexMap: normEntry.indexMap
+                )
+            }
+            Self.matchRangeCache.setObject(RangeEntry(ranges), forKey: matchKey)
+            matchedRanges = ranges
+        }
 
-        while searchStart < normalizedSource.endIndex,
-              let matchRange = normalizedSource.range(of: normalizedTerm, range: searchStart..<normalizedSource.endIndex) {
-            if let originalRange = originalRange(
-                in: source,
-                normalizedSource: normalizedSource,
-                matchRange: matchRange,
-                indexMap: indexMap
-            ),
-               let start = AttributedString.Index(originalRange.lowerBound, within: attributed),
-               let end = AttributedString.Index(originalRange.upperBound, within: attributed) {
+        // --- Step 3: apply accent colour to each matched range ---
+        for range in matchedRanges {
+            if let start = AttributedString.Index(range.lowerBound, within: attributed),
+               let end = AttributedString.Index(range.upperBound, within: attributed) {
                 attributed[start..<end].foregroundColor = accent
             }
-
-            searchStart = matchRange.upperBound
         }
 
         return attributed
+    }
+
+    private func arabicPhrasePrefixRanges(
+        in source: String,
+        normalizedSource: String,
+        normalizedTerm: String,
+        indexMap: [String.Index]
+    ) -> [Range<String.Index>] {
+        let queryTokens = normalizedTerm
+            .split(separator: " ")
+            .map(String.init)
+            .filter { !$0.isEmpty }
+        guard !queryTokens.isEmpty else { return [] }
+
+        let sourceTokens = normalizedTokenRanges(in: normalizedSource)
+        guard sourceTokens.count >= queryTokens.count else { return [] }
+
+        var ranges: [Range<String.Index>] = []
+        for start in 0...(sourceTokens.count - queryTokens.count) {
+            var matched = true
+
+            for offset in queryTokens.indices {
+                let tokenRange = sourceTokens[start + offset]
+                let sourceToken = String(normalizedSource[tokenRange])
+                let queryToken = queryTokens[offset]
+
+                if offset == queryTokens.count - 1 {
+                    if !sourceToken.hasPrefix(queryToken) {
+                        matched = false
+                        break
+                    }
+                } else if sourceToken != queryToken {
+                    matched = false
+                    break
+                }
+            }
+
+            guard matched else { continue }
+
+            let lower = sourceTokens[start].lowerBound
+            let lastTokenRange = sourceTokens[start + queryTokens.count - 1]
+            let lastToken = String(normalizedSource[lastTokenRange])
+            let upper: String.Index
+            if lastToken == queryTokens.last {
+                upper = lastTokenRange.upperBound
+            } else {
+                upper = normalizedSource.index(lastTokenRange.lowerBound, offsetBy: queryTokens.last?.count ?? 0)
+            }
+
+            if let orig = originalRange(
+                in: source,
+                normalizedSource: normalizedSource,
+                matchRange: lower..<upper,
+                indexMap: indexMap
+            ) {
+                ranges.append(orig)
+            }
+        }
+
+        return ranges
+    }
+
+    private func normalizedTokenRanges(in text: String) -> [Range<String.Index>] {
+        var ranges: [Range<String.Index>] = []
+        var cursor = text.startIndex
+
+        while cursor < text.endIndex {
+            while cursor < text.endIndex, text[cursor].isWhitespace {
+                cursor = text.index(after: cursor)
+            }
+            guard cursor < text.endIndex else { break }
+
+            let start = cursor
+            while cursor < text.endIndex, !text[cursor].isWhitespace {
+                cursor = text.index(after: cursor)
+            }
+            ranges.append(start..<cursor)
+        }
+
+        return ranges
     }
 
     private func highlightAllahIfNeeded(source: String, baseAttributed: AttributedString) -> AttributedString {
@@ -151,11 +294,25 @@ struct HighlightedSnippet: View {
     }
 
     private func highlightArabicAllah(source: String, attributed: inout AttributedString) {
-        for start in source.indices {
-            if let range = arabicAllahRange(startingAt: start, in: source),
-               let attributedStart = AttributedString.Index(range.lowerBound, within: attributed),
-               let attributedEnd = AttributedString.Index(range.upperBound, within: attributed) {
-                attributed[attributedStart..<attributedEnd].foregroundColor = .red
+        let cacheKey = source as NSString
+        let ranges: [Range<String.Index>]
+        if let cached = Self.allahRangeCache.object(forKey: cacheKey) {
+            ranges = cached.ranges
+        } else {
+            var found: [Range<String.Index>] = []
+            for start in source.indices {
+                if let range = arabicAllahRange(startingAt: start, in: source) {
+                    found.append(range)
+                }
+            }
+            Self.allahRangeCache.setObject(RangeEntry(found), forKey: cacheKey)
+            ranges = found
+        }
+
+        for range in ranges {
+            if let start = AttributedString.Index(range.lowerBound, within: attributed),
+               let end = AttributedString.Index(range.upperBound, within: attributed) {
+                attributed[start..<end].foregroundColor = .red
             }
         }
     }
@@ -195,7 +352,7 @@ struct HighlightedSnippet: View {
 
     private func rangeUpperBound(afterBaseAt index: String.Index, in source: String) -> String.Index {
         var cursor = source.index(after: index)
-        while cursor < source.endIndex, source[cursor].isArabicMark {
+        while cursor < source.endIndex, source[cursor].isArabicAllahHighlightMark {
             cursor = source.index(after: cursor)
         }
         return cursor
@@ -267,6 +424,10 @@ private extension Character {
     var isArabicMark: Bool {
         unicodeScalars.allSatisfy(\.isArabicMarkScalar)
     }
+
+    var isArabicAllahHighlightMark: Bool {
+        unicodeScalars.allSatisfy(\.isArabicAllahHighlightMarkScalar)
+    }
 }
 
 private extension UnicodeScalar {
@@ -276,6 +437,17 @@ private extension UnicodeScalar {
              0x064B...0x065F,
              0x0670,
              0x06D6...0x06ED:
+            return true
+        default:
+            return false
+        }
+    }
+
+    var isArabicAllahHighlightMarkScalar: Bool {
+        switch value {
+        case 0x0610...0x061A,
+             0x064B...0x065F,
+             0x0670:
             return true
         default:
             return false

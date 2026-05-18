@@ -276,6 +276,10 @@ final class Settings: ObservableObject {
     @AppStorage("showTransliteration") var showTransliteration: Bool = false
     @AppStorage("showEnglishSaheeh") var showEnglishSaheeh: Bool = true
     @AppStorage("showEnglishMustafa") var showEnglishMustafa: Bool = false
+    @AppStorage("copyAyahArabic") var copyAyahArabic: Bool = true
+    @AppStorage("copyAyahTransliteration") var copyAyahTransliteration: Bool = false
+    @AppStorage("copyAyahEnglishSaheeh") var copyAyahEnglishSaheeh: Bool = false
+    @AppStorage("copyAyahEnglishMustafa") var copyAyahEnglishMustafa: Bool = false
     @AppStorage("showPageJuzDividers") var showPageJuzDividers: Bool = true
     @AppStorage("showPageJuzOverlay") var showPageJuzOverlay: Bool = false
     @AppStorage("showFullSurahRow") var showFullSurahRow: Bool = false

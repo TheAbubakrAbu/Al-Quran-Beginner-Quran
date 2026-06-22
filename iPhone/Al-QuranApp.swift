@@ -12,7 +12,12 @@ struct AlQuranApp: App {
     @Environment(\.scenePhase) private var scenePhase
 
     @State private var isLaunching = true
-    
+
+    init() {
+        // Activate WatchConnectivity so settings sync (and watch app-installed detection) work both ways.
+        _ = WatchConnectivityManager.shared
+    }
+
     private enum RootStage: Equatable {
         case launch
         case splash
@@ -40,15 +45,21 @@ struct AlQuranApp: App {
                 .accentColor(settings.accentColor.color)
                 .tint(settings.accentColor.color)
                 .preferredColorScheme(settings.colorScheme)
-                .animation(.easeInOut, value: settings.firstLaunch)
-                .animation(.easeInOut, value: isLaunching)
                 .appReviewPrompt()
         }
         .onChange(of: settings.accentColor) { _ in
             WidgetCenter.shared.reloadAllTimelines()
         }
-        .onChange(of: scenePhase) { _ in
+        .onChange(of: scenePhase) { phase in
             quranPlayer.saveLastListenedSurah()
+            quranPlayer.saveLastListenedAyah()
+            settings.refreshQuranWidgets()
+            if phase == .active {
+            } else {
+                // Send any just-made setting change before the app is suspended, so it can't be lost (and
+                // can't be reverted by a stale synced value on the next launch).
+                WatchConnectivityManager.shared.flushPendingSync()
+            }
         }
     }
 
@@ -80,51 +91,68 @@ struct AlQuranApp: App {
 private struct MainTabView: View {
     @EnvironmentObject private var quranPlayer: QuranPlayer
 
+    private enum AppTab: Hashable { case adhan, quran, islam, settings }
+    @State private var selectedTab: AppTab = .adhan
+
     var body: some View {
-        TabView {
-            QuranView()
-                .tabItem {
-                    Image(systemName: "character.book.closed.ar")
-                    Text("Quran")
-                }
-
-            IslamView()
-                .withNowPlayingInset()
-                .tabItem {
-                    Image(systemName: "moon.stars")
-                    Text("Tools")
-                }
-
-            SettingsView()
-                .withNowPlayingInset()
-                .tabItem {
-                    Image(systemName: "gearshape")
-                    Text("Settings")
-                }
-        }
-    }
-}
-
-private struct NowPlayingInsetModifier: ViewModifier {
-    @EnvironmentObject private var quranPlayer: QuranPlayer
-
-    func body(content: Content) -> some View {
-        content.safeAreaInset(edge: .bottom) {
-            VStack(spacing: SafeAreaInsetVStackSpacing.standard) {
-                if quranPlayer.isPlaying || quranPlayer.isPaused {
-                    NowPlayingView()
+        tabs
+            // Single Now Playing bar for the whole app, applied once at the root so it persists across every
+            // screen — including pushed subviews — instead of each tab adding it. Suppressed on the Quran tab,
+            // which renders its own richer bar (scroll-to-surah, in-Quran navigation).
+            .safeAreaInset(edge: .bottom) {
+                if selectedTab != .quran,
+                   quranPlayer.isPlaying || quranPlayer.isPaused {
+                    VStack(spacing: SafeAreaInsetVStackSpacing.standard) {
+                        NowPlayingView()
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 8)
+                    .background(Color.white.opacity(0.00001))
+                    .animation(.easeInOut, value: quranPlayer.isPlaying || quranPlayer.isPaused)
                 }
             }
-            .padding(.horizontal, 24)
-            .padding(.bottom, 8)
-            .background(Color.white.opacity(0.00001))
-            .animation(.easeInOut, value: quranPlayer.isPlaying || quranPlayer.isPaused)
+    }
+
+    @ViewBuilder
+    private var tabs: some View {
+        if #available(iOS 18.0, *) {
+            TabView(selection: $selectedTab) {
+                Tab("Quran", systemImage: "character.book.closed.ar", value: AppTab.quran) {
+                    QuranView()
+                }
+
+                Tab("Islam", systemImage: "moon.stars", value: AppTab.islam) {
+                    IslamView()
+                }
+
+                Tab("Settings", systemImage: "gearshape", value: AppTab.settings) {
+                    SettingsView()
+                }
+            }
+        } else {
+            TabView(selection: $selectedTab) {
+                QuranView()
+                    .tabItem {
+                        Image(systemName: "character.book.closed.ar")
+                        Text("Quran")
+                    }
+                    .tag(AppTab.quran)
+
+                IslamView()
+                    .tabItem {
+                        Image(systemName: "moon.stars")
+                        Text("Islam")
+                    }
+                    .tag(AppTab.islam)
+
+                SettingsView()
+                    .tabItem {
+                        Image(systemName: "gearshape")
+                        Text("Settings")
+                    }
+                    .tag(AppTab.settings)
+            }
         }
     }
 }
 
-private extension View {
-    func withNowPlayingInset() -> some View {
-        modifier(NowPlayingInsetModifier())
-    }
-}

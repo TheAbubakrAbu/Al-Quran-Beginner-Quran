@@ -1,4 +1,6 @@
 import SwiftUI
+import Combine
+import WidgetKit
 import os
 
 let logger = Logger(subsystem: AppIdentifiers.bundleIdentifier, category: "Settings")
@@ -22,7 +24,10 @@ final class Settings: ObservableObject {
 
     private init() {
         self.accentColor = AccentColor(rawValue: appGroupUserDefaults?.string(forKey: "accentColor") ?? AppIdentifiers.mainColorString) ?? AppIdentifiers.mainColor
+        self.customAccentColorHex = appGroupUserDefaults?.string(forKey: "customAccentColorHex") ?? "34C759"
+        self.nowPlayingExpanded = appGroupUserDefaults?.bool(forKey: "nowPlayingExpanded") ?? false
         
+        loadKhatmProgressCacheFromStorage()
         runQuranStartupMigrations()
         isReadyForUI = true
     }
@@ -41,6 +46,22 @@ final class Settings: ObservableObject {
         didSet {
             guard Bundle.main.bundleIdentifier?.contains("Widget") != true else { return }
             appGroupUserDefaults?.setValue(accentColor.rawValue, forKey: "accentColor")
+        }
+    }
+
+    /// Hex ("RRGGBB") backing `AccentColor.custom`, set via the Appearance color picker.
+    @Published var customAccentColorHex: String {
+        didSet {
+            guard Bundle.main.bundleIdentifier?.contains("Widget") != true else { return }
+            appGroupUserDefaults?.setValue(customAccentColorHex, forKey: "customAccentColorHex")
+        }
+    }
+
+    /// Big vs. small in-app Now Playing player. A @Published (not @AppStorage) so `withAnimation` animates it.
+    @Published var nowPlayingExpanded: Bool {
+        didSet {
+            guard Bundle.main.bundleIdentifier?.contains("Widget") != true else { return }
+            appGroupUserDefaults?.setValue(nowPlayingExpanded, forKey: "nowPlayingExpanded")
         }
     }
 
@@ -115,20 +136,6 @@ final class Settings: ObservableObject {
         }
     }
 
-    func toggleSavedSajdah(surah: Int, ayah: Int) {
-        let key = "\(surah)-\(ayah)"
-        var s = savedSajdahAyahIDs
-        if s.contains(key) { s.remove(key) } else { s.insert(key) }
-        savedSajdahAyahIDs = s
-    }
-
-    func toggleSavedBrokenLetter(surah: Int, ayah: Int) {
-        let key = "\(surah)-\(ayah)"
-        var s = savedBrokenLetterAyahIDs
-        if s.contains(key) { s.remove(key) } else { s.insert(key) }
-        savedBrokenLetterAyahIDs = s
-    }
-
     @AppStorage("reciteType") var reciteType: String = "Continue to Next"
 
     @AppStorage("favoriteSurahsData") private var favoriteSurahsData = Data()
@@ -168,6 +175,11 @@ final class Settings: ObservableObject {
 
     @AppStorage("showBookmarks") var showBookmarks = true
     @AppStorage("showFavorites") var showFavorites = true
+    /// One master grid toggle (driven by the toolbar button) for every list on the Quran tab except the
+    /// summary: bookmarked ayahs, favorite surahs, and the surah / juz browse list.
+    @AppStorage("quranGridMode") var quranGridMode = false
+    /// Shows the spelled-out pronunciation aid above muqatta'at ayahs (e.g. أَلِفۡ لَآم مِيٓمۡ). Off by default.
+    @AppStorage("showMuqattaatHelper") var showMuqattaatHelper = false
 
     @AppStorage("shareShowAyahInformation") var showAyahInformation: Bool = true
     @AppStorage("shareShowSurahInformation") var showSurahInformation: Bool = false
@@ -193,6 +205,43 @@ final class Settings: ObservableObject {
 
     @AppStorage("lastReadSurah") var lastReadSurah: Int = 0
     @AppStorage("lastReadAyah") var lastReadAyah: Int = 0
+
+    /// When off, the app neither saves nor shows the "Last Read Ayah" / "Last Listened Surah" sections.
+    @AppStorage("saveLastReadAyah") var saveLastReadAyah: Bool = true
+    @AppStorage("saveLastListenedSurah") var saveLastListenedSurah: Bool = true
+    /// When off, the app neither saves nor shows the "Last Listened Ayah" section.
+    @AppStorage("saveLastListenedAyah") var saveLastListenedAyah: Bool = true
+    /// When on, the Quran tab shows the daily "Ayah of the Day" card.
+    @AppStorage("showAyahOfTheDay") var showAyahOfTheDay: Bool = true
+    /// When on, the Quran tab collapses the Ayah of the Day / Last Listened / Last Read cards into one
+    /// compact section of tiles. On by default.
+    @AppStorage("quranSummaryMode") var quranSummaryMode: Bool = true
+    /// Day key (yyyy-MM-dd) for which the Ayah of the Day card has been hidden via "Hide for Today".
+    @AppStorage("ayahOfTheDayHiddenDate") var ayahOfTheDayHiddenDate: String = ""
+
+    @AppStorage("lastListenedAyahData") private var lastListenedAyahData: Data?
+    var lastListenedAyah: LastListenedAyah? {
+        get {
+            guard let data = lastListenedAyahData else { return nil }
+            do {
+                return try Self.decoder.decode(LastListenedAyah.self, from: data)
+            } catch {
+                logger.debug("Failed to decode last listened ayah: \(error)")
+                return nil
+            }
+        }
+        set {
+            if let newValue = newValue {
+                do {
+                    lastListenedAyahData = try Self.encoder.encode(newValue)
+                } catch {
+                    logger.debug("Failed to encode last listened ayah: \(error)")
+                }
+            } else {
+                lastListenedAyahData = nil
+            }
+        }
+    }
 
     @AppStorage("lastListenedSurahData") private var lastListenedSurahData: Data?
     var lastListenedSurah: LastListenedSurah? {
@@ -281,7 +330,6 @@ final class Settings: ObservableObject {
     @AppStorage("copyAyahEnglishSaheeh") var copyAyahEnglishSaheeh: Bool = false
     @AppStorage("copyAyahEnglishMustafa") var copyAyahEnglishMustafa: Bool = false
     @AppStorage("showPageJuzDividers") var showPageJuzDividers: Bool = true
-    @AppStorage("showPageJuzOverlay") var showPageJuzOverlay: Bool = false
     @AppStorage("showFullSurahRow") var showFullSurahRow: Bool = false
 
     @AppStorage("quranSearchHistoryData") private var quranSearchHistoryData = Data()
@@ -352,6 +400,8 @@ final class Settings: ObservableObject {
         favoriteNameNumbers.contains(number)
     }
     
+    // MARK: Arabic search normalization
+
     func cleanSearch(_ text: String, whitespace: Bool = false) -> String {
         let normalized = normalizedArabicForSearch(text)
         var cleaned = String(normalized.unicodeScalars
@@ -369,13 +419,13 @@ final class Settings: ObservableObject {
     func cleanSearchIgnoringSilentArabicLetters(_ text: String, whitespace: Bool = false) -> String {
         cleanSearch(text.removingSilentArabicLettersForSearch, whitespace: whitespace)
     }
-    
+
     private func normalizedArabicForSearch(_ text: String) -> String {
         Self.canonicalArabicSearchMap.reduce(text) { partial, pair in
             partial.replacingOccurrences(of: pair.key, with: pair.value)
         }
     }
-    
+
     private static let canonicalArabicSearchMap: [String: String] = [
         // Alif family
         "\u{0670}": "ا", // dagger alif
@@ -402,7 +452,7 @@ final class Settings: ObservableObject {
         // Teh marbuta equivalence (broad)
         "ة": "ه"
     ]
-    
+
     private static let unwantedCharSet: CharacterSet = {
         var set = CharacterSet.punctuationCharacters
             .union(.symbols)
@@ -411,7 +461,7 @@ final class Settings: ObservableObject {
         set.remove(charactersIn: "&|!#")
         return set
     }()
-    
+
     private func collapsingWhitespace(_ text: String) -> String {
         text
             .components(separatedBy: .whitespacesAndNewlines)
@@ -451,12 +501,50 @@ final class Settings: ObservableObject {
 
     func colorSchemeFromString(_ colorScheme: String) -> ColorScheme? {
         switch colorScheme {
-        case "light":
+        case "light", "sepia":
             return .light
-        case "dark":
+        case "dark", "gray":
             return .dark
         default:
             return nil
+        }
+    }
+
+    // MARK: - Reading themes (Sepia / Gray)
+    // These layer custom background + row colors on top of a light (Sepia) or dark (Gray) base, so the app
+    // offers warm/neutral reading looks beyond plain Light / Dark / System. Light/Dark/System return nil here
+    // and keep the standard system grouped colors (no behavior change for existing users).
+
+    /// True when the active theme paints its own background/row colors instead of the system grouped colors.
+    var hasCustomThemeColors: Bool {
+        colorSchemeString == "sepia" || colorSchemeString == "gray"
+    }
+
+    /// Background shown behind list content for custom themes (warm cream / neutral charcoal).
+    var themeBackgroundColor: Color? {
+        switch colorSchemeString {
+        case "sepia": return Color(red: 0.90, green: 0.83, blue: 0.69)
+        case "gray":  return Color(red: 0.13, green: 0.13, blue: 0.14)
+        default:      return nil
+        }
+    }
+
+    /// Row / card color for plain (non-glass) list rows in custom themes, set apart from the background.
+    var themeRowBackgroundColor: Color? {
+        switch colorSchemeString {
+        case "sepia": return Color(red: 0.93, green: 0.90, blue: 0.82)
+        case "gray":  return Color(red: 0.19, green: 0.19, blue: 0.20)
+        default:      return nil
+        }
+    }
+
+    /// Tint blended into Liquid Glass cards/controls for custom themes, so glass reads as warm cream
+    /// (Sepia) or neutral charcoal (Gray) instead of plain white/black. Nil = untinted system glass.
+    var themeGlassTint: Color? {
+        switch colorSchemeString {
+        case "sepia": return Color(red: 0.85, green: 0.74, blue: 0.50).opacity(0.55)
+        case "gray":  return Color(red: 0.33, green: 0.33, blue: 0.35).opacity(0.55)
+        default:      return nil
         }
     }
 

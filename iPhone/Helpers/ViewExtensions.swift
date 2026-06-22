@@ -24,6 +24,13 @@ extension View {
         modifier(ConditionalListStyle(defaultView: defaultView))
     }
 
+    /// Tints list rows for the Sepia / Gray reading themes. Apply this to the rows/sections INSIDE a `List`
+    /// (not to the `List` itself) — `.listRowBackground` only propagates when attached to row content, which
+    /// is why the list-level version in `ConditionalListStyle` couldn't color the cells.
+    func themedListRowBackground() -> some View {
+        modifier(ThemedListRowBackground())
+    }
+
     @ViewBuilder
     func compactListSectionSpacing() -> some View {
         #if os(iOS)
@@ -95,16 +102,53 @@ struct ConditionalListStyle: ViewModifier {
         .tint(settings.accentColor.color)
         .dismissKeyboardOnScroll()
         .topContentMargin(0)
+        // Force the theme's light/dark base here (not just at the app root) so sheets — which are their own
+        // presentation contexts and don't inherit the root's preferredColorScheme — also adopt the theme.
+        .preferredColorScheme(settings.colorScheme)
     }
 
+    #if os(iOS)
+    // Single, structurally-constant modifier chain (only the VALUES change with the theme). Switching to/from
+    // Sepia/Gray used to flip between if/else branches, which changed the view tree and recreated the List —
+    // scrolling it back to the top. Keeping one branch preserves the List, so no theme change resets scroll.
+    // (Row colors are handled separately by `themedListRowBackground()` applied inside each List.)
     @ViewBuilder
     private func styledContent(_ content: Content) -> some View {
+        let base = defaultView ? AnyView(content) : AnyView(content.listStyle(.plain))
+
+        if #available(iOS 16.0, *) {
+            base
+                .scrollContentBackground(settings.hasCustomThemeColors ? .hidden : .automatic)
+                .background(resolvedListBackground.ignoresSafeArea())
+        } else {
+            base
+                .background(resolvedListBackground.ignoresSafeArea())
+        }
+    }
+
+    private var resolvedListBackground: Color {
+        if settings.hasCustomThemeColors {
+            return settings.themeBackgroundColor ?? Color(.systemGroupedBackground)
+        }
         if defaultView {
-            content
+            return Color(.systemGroupedBackground)
+        }
+        return currentColorScheme == .dark ? .black : .white
+    }
+    #endif
+}
+
+/// Paints the per-row background for the Sepia / Gray reading themes. Must be applied to rows/sections inside
+/// a `List` so `.listRowBackground` actually reaches the cells. No-op for Light/Dark/System (system colors).
+struct ThemedListRowBackground: ViewModifier {
+    @EnvironmentObject private var settings: Settings
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if settings.hasCustomThemeColors, let rowColor = settings.themeRowBackgroundColor {
+            content.listRowBackground(rowColor)
         } else {
             content
-                .listStyle(.plain)
-                .background(currentColorScheme == .dark ? Color.black : Color.white)
         }
     }
 }

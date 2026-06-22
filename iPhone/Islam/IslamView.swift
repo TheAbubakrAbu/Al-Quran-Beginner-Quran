@@ -30,7 +30,14 @@ struct IslamView: View {
                 NavigationSplitView {
                     islamSidebar
                 } detail: {
-                    islamDetail
+                    // The detail needs its own NavigationStack so NavigationLinks inside a destination
+                    // (e.g. tapping a letter in ArabicView) push within the detail column instead of
+                    // hijacking the whole split. `.id` rebuilds the stack when the sidebar selection
+                    // changes, so switching sections always resets to that section's root.
+                    NavigationStack {
+                        islamDetail
+                    }
+                    .id(selectedResource ?? .arabicAlphabet)
                 }
             } else if #available(iOS 16.0, *) {
                 NavigationStack {
@@ -55,29 +62,39 @@ struct IslamView: View {
 
     private var islamList: some View {
         List {
+            Group {
             resourcesSection
             ProphetQuote()
             AlIslamAppsSection()
+            }
+            .themedListRowBackground()
         }
         .applyConditionalListStyle(defaultView: settings.defaultView)
-        .navigationTitle(AppIdentifiers.toolsView)
+        .navigationTitle("Al-Islam")
     }
 
     #if os(iOS)
     @available(iOS 16.0, *)
     private var islamSidebar: some View {
         List(selection: $selectedResource) {
+            Group {
             resourcesSectionSplit
             ProphetQuote()
             AlIslamAppsSection()
+            }
+            .themedListRowBackground()
         }
         .applyConditionalListStyle(defaultView: settings.defaultView)
-        .navigationTitle(AppIdentifiers.toolsView)
+        .navigationTitle("Al-Islam")
     }
 
     @available(iOS 16.0, *)
     private var islamDetail: some View {
+        // Re-identify the detail by the current selection so the split-view detail always rebuilds when the
+        // sidebar selection changes. Without this the detail could get "stuck" on a previous item after the
+        // view disappeared and came back on iPad/Mac.
         destinationView(for: selectedResource ?? .arabicAlphabet)
+            .id(selectedResource ?? .arabicAlphabet)
     }
 
     @available(iOS 16.0, *)
@@ -176,7 +193,9 @@ struct IslamView: View {
     ) -> some View {
         Button {
             settings.hapticFeedback()
-            selectedResource = value
+            withAnimation(.easeInOut) {
+                selectedResource = value
+            }
         } label: {
             toolLabel(title, systemImage: systemImage)
         }
@@ -542,7 +561,7 @@ private struct Card: View {
                 }
             }
 
-            Button("Cancel", role: .cancel) { }
+            Button("Cancel") { }
         }
         #endif
     }

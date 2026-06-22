@@ -10,6 +10,9 @@ struct ConditionalGlassEffect: ViewModifier {
     /// When set, tints glass with this color (opacity from `useColor`, default 0.35) instead of the app accent.
     var customTint: Color? = nil
     var interactive: Bool = true
+    /// When false, glass skips the Sepia/Gray reading-theme tint. Use for nested glass (e.g. a pill inside an
+    /// already-tinted card) so it doesn't read as a heavy double-tinted box.
+    var themeTint: Bool = true
 
     func body(content: Content) -> some View {
         if #available(iOS 26.0, watchOS 26.0, *) {
@@ -88,7 +91,12 @@ struct ConditionalGlassEffect: ViewModifier {
         if let customTint {
             return customTint.opacity(useColor ?? 0.35)
         }
-        return useColor.map { settings.accentColor.color.opacity($0) }
+        if let useColor {
+            return settings.accentColor.color.opacity(useColor)
+        }
+        // Untinted glass picks up the active reading theme so cards aren't plain white/black in Sepia/Gray,
+        // unless the caller opts out (nested glass that would otherwise double-tint).
+        return themeTint ? settings.themeGlassTint : nil
     }
 }
 
@@ -120,9 +128,10 @@ extension View {
         circle: Bool = false,
         useColor: Double? = nil,
         customTint: Color? = nil,
-        interactive: Bool = true
+        interactive: Bool = true,
+        themeTint: Bool = true
     ) -> some View {
-        modifier(ConditionalGlassEffect(clear: clear, rectangle: rectangle, circle: circle, useColor: useColor, customTint: customTint, interactive: interactive))
+        modifier(ConditionalGlassEffect(clear: clear, rectangle: rectangle, circle: circle, useColor: useColor, customTint: customTint, interactive: interactive, themeTint: themeTint))
     }
 
     #if os(iOS)

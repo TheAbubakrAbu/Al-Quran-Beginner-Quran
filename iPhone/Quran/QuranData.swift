@@ -1,9 +1,10 @@
 import SwiftUI
-#if canImport(UIKit)
 import UIKit
-#elseif canImport(AppKit)
+import Combine
+#if canImport(AppKit)
 import AppKit
 #endif
+import os
 
 struct Surah: Codable, Identifiable, Equatable {
     let id: Int
@@ -174,6 +175,18 @@ struct Surah: Codable, Identifiable, Equatable {
     }
 }
 
+/// Thread-safe memoization for the diacritic-stripping in `Ayah.textCleanArabic`. The cleaned
+/// result is a pure function of the raw Arabic text + the `removeArabicDots` flag, so the same
+/// ayah rendered repeatedly (SwiftUI re-evaluations, scrolling) reuses the cached string instead
+/// of re-running two O(n) Unicode passes each time. NSCache is thread-safe and self-evicting.
+private enum CleanArabicTextCache {
+    static let cache: NSCache<NSString, NSString> = {
+        let c = NSCache<NSString, NSString>()
+        c.countLimit = AppPerformance.cleanArabicCacheLimit
+        return c
+    }()
+}
+
 struct Ayah: Codable, Identifiable, Equatable {
     let id: Int
     let idArabic: String
@@ -229,8 +242,16 @@ struct Ayah: Codable, Identifiable, Equatable {
     }
     /// Clean (no diacritics) Arabic for the given display qiraah.
     func textCleanArabic(for displayQiraah: String?) -> String {
-        let cleaned = textArabic(for: displayQiraah).removingArabicDiacriticsAndSigns
-        return Settings.shared.removeArabicDots ? cleaned.removingArabicDots : cleaned
+        let raw = textArabic(for: displayQiraah)
+        let removeDots = Settings.shared.removeArabicDots
+        let key = ((removeDots ? "D1:" : "D0:") + raw) as NSString
+        if let cached = CleanArabicTextCache.cache.object(forKey: key) {
+            return cached as String
+        }
+        let base = raw.removingArabicDiacriticsAndSigns
+        let result = removeDots ? base.removingArabicDots : base
+        CleanArabicTextCache.cache.setObject(result as NSString, forKey: key)
+        return result
     }
 
     /// True if this ayah exists as its own verse in the given qiraah. In Hafs every ayah exists; in Warsh/Qaloon/etc. some Hafs ayahs are merged, so we only show ayahs that have qiraah-specific text (e.g. Baqarah has 286 in Hafs but 285 in Warsh).
@@ -851,6 +872,15 @@ final class TajweedStore {
         let words = wordClusterRanges(clusters: clusters)
         let finalAaridCarrier = finalWordMaddAaridCarrierIndex(words: words, clusters: clusters)
 
+        // A lone madd letter at the very end of the last word of the ayah (e.g. the final آ in أَقۡفَالُهَآ)
+        // is read as a natural 2-count madd at waqf, not madd lazim. Don't highlight it — except in the
+        // muqatta'at openings, where a final maddah letter genuinely is madd lazim (e.g. صٓ, نٓ).
+        let muqattaatOpening = TajweedRules.surahsOpeningMuqattaat.contains(surah)
+            && (ayah == 1 || (surah == 42 && ayah == 2))
+        let ayahFinalMaddNaturalIndex: Int? = muqattaatOpening
+            ? nil
+            : indexOfFinalPronouncedArabicLetterCluster(clusters: clusters)
+
         if settings.isTajweedCategoryVisible(.maddNaturalMiniature) {
             appendScalarPaintOps(
                 text: text,
@@ -861,7 +891,7 @@ final class TajweedStore {
             )
         }
 
-        appendExplicitMaddahPaintOps(text: text, clusters: clusters, finalAaridCarrier: finalAaridCarrier, into: &ops)
+        appendExplicitMaddahPaintOps(text: text, clusters: clusters, finalAaridCarrier: finalAaridCarrier, ayahFinalNaturalIndex: ayahFinalMaddNaturalIndex, into: &ops)
 
         if settings.isTajweedCategoryVisible(.maddNecessary) {
             for index in clusters.indices where isLazimCombinedAlifCluster(clusters[index]) {
@@ -883,6 +913,7 @@ final class TajweedStore {
                 ops.append(PaintOp(range: nsRange(for: cur), priority: PaintPriority.maddNecessary6, category: .maddNecessary))
             }
             for i in clusters.indices where isLazimWawThenAlifSukoon(clusters: clusters, wawIndex: i) {
+                guard i + 1 < clusters.count else { continue }
                 if i == finalAaridCarrier || i + 1 == finalAaridCarrier { continue }
                 if hasMiniatureMaddScalar(clusters[i]) || hasMiniatureMaddScalar(clusters[i + 1]) { continue }
                 if strongerMaddRuleCovers(range: nsRange(for: clusters[i]), ops: ops) { continue }
@@ -960,6 +991,7 @@ final class TajweedStore {
         if settings.isTajweedCategoryVisible(.maddNecessary) {
             for i in clusters.indices where hasMaddah(clusters[i]) {
                 if i == finalAaridCarrier { continue }
+                if i == ayahFinalMaddNaturalIndex { continue }
                 if hasMiniatureMaddScalar(clusters[i]) { continue }
                 if strongerMaddRuleCoversCluster(index: i, ops: ops, clusters: clusters) { continue }
                 appendSpecialMaddPaintOps(
@@ -1059,11 +1091,15 @@ final class TajweedStore {
         return false
     }
 
-    private func appendExplicitMaddahPaintOps(text: String, clusters: [CharacterClusterInfo], finalAaridCarrier: Int?, into ops: inout [PaintOp]) {
+    private func appendExplicitMaddahPaintOps(text: String, clusters: [CharacterClusterInfo], finalAaridCarrier: Int?, ayahFinalNaturalIndex: Int?, into ops: inout [PaintOp]) {
         for index in clusters.indices where hasMaddah(clusters[index]) {
             if index == finalAaridCarrier { continue }
             if hasMiniatureMaddMark(clusters[index]) { continue }
-            let classification = explicitMaddahCategory(clusters: clusters, index: index)
+            var classification = explicitMaddahCategory(clusters: clusters, index: index)
+            // Ayah-final lone madd letter: read as natural madd at waqf, not the highlighted madd lazim catch-all.
+            if index == ayahFinalNaturalIndex, classification.category == .maddNecessary {
+                classification = (.maddNatural, PaintPriority.maddNatural2)
+            }
             guard settings.isTajweedCategoryVisible(classification.category) else { continue }
             appendSpecialMaddPaintOps(
                 text: text,
@@ -1458,6 +1494,20 @@ final class TajweedStore {
 
     private func finalWordMaddAaridCarrierIndex(words: [Range<Int>], clusters: [CharacterClusterInfo]) -> Int? {
         guard let finalWord = words.last else { return nil }
+
+        // A word ending in madd 'iwad (a silent final alif/alif-maqsurah preceded by tanwin fath, e.g.
+        // مَّذۡكُورًا) is recited as a 2-count 'iwad madd on waqf — never aarid lil sukoon. Stripping that
+        // silent alif would otherwise shift the "second-to-last" letter onto the preceding madd letter
+        // (the waw here), wrongly flagging it. Bail so only a genuine second-to-last carrier qualifies.
+        let rawFinalLetters = finalWord.filter { clusters.indices.contains($0) && clusters[$0].primaryArabicLetter != nil }
+        if let rawLast = rawFinalLetters.last,
+           let base = clusters[rawLast].primaryArabicLetter, base == "ا" || base == "ى",
+           isSilentFinalLetter(clusters: clusters, index: rawLast),
+           let prev = previousArabicLetterClusterIndex(clusters: clusters, before: rawLast),
+           hasFathatayn(clusters[prev]) {
+            return nil
+        }
+
         let pronouncedLetters = effectivePronouncedArabicLetterIndices(in: finalWord, clusters: clusters)
         guard pronouncedLetters.count >= 2 else { return nil }
         let requiredCarrierIndex = pronouncedLetters[pronouncedLetters.count - 2]
@@ -1693,6 +1743,7 @@ final class TajweedStore {
 
     private func appendBareConsonantSilentPaintOps(clusters: [CharacterClusterInfo], muqattaatProtectedIndices: Set<Int>, into ops: inout [PaintOp]) {
         guard settings.isTajweedCategoryVisible(.droppedLetter) else { return }
+        let ayahFinalLetterIndex = indexOfFinalArabicLetterCluster(clusters: clusters)
         for index in clusters.indices {
             if muqattaatProtectedIndices.contains(index) { continue }
             let cluster = clusters[index]
@@ -1705,9 +1756,47 @@ final class TajweedStore {
             }
             if isFathataynHelperBeforeIdghamBilaGhunnah(clusters: clusters, index: index) { continue }
             if base == "ل", isLamConnectedToAllahWord(clusters: clusters, index: index) { continue }
+            // The ayah-FINAL bare consonant (e.g. the meem of أَمۡثَٰلَكُم at waqf) has no tashkeel and meets no
+            // other rule — it is pronounced with a waqf sukoon, not dropped, so leave it in the default color.
+            // This exception is limited to the ayah's final letter: word-final bare consonants elsewhere in the
+            // ayah still get the normal silent/dropped coloring. (Madd letters ا/و/ي can be genuinely silent
+            // word-final, so they keep their existing behavior even at the ayah end.)
+            let isMaddLetter = base == "ا" || base == "ى" || base == "و" || base == "ي"
+            if !isMaddLetter, index == ayahFinalLetterIndex { continue }
+            // An unmarked alif / alif-maqsura / ya is only genuinely silent when there is a reason for it:
+            //   (A) the next word begins with hamzatul-wasl (ٱ), e.g. فِي ٱلۡأَرۡضِ, or
+            //   (B) the preceding letter carries fathatayn (ً or ٗ), e.g. خُشَّعًا / هُدٗى.
+            // Without either, leave it in the default color (a madd rule may color it instead) rather than
+            // graying these letters at random. (و keeps its existing behavior.)
+            if base == "ا" || base == "ى" || base == "ي" {
+                let prevIdx = previousArabicLetterClusterIndex(clusters: clusters, before: index)
+                let justifiedByNextHamzatWasl = nextWordStartsWithHamzatWasl(clusters: clusters, index: index)
+                let justifiedByPrecedingFathatayn = prevIdx.map { hasFathatayn(clusters[$0]) } ?? false
+                // (C) Iqlab tanwin: the previous letter carries the tiny high/low meem (e.g. سَمِيعَۢا),
+                // which leaves a silent carrier alif just like fathatayn does — gray it too.
+                let justifiedByPrecedingIqlaab = prevIdx.map {
+                    isSilentFinalLetterAfterTinyMeem(clusters: clusters, index: index, previousIndex: $0)
+                } ?? false
+                if !justifiedByNextHamzatWasl, !justifiedByPrecedingFathatayn, !justifiedByPrecedingIqlaab { continue }
+            }
             let range = primaryArabicLetterScalarRange(in: cluster) ?? nsRange(for: cluster)
             ops.append(PaintOp(range: range, priority: PaintPriority.droppedLetter, category: .droppedLetter))
         }
+    }
+
+    /// True when `index` is a word-final letter whose following word begins with hamzatul-wasl (ٱ),
+    /// e.g. the ya of `فِي ٱلۡأَرۡضِ`. Requires an intervening word boundary so only a *next word* counts.
+    private func nextWordStartsWithHamzatWasl(clusters: [CharacterClusterInfo], index: Int) -> Bool {
+        var i = index + 1
+        var sawWordBoundary = false
+        while i < clusters.count {
+            let cl = clusters[i]
+            if isWhitespaceOnly(cl) { sawWordBoundary = true; i += 1; continue }
+            if isAyahEndOrDecorativeCluster(cl) { i += 1; continue }
+            guard cl.primaryArabicLetter != nil else { i += 1; continue }
+            return sawWordBoundary && cl.contains(Self.hamzatWasl)
+        }
+        return false
     }
 
     private func isFathataynHelperBeforeIdghamBilaGhunnah(clusters: [CharacterClusterInfo], index: Int) -> Bool {
@@ -1914,6 +2003,9 @@ final class TajweedStore {
             guard hasFathaFamily(prev) else { return false }
             // Tanwin fath (regular ً or Uthmani ٗ on previous letter) + following alif: not colored as natural madd.
             if hasFathatayn(prev) { return false }
+            // Iqlab tanwin (fatha + tiny high/low meem on previous letter, e.g. سَمِيعَۢا): the following
+            // alif is a silent tanwin carrier, not natural madd — let the silent painter color it instead.
+            if clusterHasTinyMeemIqlaabMark(prev) { return false }
             return !nextClusterIsHamzatWasl(clusters: clusters, after: i)
         }
         if cur.primaryArabicLetter == "و" {
@@ -2249,13 +2341,10 @@ final class TajweedStore {
     }
 
     private func tinyMeemPaintRanges(in cluster: CharacterClusterInfo) -> [NSRange] {
-        if cluster.contains(Self.smallLowMeem) {
-            return [nsRange(for: cluster)]
-        }
-        if let highMeemRange = scalarRange(in: cluster, scalar: Self.smallHighMeem) {
-            return [highMeemRange]
-        }
-        return []
+        // Color the whole carrier letter (e.g. the ة in ةُۢ before baa), not just the small meem mark,
+        // so the iqlaab is actually visible on the letter.
+        guard clusterHasTinyMeemIqlaabMark(cluster) else { return [] }
+        return [nsRange(for: cluster)]
     }
 
     private func hasFathatayn(_ cluster: CharacterClusterInfo) -> Bool {
@@ -2269,27 +2358,6 @@ final class TajweedStore {
             return true
         }
         return indexOfVerseFinalQalqalahCluster(clusters: clusters) == index
-    }
-
-    private func isEffectiveWordFinalCluster(clusters: [CharacterClusterInfo], index: Int) -> Bool {
-        guard clusters.indices.contains(index), clusters[index].primaryArabicLetter != nil else { return false }
-        var next = index + 1
-        while next < clusters.count {
-            let cluster = clusters[next]
-            if isWhitespaceOnly(cluster) || isAyahEndOrDecorativeCluster(cluster) {
-                return true
-            }
-            guard cluster.primaryArabicLetter != nil else {
-                next += 1
-                continue
-            }
-            if isSilentFinalLetter(clusters: clusters, index: next) {
-                next += 1
-                continue
-            }
-            return false
-        }
-        return true
     }
 
     private func sourceRangeForSpecialNoonProxyMark(in cluster: CharacterClusterInfo) -> NSRange {
@@ -2437,8 +2505,9 @@ final class TajweedStore {
             }
 
             // Tanween follows noon-sound rules; color source as tanween mark only.
+            // Note: a tanween cluster that also carries the iqlaab tiny-meem mark (e.g. taa-marbuta ةٌۢ before
+            // baa) still colors its tanween source as iqlaab — the tiny-meem mark above is painted separately.
             if tanweenScalarRange(in: cluster) != nil {
-                if clusterHasTinyMeemIqlaabMark(cluster) { continue }
                 let skipFollower = hasFathatayn(cluster)
                 guard let nextIndex = nextArabicLetterClusterIndex(
                     clusters: clusters,
@@ -2973,6 +3042,7 @@ final class QuranData: ObservableObject {
     private var juzSearchIndex: [JuzSearchIndexEntry] = []
     private var cachedSajdahAyahResults: [(surah: Surah, ayah: Ayah)]?
     private var cachedMuqattaatAyahResults: [(surah: Surah, ayah: Ayah)]?
+    private var cachedPageAyahResults: [(page: Int, surah: Surah, ayah: Ayah)]?
 
     private var loadTask: Task<Void, Never>?
     private var searchIndexBuildTask: Task<Void, Never>?
@@ -3683,9 +3753,23 @@ final class QuranData: ObservableObject {
         }
     }
 
+    /// Re-merge the data when the user toggles "show qiraah" on (qiraat overlays are skipped at launch
+    /// for speed when it is off). Runs in the background and keeps the already-shown data visible until
+    /// the new data is ready, so there is no lag or launch-screen flash. No-op until the first load finishes.
+    func reloadForQiraahAvailabilityChange() {
+        guard loadState == .ready || loadState == .failed else { return }
+        loadTask?.cancel()
+        loadTask = Task(priority: .utility) { [weak self] in
+            guard let self else { return }
+            try? await self.loadAttempt()
+            await MainActor.run { self.loadTask = nil }
+        }
+    }
+
     private func invalidateDerivedResultCaches() {
         cachedSajdahAyahResults = nil
         cachedMuqattaatAyahResults = nil
+        cachedPageAyahResults = nil
     }
 
     private func searchTokens(from cleanedText: String) -> [String] {
@@ -3959,12 +4043,18 @@ final class QuranData: ObservableObject {
             throw NSError(domain: "QuranData", code: 1, userInfo: [NSLocalizedDescriptionKey: "Quran.json missing"])
         }
 
+        // Most users never look at other qiraat, so loading + merging the 7 overlay JSONs on every
+        // launch is wasted work. Only load them when the user actually shows qiraah (or has a non-Hafs
+        // display selected). When they later enable it, `reloadForQiraahAvailabilityChange()` re-runs
+        // this in the background so there is no lag. The signature suffix keeps the with/without-overlay
+        // disk caches separate.
+        let includeQiraat = await MainActor.run { settings.showQiraahDetails || settings.displayQiraahForArabic != nil }
         let qiraahKey = await MainActor.run { settings.displayQiraahForArabic ?? "" }
-        let qiraatURLs = Self.qiraatKeys.compactMap { filename, _ in
+        let qiraatURLs = includeQiraat ? Self.qiraatKeys.compactMap { filename, _ in
             Bundle.main.url(forResource: filename, withExtension: "json", subdirectory: "JSONs/Qiraat")
                 ?? Bundle.main.url(forResource: filename, withExtension: "json")
-        }
-        let cacheSignature = resourceSignature(for: [url] + qiraatURLs)
+        } : []
+        let cacheSignature = resourceSignature(for: [url] + qiraatURLs) + (includeQiraat ? "-q" : "-noq")
 
         if let staticCache = loadStaticCache(resourceSignature: cacheSignature) {
             await MainActor.run {
@@ -4024,7 +4114,7 @@ final class QuranData: ObservableObject {
         let data = try Data(contentsOf: url, options: .mappedIfSafe)
         var surahs = try JSONDecoder().decode([Surah].self, from: data)
 
-        let overlay = loadQiraatOverlay()
+        let overlay = includeQiraat ? loadQiraatOverlay() : [:]
         if !overlay.isEmpty {
             surahs = surahs.map { surah in
                 let baseAyahsByID = Dictionary(uniqueKeysWithValues: surah.ayahs.map { ($0.id, $0) })
@@ -4555,6 +4645,7 @@ final class QuranData: ObservableObject {
         let surahByID = Dictionary(uniqueKeysWithValues: surahs.map { ($0.id, $0) })
         var rows: [JuzSectionData.Row] = []
 
+        guard juz.startSurah <= juz.endSurah else { return rows }
         for surahID in juz.startSurah...juz.endSurah {
             guard let surah = surahByID[surahID] else { continue }
             let totalAyahs = surah.numberOfAyahs
@@ -4589,6 +4680,32 @@ final class QuranData: ObservableObject {
     
     func surah(_ number: Int) -> Surah? {
         surahIndex[number].map { quran[$0] }
+    }
+
+    // MARK: - Surah Info (bundled, lazily loaded)
+
+    private var surahInfosCache: [Int: [SurahInfoSource]]? = nil
+
+    /// The available info sources (e.g. Maududi, Ibn Ashur) for a surah, loaded once from SurahInfos.json
+    /// and cached. Returns an empty array when no info is bundled for that surah.
+    func surahInfoSources(for surahNumber: Int) -> [SurahInfoSource] {
+        if surahInfosCache == nil {
+            surahInfosCache = Self.loadSurahInfos()
+        }
+        return surahInfosCache?[surahNumber] ?? []
+    }
+
+    private static func loadSurahInfos() -> [Int: [SurahInfoSource]] {
+        guard let url = Bundle.main.url(forResource: "SurahInfos", withExtension: "json", subdirectory: "JSONs")
+            ?? Bundle.main.url(forResource: "SurahInfos", withExtension: "json"),
+              let data = try? Data(contentsOf: url),
+              let entries = try? JSONDecoder().decode([SurahInfoEntry].self, from: data) else { return [:] }
+
+        var result: [Int: [SurahInfoSource]] = [:]
+        for entry in entries {
+            result[entry.id] = entry.sources
+        }
+        return result
     }
 
     func ayah(surah: Int, ayah: Int) -> Ayah? {
@@ -4723,6 +4840,44 @@ final class QuranData: ObservableObject {
             }
         cachedMuqattaatAyahResults = results
         return results
+    }
+
+    /// First ayah of every mushaf page, in page order — used by the "Pages" browse mode (Sajdah-style).
+    func pageAyahResults() -> [(page: Int, surah: Surah, ayah: Ayah)] {
+        if let cachedPageAyahResults {
+            return cachedPageAyahResults
+        }
+
+        var seenPages = Set<Int>()
+        var results: [(page: Int, surah: Surah, ayah: Ayah)] = []
+        for surah in quran {
+            for ayah in surah.ayahs {
+                guard let page = ayah.page, !seenPages.contains(page) else { continue }
+                seenPages.insert(page)
+                results.append((page: page, surah: surah, ayah: ayah))
+            }
+        }
+        results.sort { $0.page < $1.page }
+        cachedPageAyahResults = results
+        return results
+    }
+
+    /// Every ayah on a given mushaf page, in order — used by page search results.
+    func ayahs(onPage page: Int) -> [(surah: Surah, ayah: Ayah)] {
+        quran.flatMap { surah in
+            surah.ayahs.compactMap { ayah in
+                ayah.page == page ? (surah: surah, ayah: ayah) : nil
+            }
+        }
+    }
+
+    /// Every ayah in a given juz, in order — used by juz search results.
+    func ayahs(inJuz juz: Int) -> [(surah: Surah, ayah: Ayah)] {
+        quran.flatMap { surah in
+            surah.ayahs.compactMap { ayah in
+                ayah.juz == juz ? (surah: surah, ayah: ayah) : nil
+            }
+        }
     }
 
     func filteredSurahs(query rawQuery: String) -> [Surah] {

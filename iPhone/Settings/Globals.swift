@@ -7,7 +7,6 @@ import SwiftUI
 enum AppIdentifiers {
     static let appFullName = "Al-Quran | Beginner Quran"
     static let appName = "Al-Quran"
-    static let toolsView = "Tools"
     
     static let mainColor = AccentColor.green
     static let mainColorString = "green"
@@ -61,6 +60,14 @@ enum AppPerformance {
         #endif
     }
 
+    static var cleanArabicCacheLimit: Int {
+        #if os(watchOS)
+        400
+        #else
+        isLowMemoryDevice ? 1500 : 4000
+        #endif
+    }
+
     static var prewarmArabicAyahLimit: Int? {
         #if os(watchOS)
         20
@@ -73,7 +80,7 @@ enum AppPerformance {
 enum AccentColor: String, CaseIterable, Identifiable {
     var id: String { self.rawValue }
 
-    case red, orange, yellow, green, blue, indigo, cyan, teal, mint, purple, pink, brown
+    case red, orange, yellow, green, blue, indigo, cyan, teal, mint, purple, pink, brown, custom
 
     var color: Color {
         switch self {
@@ -89,11 +96,40 @@ enum AccentColor: String, CaseIterable, Identifiable {
         case .purple: return .purple
         case .pink: return .pink
         case .brown: return .brown
+        // Resolved from the user's stored hex. Views observe `settings`, so changing the hex re-renders them.
+        case .custom: return Color(hex: Settings.shared.customAccentColorHex) ?? .green
         }
     }
 }
 
-let accentColors: [AccentColor] = AccentColor.allCases
+/// Preset swatches shown in Appearance. `.custom` is excluded — it's driven by the color picker instead.
+let accentColors: [AccentColor] = AccentColor.allCases.filter { $0 != .custom }
+
+extension Color {
+    /// Creates a color from a 6-digit RGB hex string ("RRGGBB", leading "#" optional). Returns nil if invalid.
+    init?(hex: String) {
+        var s = hex.trimmingCharacters(in: .whitespacesAndNewlines)
+        if s.hasPrefix("#") { s.removeFirst() }
+        guard s.count == 6, let rgb = UInt64(s, radix: 16) else { return nil }
+        self = Color(
+            red: Double((rgb >> 16) & 0xFF) / 255,
+            green: Double((rgb >> 8) & 0xFF) / 255,
+            blue: Double(rgb & 0xFF) / 255
+        )
+    }
+
+    /// 6-digit RGB hex string for this color.
+    var hexString: String {
+        #if canImport(UIKit)
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        UIColor(self).getRed(&r, green: &g, blue: &b, alpha: &a)
+        let clamp = { (v: CGFloat) in Int(round(max(0, min(1, v)) * 255)) }
+        return String(format: "%02X%02X%02X", clamp(r), clamp(g), clamp(b))
+        #else
+        return "000000"
+        #endif
+    }
+}
 
 struct CustomColorSchemeKey: EnvironmentKey {
     static let defaultValue: ColorScheme? = nil
@@ -108,7 +144,10 @@ extension EnvironmentValues {
 
 func arabicNumberString(from number: Int) -> String {
     let arabicNumbers = ["٠", "١", "٢", "٣", "٤", "٥", "٦", "٧", "٨", "٩"]
-    return String(number).map { arabicNumbers[Int(String($0))!] }.joined()
+    return String(number).map { ch -> String in
+        guard let digit = ch.wholeNumberValue, digit >= 0, digit <= 9 else { return String(ch) }
+        return arabicNumbers[digit]
+    }.joined()
 }
 
 private let quranStripScalars: Set<UnicodeScalar> = {
@@ -268,8 +307,10 @@ extension String {
     }
 
     subscript(_ r: Range<Int>) -> Substring {
-        let start = index(startIndex, offsetBy: r.lowerBound)
-        let end = index(startIndex, offsetBy: r.upperBound)
+        let lower = Swift.max(0, Swift.min(r.lowerBound, count))
+        let upper = Swift.max(lower, Swift.min(r.upperBound, count))
+        let start = index(startIndex, offsetBy: lower, limitedBy: endIndex) ?? endIndex
+        let end = index(startIndex, offsetBy: upper, limitedBy: endIndex) ?? endIndex
         return self[start..<end]
     }
 }

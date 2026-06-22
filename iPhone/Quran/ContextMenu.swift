@@ -26,7 +26,9 @@ struct SurahContextMenu: View {
     var body: some View {
         Button(role: isFavorite ? .destructive : .cancel) {
             settings.hapticFeedback()
-            settings.toggleSurahFavorite(surah: surahID)
+            withAnimation(.easeInOut) {
+                settings.toggleSurahFavorite(surah: surahID)
+            }
         } label: {
             Label(
                 isFavorite ? "Unfavorite Surah" : "Favorite Surah",
@@ -284,6 +286,7 @@ struct AyahTafsirSheet: View {
                             }
                             .pickerStyle(.segmented)
                             .animation(.easeInOut, value: selectedAuthor)
+                            .onChange(of: selectedAuthor) { _ in settings.hapticFeedback() }
 
                             if let tafsirText = selectedTafsirText {
                                 VStack(alignment: .leading, spacing: 12) {
@@ -317,6 +320,7 @@ struct AyahTafsirSheet: View {
             .navigationTitle("\(surahName) \(surahNumber):\(ayahNumber)")
             .navigationBarTitleDisplayMode(.inline)
             .searchable(text: $searchText.animation(.easeInOut), prompt: "Search tafsir")
+            .dismissKeyboardOnScroll()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button {
@@ -458,10 +462,206 @@ struct AyahTafsirSheet: View {
     }
 }
 
+/// "About this Surah" sheet — bundled surah background, mirroring the Tafsir sheet: a source picker
+/// (Maududi / Ibn Ashur), searchable content, and the same accent-foreground search match (no highlight box).
+struct SurahInfoSheet: View {
+    @EnvironmentObject var settings: Settings
+    @EnvironmentObject var quranData: QuranData
+    @Environment(\.dismiss) private var dismiss
+
+    let surahName: String
+    let surahNumber: Int
+
+    @State private var searchText = ""
+    @AppStorage("quran.surahInfo.source") private var selectedSourceName = ""
+
+    private var sources: [SurahInfoSource] {
+        quranData.surahInfoSources(for: surahNumber)
+    }
+
+    private var selectedSource: SurahInfoSource? {
+        sources.first(where: { $0.name == selectedSourceName }) ?? sources.first
+    }
+
+    private var selectedSourceBinding: Binding<String> {
+        Binding(
+            get: { selectedSource?.name ?? "" },
+            set: { selectedSourceName = $0 }
+        )
+    }
+
+    /// True when the text is mostly Arabic script, so the sheet can lay it out right-to-left.
+    private static func isArabic(_ text: String) -> Bool {
+        var arabic = 0, latin = 0
+        for scalar in text.unicodeScalars {
+            let v = scalar.value
+            if (0x0600...0x06FF).contains(v) || (0x0750...0x077F).contains(v) || (0x08A0...0x08FF).contains(v) {
+                arabic += 1
+            } else if (0x41...0x5A).contains(v) || (0x61...0x7A).contains(v) {
+                latin += 1
+            }
+        }
+        return arabic > latin
+    }
+
+    var body: some View {
+        NavigationView {
+            Group {
+                if sources.isEmpty {
+                    infoPlaceholder
+                } else {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 16) {
+                            noticeCard
+                            surahHeaderCard
+
+                            if sources.count > 1 {
+                                Picker("Source", selection: selectedSourceBinding.animation(.easeInOut)) {
+                                    ForEach(sources) { source in
+                                        Text(source.name).tag(source.name)
+                                    }
+                                }
+                                .pickerStyle(.segmented)
+                                .animation(.easeInOut, value: selectedSource)
+                                .onChange(of: selectedSourceName) { _ in settings.hapticFeedback() }
+                            }
+
+                            if let source = selectedSource {
+                                let arabic = Self.isArabic(source.contents)
+                                VStack(alignment: arabic ? .trailing : .leading, spacing: 12) {
+                                    Text(source.name)
+                                        .font(.headline)
+                                        .frame(maxWidth: .infinity, alignment: arabic ? .trailing : .leading)
+
+                                    TafsirMarkdownView(
+                                        markdown: source.contents,
+                                        searchText: searchText,
+                                        accent: settings.accentColor.color,
+                                        textAlignment: arabic ? .trailing : .leading
+                                    )
+                                    .frame(maxWidth: .infinity, alignment: arabic ? .trailing : .leading)
+                                }
+                                .frame(maxWidth: .infinity, alignment: arabic ? .trailing : .leading)
+                                .id(source.name)
+                                .textSelection(.enabled)
+                            }
+                        }
+                        .padding()
+                    }
+                }
+            }
+            .navigationTitle("Surah \(surahNumber): \(surahName)")
+            .navigationBarTitleDisplayMode(.inline)
+            .searchable(text: $searchText.animation(.easeInOut), prompt: "Search info")
+            .dismissKeyboardOnScroll()
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button {
+                        dismiss()
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.body.weight(.semibold))
+                    }
+                }
+            }
+        }
+        .modifier(SheetPresentationModifier())
+    }
+
+    private var noticeCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("About this Surah", systemImage: "book.closed")
+                .font(.subheadline.weight(.semibold))
+
+            Text("Background on this surah — its name, period of revelation, and themes. Switch between sources with the picker.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color.secondary.opacity(0.1))
+        )
+    }
+
+    @ViewBuilder
+    private var surahHeaderCard: some View {
+        if let surah = quranData.surah(surahNumber) {
+            VStack(alignment: .leading, spacing: 10) {
+                // Always show the full surah row details.
+                SurahRow(surah: surah, hideInfo: false).equatable()
+
+                Divider()
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Label("Revelation Info", systemImage: "book.closed")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(settings.accentColor.color)
+
+                    Text("Revelation order: #\(surah.revelationOrder.map(String.init) ?? "Unknown")")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    if let exceptions = surah.revelationExceptions?.trimmingCharacters(in: .whitespacesAndNewlines),
+                       !exceptions.isEmpty {
+                        Text("Exceptions: \(exceptions)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .conditionalGlassEffect(rectangle: true, useColor: 0.08)
+            .overlay(
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .stroke(settings.accentColor.color.opacity(0.18), lineWidth: 1)
+            )
+        }
+    }
+
+    private var infoPlaceholder: some View {
+        VStack(spacing: 10) {
+            Image(systemName: "text.book.closed")
+                .font(.title2)
+                .foregroundStyle(.secondary)
+
+            Text("No Info Found")
+                .font(.headline)
+
+            Text("No background information is available for this surah.")
+                .font(.subheadline)
+                .multilineTextAlignment(.center)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 32)
+    }
+}
+
 private struct TafsirMarkdownView: View {
     let markdown: String
     let searchText: String
     let accent: Color
+    /// Text/line alignment for the rendered blocks. Pass `.trailing` for Arabic so it reads right-to-left.
+    var textAlignment: TextAlignment = .leading
+
+    private var frameAlignment: Alignment {
+        switch textAlignment {
+        case .leading:  return .leading
+        case .center:   return .center
+        case .trailing: return .trailing
+        }
+    }
+
+    private var stackAlignment: HorizontalAlignment {
+        switch textAlignment {
+        case .leading:  return .leading
+        case .center:   return .center
+        case .trailing: return .trailing
+        }
+    }
 
     private var blocks: [TafsirMarkdownBlock] {
         normalizedMarkdown
@@ -482,32 +682,33 @@ private struct TafsirMarkdownView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: stackAlignment, spacing: 14) {
             ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in
                 switch block.kind {
                 case .heading:
                     Text(block.highlightedDisplayText(searchText: searchText, accent: accent))
                         .font(.title3.bold())
                         .foregroundStyle(.primary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .frame(maxWidth: .infinity, alignment: frameAlignment)
                 case .body:
                     if let attributed = block.attributedText(searchText: searchText, accent: accent) {
                         Text(attributed)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .frame(maxWidth: .infinity, alignment: frameAlignment)
                             .textSelection(.enabled)
                             .lineSpacing(5)
                     } else {
                         Text(block.displayText)
                             .font(.body)
                             .foregroundStyle(.primary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .frame(maxWidth: .infinity, alignment: frameAlignment)
                             .textSelection(.enabled)
                             .lineSpacing(5)
                     }
                 }
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: frameAlignment)
+        .multilineTextAlignment(textAlignment)
         .textSelection(.enabled)
     }
 }
@@ -571,7 +772,7 @@ private struct TafsirMarkdownBlock {
               ) {
             if let lower = AttributedString.Index(found.lowerBound, within: attributed),
                let upper = AttributedString.Index(found.upperBound, within: attributed) {
-                attributed[lower..<upper].backgroundColor = accent.opacity(0.28)
+                // Tint matches with the accent foreground only — no background highlight box.
                 attributed[lower..<upper].foregroundColor = accent
             }
             searchStart = found.upperBound
@@ -655,41 +856,45 @@ struct AyahQiraahComparisonSheet: View {
     var body: some View {
         NavigationView {
             List {
-                Section {
-                    Text("Compare this ayah across the Arabic riwayat available in the app. Some riwayat merge or omit Hafs ayah numbers, so unavailable rows are dimmed.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-
-                if !favoriteOptions.isEmpty {
-                    Section(header: Text("FAVORITES")) {
-                        ForEach(favoriteOptions) { option in
-                            qiraahRow(option)
-                        }
-                    }
-                }
-
-                ForEach(groupedOptions, id: \.teacher) { group in
-                    Section(header: Text("\(group.teacher.uppercased()) - \(group.teacherArabic)")) {
-                        ForEach(group.options) { option in
-                            qiraahRow(option)
-                        }
-                    }
-                }
-
-                if filteredOptions.isEmpty {
+                Group {
                     Section {
-                        Text("No riwayat found.")
+                        Text("Compare this ayah across the Arabic riwayat available in the app. Some riwayat merge or omit Hafs ayah numbers, so unavailable rows are dimmed.")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
+
+                    if !favoriteOptions.isEmpty {
+                        Section(header: Text("FAVORITES")) {
+                            ForEach(favoriteOptions) { option in
+                                qiraahRow(option)
+                            }
+                        }
+                    }
+
+                    ForEach(groupedOptions, id: \.teacher) { group in
+                        Section(header: Text("\(group.teacher.uppercased()) - \(group.teacherArabic)")) {
+                            ForEach(group.options) { option in
+                                qiraahRow(option)
+                            }
+                        }
+                    }
+
+                    if filteredOptions.isEmpty {
+                        Section {
+                            Text("No riwayat found.")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                 }
+                .themedListRowBackground()
             }
             .applyConditionalListStyle(defaultView: settings.defaultView)
             .compactListSectionSpacing()
             .navigationTitle("Qiraah Comparison")
             .navigationBarTitleDisplayMode(.inline)
             .searchable(text: $searchText.animation(.easeInOut), prompt: "Search riwayat")
+            .dismissKeyboardOnScroll()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button {
@@ -947,80 +1152,84 @@ struct AyahEnglishComparisonSheet: View {
     var body: some View {
         NavigationView {
             List {
-                Section {
-                    Text("Compare this ayah across several English Qur'an translations. Results are loaded from alquran.cloud.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-
-                if shouldShowQuranText,
-                   let ayah = quranData.ayah(surah: surahNumber, ayah: ayahNumber) {
-                    Section(header: Text("QURAN TEXT")) {
-                        comparisonRow(
-                            title: nil,
-                            text: ayah.displayArabicText(surahId: surahNumber, clean: settings.cleanArabicText),
-                            isArabic: true
-                        )
-
-                        if settings.showTransliteration {
-                            comparisonRow(title: "Transliteration", text: ayah.textTransliteration)
-                        }
+                Group {
+                    Section {
+                        Text("Compare this ayah across several English Qur'an translations. Results are loaded from alquran.cloud.")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
                     }
-                }
 
-                Section(header: Text("DOWNLOADED TRANSLATIONS")) {
-                    if let ayah = quranData.ayah(surah: surahNumber, ayah: ayahNumber) {
-                        ForEach(filteredInAppEditions) { edition in
+                    if shouldShowQuranText,
+                       let ayah = quranData.ayah(surah: surahNumber, ayah: ayahNumber) {
+                        Section(header: Text("QURAN TEXT")) {
                             comparisonRow(
-                                title: edition.name,
-                                text: inAppTranslationText(for: edition.id, ayah: ayah),
-                                editionID: edition.id,
-                                isDownloaded: true
+                                title: nil,
+                                text: ayah.displayArabicText(surahId: surahNumber, clean: settings.cleanArabicText),
+                                isArabic: true
                             )
-                        }
 
-                        if filteredInAppEditions.isEmpty {
-                            Text("No downloaded translations found.")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
+                            if settings.showTransliteration {
+                                comparisonRow(title: "Transliteration", text: ayah.textTransliteration)
+                            }
+                        }
+                    }
+
+                    Section(header: Text("DOWNLOADED TRANSLATIONS")) {
+                        if let ayah = quranData.ayah(surah: surahNumber, ayah: ayahNumber) {
+                            ForEach(filteredInAppEditions) { edition in
+                                comparisonRow(
+                                    title: edition.name,
+                                    text: inAppTranslationText(for: edition.id, ayah: ayah),
+                                    editionID: edition.id,
+                                    isDownloaded: true
+                                )
+                            }
+
+                            if filteredInAppEditions.isEmpty {
+                                Text("No downloaded translations found.")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+
+                    Section(header: Text("ONLINE TRANSLATIONS")) {
+                        if viewModel.isLoading && viewModel.translations.isEmpty {
+                            HStack {
+                                ProgressView()
+                                Text("Loading translations...")
+                                    .foregroundStyle(.secondary)
+                            }
+                        } else if let errorMessage = viewModel.errorMessage, viewModel.translations.isEmpty {
+                                Text(errorMessage)
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            } else {
+                            ForEach(filteredOnlineEditions) { edition in
+                                comparisonRow(
+                                    title: edition.name,
+                                    text: viewModel.translations[edition.id] ?? "Unavailable",
+                                    editionID: edition.id
+                                )
+                                .opacity(viewModel.translations[edition.id] == nil ? 0.55 : 1)
+                            }
+
+                            if filteredOnlineEditions.isEmpty {
+                                Text("No translations found.")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            }
                         }
                     }
                 }
-
-                Section(header: Text("ONLINE TRANSLATIONS")) {
-                    if viewModel.isLoading && viewModel.translations.isEmpty {
-                        HStack {
-                            ProgressView()
-                            Text("Loading translations...")
-                                .foregroundStyle(.secondary)
-                        }
-                    } else if let errorMessage = viewModel.errorMessage, viewModel.translations.isEmpty {
-                            Text(errorMessage)
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                        } else {
-                        ForEach(filteredOnlineEditions) { edition in
-                            comparisonRow(
-                                title: edition.name,
-                                text: viewModel.translations[edition.id] ?? "Unavailable",
-                                editionID: edition.id
-                            )
-                            .opacity(viewModel.translations[edition.id] == nil ? 0.55 : 1)
-                        }
-
-                        if filteredOnlineEditions.isEmpty {
-                            Text("No translations found.")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
+                .themedListRowBackground()
             }
             .applyConditionalListStyle(defaultView: settings.defaultView)
             .compactListSectionSpacing()
             .navigationTitle("Translation Comparison")
             .navigationBarTitleDisplayMode(.inline)
             .searchable(text: $searchText.animation(.easeInOut), prompt: "Search translations")
+            .dismissKeyboardOnScroll()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button {
@@ -1113,9 +1322,11 @@ struct AyahContextMenuModifier: ViewModifier {
     
     @Binding var searchText: String
     @Binding var scrollToSurahID: Int
-    
+
     let lastRead: Bool
-    
+    /// When true, the menu leads with "Hide for Today" + "Delete Forever" (the Ayah of the Day card).
+    var ayahOfTheDay: Bool = false
+
     @State var showAyahSheet = false
     
     @State private var showingNoteSheet = false
@@ -1204,6 +1415,7 @@ struct AyahContextMenuModifier: ViewModifier {
     }
     
     @State private var confirmRemoveNote = false
+    @State private var confirmDeleteForever = false
 
     private func toggleBookmarkWithNoteGuard() {
         if !settings.toggleBookmarkIfNoNoteLoss(surah: surah, ayah: ayah) {
@@ -1218,7 +1430,21 @@ struct AyahContextMenuModifier: ViewModifier {
         #if os(iOS)
         content
             .contextMenu {
-                if lastRead {
+                if ayahOfTheDay {
+                    Button(role: .destructive) {
+                        settings.hapticFeedback()
+                        withAnimation {
+                            settings.ayahOfTheDayHiddenDate = Settings.dayKey()
+                        }
+                    } label: { Label("Hide for Today", systemImage: "eye.slash") }
+
+                    Button(role: .destructive) {
+                        settings.hapticFeedback()
+                        confirmDeleteForever = true
+                    } label: { Label("Delete Forever", systemImage: "trash") }
+
+                    Divider()
+                } else if lastRead {
                     Button(role: .destructive) {
                         settings.hapticFeedback()
                         withAnimation {
@@ -1226,10 +1452,15 @@ struct AyahContextMenuModifier: ViewModifier {
                             settings.lastReadAyah = 0
                         }
                     } label: { Label("Remove", systemImage: "minus.circle") }
-                    
+
+                    Button(role: .destructive) {
+                        settings.hapticFeedback()
+                        confirmDeleteForever = true
+                    } label: { Label("Delete Forever", systemImage: "trash") }
+
                     Divider()
                 }
-                
+
                 Button(role: isBookmarked ? .destructive : .cancel) {
                     settings.hapticFeedback()
                     toggleBookmarkWithNoteGuard()
@@ -1254,7 +1485,9 @@ struct AyahContextMenuModifier: ViewModifier {
                 if !currentNote.isEmpty {
                     Button(role: .destructive) {
                         settings.hapticFeedback()
-                        removeNote()
+                        withAnimation(.easeInOut) {
+                            removeNote()
+                        }
                     } label: {
                         Label("Remove Note", systemImage: "minus.circle")
                     }
@@ -1415,6 +1648,25 @@ struct AyahContextMenuModifier: ViewModifier {
             } message: {
                 Text(Settings.bookmarkNoteRemovalDialogMessage)
             }
+            .confirmationDialog("Are you sure?", isPresented: $confirmDeleteForever, titleVisibility: .visible) {
+                Button("Remove Permanently", role: .destructive) {
+                    settings.hapticFeedback()
+                    withAnimation {
+                        if ayahOfTheDay {
+                            settings.showAyahOfTheDay = false
+                        } else {
+                            settings.lastReadSurah = 0
+                            settings.lastReadAyah = 0
+                            settings.saveLastReadAyah = false
+                        }
+                    }
+                }
+                Button("Cancel") {}
+            } message: {
+                Text(ayahOfTheDay
+                     ? "You can re-enable Ayah of the Day later in Quran Settings."
+                     : "You can re-enable Last Read Ayah later in Quran Settings.")
+            }
         #else
         content
         #endif
@@ -1429,7 +1681,8 @@ extension View {
         bookmarkedAyahs: Set<String>,
         searchText: Binding<String>,
         scrollToSurahID: Binding<Int>,
-        lastRead: Bool = false
+        lastRead: Bool = false,
+        ayahOfTheDay: Bool = false
     ) -> some View {
         self.modifier(AyahContextMenuModifier(
             surah: surah,
@@ -1438,7 +1691,8 @@ extension View {
             bookmarkedAyahs: bookmarkedAyahs,
             searchText: searchText,
             scrollToSurahID: scrollToSurahID,
-            lastRead: lastRead
+            lastRead: lastRead,
+            ayahOfTheDay: ayahOfTheDay
         ))
     }
 }
@@ -1494,7 +1748,9 @@ struct LeftSwipeActions: ViewModifier {
             .swipeActions(edge: .leading) {
                 Button {
                     settings.hapticFeedback()
-                    settings.toggleSurahFavorite(surah: surah)
+                    withAnimation(.easeInOut) {
+                        settings.toggleSurahFavorite(surah: surah)
+                    }
                 } label: {
                     Image(systemName: isFavorite ? "star.fill" : "star")
                 }

@@ -116,10 +116,13 @@ struct AdhkarView: View {
 
     var body: some View {
         List {
-            introductionSection
-            adhkarRows
-            etymologySection
-            virtuesSection
+            Group {
+                introductionSection
+                adhkarRows
+                etymologySection
+                virtuesSection
+            }
+            .themedListRowBackground()
         }
         #if os(iOS)
         .adaptiveSafeArea(edge: .bottom) {
@@ -130,7 +133,8 @@ struct AdhkarView: View {
                 }
                 .pickerStyle(.segmented)
                 .conditionalGlassEffect()
-                
+                .onChange(of: settings.useFontArabic) { _ in settings.hapticFeedback() }
+
                 SearchBar(text: $searchText.animation(.easeInOut))
                     .padding([.horizontal, .top], -8)
             }

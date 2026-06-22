@@ -1,5 +1,28 @@
 import SwiftUI
 
+/// A slim, unobtrusive progress bar used under the last-read / last-listened rows.
+struct TinyProgressBar: View {
+    let fraction: Double
+    let color: Color
+
+    var body: some View {
+        // The base capsule defines the bar's size (full width, fixed height); the fill is an overlay so it
+        // never collapses to a sliver while the enclosing list row is still computing its layout.
+        Capsule()
+            .fill(color.opacity(0.22))
+            .frame(height: 3)
+            .frame(maxWidth: .infinity)
+            .overlay(alignment: .leading) {
+                GeometryReader { geo in
+                    Capsule()
+                        .fill(color)
+                        .frame(width: max(0, min(1, fraction)) * geo.size.width, height: 3)
+                }
+            }
+            .accessibilityHidden(true)
+    }
+}
+
 struct SurahRow: View, Equatable {
     @EnvironmentObject var settings: Settings
     
@@ -14,6 +37,8 @@ struct SurahRow: View, Equatable {
     let khatmCompletedAyahs: Int?
     let khatmTotalAyahs: Int?
     let searchQuery: String
+    /// When true, renders the same row content wrapped as a grid card (so grid == list look).
+    let grid: Bool
 
     init(
         surah: Surah,
@@ -26,7 +51,8 @@ struct SurahRow: View, Equatable {
         fontArabic: String = Settings.shared.fontArabic,
         khatmCompletedAyahs: Int? = nil,
         khatmTotalAyahs: Int? = nil,
-        searchQuery: String = ""
+        searchQuery: String = "",
+        grid: Bool = false
     ) {
         self.surah = surah
         self.ayah = ayah
@@ -39,6 +65,7 @@ struct SurahRow: View, Equatable {
         self.khatmCompletedAyahs = khatmCompletedAyahs
         self.khatmTotalAyahs = khatmTotalAyahs
         self.searchQuery = searchQuery
+        self.grid = grid
     }
 
     private var revelationEmoji: String {
@@ -159,6 +186,36 @@ struct SurahRow: View, Equatable {
     
     var body: some View {
         #if os(iOS)
+        if grid { gridBody } else { listBody }
+        #else
+        VStack {
+            HStack {
+                Text("\(surah.id) - \(surah.nameTransliteration)")
+                    .font(.subheadline)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                Text("\(surah.nameArabic) - \(surah.idArabic)")
+                    .font(.headline)
+                    .foregroundColor(settings.accentColor.color)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+                    .minimumScaleFactor(0.9)
+            }
+
+            Text("\(revelationEmoji) • \(surah.numberOfAyahs) Ayahs • \(pageLine)")
+                .font(.caption2)
+                .foregroundColor(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .lineLimit(1)
+        .minimumScaleFactor(0.5)
+        .contentShape(Rectangle())
+        #endif
+    }
+
+    #if os(iOS)
+    // The normal surah row. Used in both the list and (wrapped as a card) the grid, so favorites look
+    // identical to normal surahs in either layout.
+    private var listBody: some View {
         HStack(alignment: .center) {
             surahNumberPill
                 .padding(.trailing, 2)
@@ -169,7 +226,7 @@ struct SurahRow: View, Equatable {
                         .font(.caption2)
                         .foregroundColor(.secondary)
                 }
-                
+
                 HighlightedSnippet(
                     source: surah.nameTransliteration,
                     term: searchQuery,
@@ -177,13 +234,14 @@ struct SurahRow: View, Equatable {
                     accent: accentColor.color,
                     fg: .primary
                 )
-                
+
                 HighlightedSnippet(
                     source: surah.nameEnglish,
                     term: searchQuery,
                     font: .caption,
                     accent: accentColor.color,
-                    fg: showInfo ? .primary : .secondary
+                    fg: showInfo ? .primary : .secondary,
+                    trailingSuffix: showInfo ? "" : " \(revelationEmoji)"
                 )
 
                 if showInfo {
@@ -209,8 +267,9 @@ struct SurahRow: View, Equatable {
 
                 khatmProgressLine
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
             .lineLimit(1)
+            .layoutPriority(1)
+            .frame(maxWidth: .infinity, alignment: .leading)
 
             HStack {
                 HighlightedSnippet(
@@ -220,41 +279,120 @@ struct SurahRow: View, Equatable {
                     accent: accentColor.color,
                     fg: .primary
                 )
-                
+
                 Text(surah.idArabic)
                     .font(.custom(Settings.hafsUthmaniFontName, size: UIFont.preferredFont(forTextStyle: .title1).pointSize))
                     .foregroundColor(accentColor.color)
             }
             .minimumScaleFactor(1)
+            .padding(.leading, 8)
             .frame(maxWidth: .infinity, alignment: .trailing)
         }
         .lineLimit(1)
         .minimumScaleFactor(0.75)
         .contentShape(Rectangle())
-        #else
-        VStack {
-            HStack {
-                Text("\(surah.id) - \(surah.nameTransliteration)")
-                    .font(.subheadline)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                
-                Text("\(surah.nameArabic) - \(surah.idArabic)")
-                    .font(.headline)
-                    .foregroundColor(settings.accentColor.color)
-                    .frame(maxWidth: .infinity, alignment: .trailing)
-                    .minimumScaleFactor(0.9)
+    }
+
+    /// Custom grid tile: the same information as the list row, re-laid out vertically so it reads
+    /// well in a narrow 2-column grid cell.
+    private var gridBody: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 6) {
+                Text("\(surah.id)")
+                    .font(.subheadline.monospacedDigit().weight(.bold))
+                    .foregroundColor(accentColor.color)
+
+                Spacer(minLength: 0)
+
+                if favoriteState {
+                    Image(systemName: "star.fill")
+                        .font(.caption2)
+                        .foregroundStyle(accentColor.color)
+                }
             }
 
-            Text("\(revelationEmoji) • \(surah.numberOfAyahs) Ayahs • \(pageLine)")
-                .font(.caption2)
-                .foregroundColor(.secondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            HStack(spacing: 4) {
+                Text(surah.idArabic)
+                    .font(.custom(Settings.hafsUthmaniFontName, size: UIFont.preferredFont(forTextStyle: .title3).pointSize))
+                    .foregroundColor(accentColor.color)
+                
+                HighlightedSnippet(
+                    source: surah.nameArabic,
+                    term: searchQuery,
+                    font: .custom(fontArabic, size: UIFont.preferredFont(forTextStyle: .title3).pointSize),
+                    accent: accentColor.color,
+                    fg: .primary
+                )
+            }
+            .lineLimit(1)
+            .minimumScaleFactor(0.5)
+
+            if let context = positionContextLine {
+                Text(context)
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
+
+            HighlightedSnippet(
+                source: surah.nameTransliteration,
+                term: searchQuery,
+                font: .subheadline.weight(.semibold),
+                accent: accentColor.color,
+                fg: .primary
+            )
+            .lineLimit(1)
+            .minimumScaleFactor(0.6)
+
+            HighlightedSnippet(
+                source: surah.nameEnglish,
+                term: searchQuery,
+                font: .caption,
+                accent: accentColor.color,
+                fg: showInfo ? .primary : .secondary,
+                trailingSuffix: showInfo ? "" : " \(revelationEmoji)"
+            )
+            .lineLimit(1)
+            .minimumScaleFactor(0.6)
+
+            if showInfo {
+                Text(pageLine)
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+
+                Text(ayahAndRevelationLine)
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+
+                if let sortedMetricLine,
+                   settings.quranSortMode == .words || settings.quranSortMode == .letters {
+                    Text(sortedMetricLine)
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
+                }
+            } else if let sortedMetricLine {
+                Text(sortedMetricLine)
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+            }
+
+            khatmProgressLine
+
+            Spacer(minLength: 0)
         }
-        .lineLimit(1)
-        .minimumScaleFactor(0.5)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+        .padding(12)
+        .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.primary.opacity(0.06)))
         .contentShape(Rectangle())
-        #endif
     }
+    #endif
 
     static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.surah == rhs.surah &&
@@ -267,7 +405,8 @@ struct SurahRow: View, Equatable {
         lhs.fontArabic == rhs.fontArabic &&
         lhs.khatmCompletedAyahs == rhs.khatmCompletedAyahs &&
         lhs.khatmTotalAyahs == rhs.khatmTotalAyahs &&
-        lhs.searchQuery == rhs.searchQuery
+        lhs.searchQuery == rhs.searchQuery &&
+        lhs.grid == rhs.grid
     }
 }
 
@@ -279,6 +418,11 @@ struct SurahAyahRow: View {
     var ayah: Ayah
     var note: String? = nil
     var disableTajweedColors: Bool = false
+    /// When true, renders the same single-line row content wrapped as a grid card (grid == list look).
+    var grid: Bool = false
+    /// Multiplier on the Arabic line's font size (default matches the normal row). Pass a smaller value
+    /// for compact contexts such as the page/juz starting-ayah lists.
+    var arabicScale: CGFloat = 1.1
 
     private var isBookmarked: Bool {
         settings.bookmarkedAyahs.contains { $0.surah == surah.id && $0.ayah == ayah.id }
@@ -338,7 +482,7 @@ struct SurahAyahRow: View {
         return size.width + 8
     }
     
-    var body: some View {
+    private var listBody: some View {
         HStack {
             VStack {
                 ZStack(alignment: .topTrailing) {
@@ -370,16 +514,16 @@ struct SurahAyahRow: View {
                             .offset(x: 8, y: -6)
                     }
                 }
-                
+
                 Text(surah.nameTransliteration)
                     #if os(iOS)
                     .font(.caption)
                     #else
                     .font(.caption2)
                     #endif
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
             }
-            .lineLimit(1)
-            .minimumScaleFactor(0.5)
             #if os(iOS)
             .frame(width: 65, alignment: .center)
             #else
@@ -387,58 +531,110 @@ struct SurahAyahRow: View {
             #endif
             .foregroundColor(settings.accentColor.color)
             .padding(.trailing, 8)
-            
-            if let note = note {
-                Text(note)
-                    .font(.subheadline)
-                    .foregroundColor(.primary)
-                    .multilineTextAlignment(.leading)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .lineLimit(1)
-            } else {
-                VStack {
-                    if settings.showArabicText {
-                        HighlightedSnippet(
-                            source: arabicDisplayText(),
-                            term: "",
-                            font: .custom(settings.fontArabic, size: UIFont.preferredFont(forTextStyle: .subheadline).pointSize * 1.1),
-                            accent: settings.accentColor.color,
-                            fg: .primary,
-                            preStyledSource: arabicTajweedText(),
-                            beginnerMode: settings.beginnerMode,
-                            lineLimit: 1
-                        )
-                            .frame(maxWidth: .infinity, alignment: .trailing)
-                    }
-                    
-                    if settings.showTransliteration, settings.isHafsDisplay {
-                        Text(ayah.textTransliteration)
-                            .font(.subheadline)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .lineLimit(1)
-                    }
-                    
-                    if settings.showEnglishSaheeh, settings.isHafsDisplay {
-                        Text(ayah.textEnglishSaheeh)
-                            .font(.subheadline)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .lineLimit(1)
-                    } else if settings.showEnglishMustafa, settings.isHafsDisplay {
-                        Text(ayah.textEnglishMustafa)
-                            .font(.subheadline)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .lineLimit(1)
-                    }
-                }
-                .foregroundColor(.primary)
-            }
+
+            ayahContent
         }
         .padding(.vertical, 2)
+    }
+
+    /// The ayah text (note, or Arabic + transliteration + English, single line each) shared by the
+    /// list row and the grid tile so they show identical information.
+    @ViewBuilder
+    private var ayahContent: some View {
+        if let note = note {
+            Text(note)
+                .font(.subheadline)
+                .foregroundColor(.primary)
+                .multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .lineLimit(1)
+        } else {
+            VStack {
+                if settings.showArabicText {
+                    HighlightedSnippet(
+                        source: arabicDisplayText(),
+                        term: "",
+                        font: .custom(settings.fontArabic, size: UIFont.preferredFont(forTextStyle: .subheadline).pointSize * arabicScale),
+                        accent: settings.accentColor.color,
+                        fg: .primary,
+                        preStyledSource: arabicTajweedText(),
+                        beginnerMode: settings.beginnerMode,
+                        lineLimit: 1
+                    )
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+                }
+
+                if settings.showTransliteration, settings.isHafsDisplay {
+                    Text(ayah.textTransliteration)
+                        .font(.subheadline)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .lineLimit(1)
+                }
+
+                if settings.showEnglishSaheeh, settings.isHafsDisplay {
+                    Text(ayah.textEnglishSaheeh)
+                        .font(.subheadline)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .lineLimit(1)
+                } else if settings.showEnglishMustafa, settings.isHafsDisplay {
+                    Text(ayah.textEnglishMustafa)
+                        .font(.subheadline)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .lineLimit(1)
+                }
+            }
+            .foregroundColor(.primary)
+        }
+    }
+
+    #if os(iOS)
+    /// Custom grid tile: the same ayah information as the list row, laid out vertically for a 2-column cell.
+    private var gridBody: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                Text("\(surah.id):\(ayah.id)")
+                    .font(.subheadline.monospacedDigit().weight(.semibold))
+                    .foregroundColor(settings.accentColor.color)
+                    .onTapGesture {
+                        settings.hapticFeedback()
+                        toggleBookmarkWithNoteGuard()
+                    }
+
+                Spacer(minLength: 0)
+
+                if isBookmarked {
+                    Image(systemName: "bookmark.fill")
+                        .font(.caption2)
+                        .foregroundStyle(settings.accentColor.color)
+                }
+            }
+
+            ayahContent
+
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+        .padding(12)
+        .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.primary.opacity(0.06)))
+        .contentShape(Rectangle())
+    }
+    #endif
+
+    var body: some View {
+        Group {
+            #if os(iOS)
+            if grid { gridBody } else { listBody }
+            #else
+            listBody
+            #endif
+        }
         .contentShape(Rectangle())
         .confirmationDialog(Settings.bookmarkNoteRemovalDialogTitle, isPresented: $confirmRemoveNote, titleVisibility: .visible) {
             Button("Remove", role: .destructive) {
                 settings.hapticFeedback()
-                settings.toggleBookmark(surah: surah.id, ayah: ayah.id)
+                withAnimation(.easeInOut) {
+                    settings.toggleBookmark(surah: surah.id, ayah: ayah.id)
+                }
             }
             Button("Cancel") {}
         } message: {
@@ -447,18 +643,17 @@ struct SurahAyahRow: View {
     }
 }
 
-private enum _FmtCache {
-    static let mmss: DateComponentsFormatter = {
-        let f = DateComponentsFormatter()
-        f.allowedUnits = [.minute, .second]
-        f.zeroFormattingBehavior = .pad
-        return f
-    }()
-}
-
+/// Formats a duration as H:MM:SS once it reaches an hour, otherwise MM:SS.
 @inline(__always)
 func formatMMSS(_ seconds: Double) -> String {
-    _FmtCache.mmss.string(from: seconds) ?? "00:00"
+    let total = max(0, Int(seconds.rounded()))
+    let h = total / 3600
+    let m = (total % 3600) / 60
+    let s = total % 60
+    if h > 0 {
+        return String(format: "%d:%02d:%02d", h, m, s)
+    }
+    return String(format: "%02d:%02d", m, s)
 }
 
 #if os(iOS)
@@ -475,6 +670,8 @@ struct LastListenedSurahRow: View {
     var qiraahRefreshKey: String = ""
     @Binding var showListeningHistory: Bool
     var onSelectSurah: ((Int) -> Void)? = nil
+
+    @State private var confirmDeleteForever = false
 
     var body: some View {
         guard let surah = quranData.quran.first(where: { $0.id == lastListenedSurah.surahNumber })
@@ -546,8 +743,17 @@ struct LastListenedSurahRow: View {
                             .lineLimit(1)
                             .minimumScaleFactor(0.5)
                     }
+
+                    TinyProgressBar(
+                        fraction: lastListenedSurah.fullDuration > 0 ? lastListenedSurah.currentDuration / lastListenedSurah.fullDuration : 0,
+                        color: settings.accentColor.color
+                    )
+                    .padding(.top, 3)
+                    .opacity(quranPlayer.isPlaying || quranPlayer.isPaused ? 0.35 : 1)
+                    .animation(.easeInOut, value: quranPlayer.isPlaying || quranPlayer.isPaused)
                 }
                 .padding(.vertical, 8)
+                .contentShape(Rectangle())
 
                 if showListeningHistory && !quranPlayer.listeningHistory.isEmpty {
                     ForEach(quranPlayer.listeningHistory) { item in
@@ -597,6 +803,13 @@ struct LastListenedSurahRow: View {
                     Label("Remove", systemImage: "minus.circle")
                 }
 
+                Button(role: .destructive) {
+                    settings.hapticFeedback()
+                    confirmDeleteForever = true
+                } label: {
+                    Label("Delete Forever", systemImage: "trash")
+                }
+
                 Divider()
 
                 Button {
@@ -630,6 +843,18 @@ struct LastListenedSurahRow: View {
                     scrollToSurahID: $scrollToSurahID,
                     lastListened: true
                 )
+            }
+            .confirmationDialog("Are you sure?", isPresented: $confirmDeleteForever, titleVisibility: .visible) {
+                Button("Remove Permanently", role: .destructive) {
+                    settings.hapticFeedback()
+                    withAnimation {
+                        settings.lastListenedSurah = nil
+                        settings.saveLastListenedSurah = false
+                    }
+                }
+                Button("Cancel") {}
+            } message: {
+                Text("You can re-enable Last Listened Surah later in Quran Settings.")
             }
             #endif
             .animation(.easeInOut, value: quranPlayer.isPlaying || quranPlayer.isPaused)
@@ -675,9 +900,10 @@ struct LastListenedSurahRow: View {
                     .foregroundColor(settings.accentColor.color)
                     .minimumScaleFactor(0.75)
                     .transition(.opacity)
-                    .opacity(!quranPlayer.isPlaying && !quranPlayer.isPaused ? 1 : 0)
+                    .opacity(!quranPlayer.isPlaying && !quranPlayer.isPaused ? 1 : 0.35)
                     .animation(.easeInOut, value: quranPlayer.isPlaying)
                     .animation(.easeInOut, value: quranPlayer.isPaused)
+                    .contentShape(Rectangle())
             }
             .disabled(quranPlayer.isPlaying || quranPlayer.isPaused)
         }
@@ -698,6 +924,225 @@ struct LastListenedSurahRow: View {
                 .minimumScaleFactor(0.5)
         }
         .padding(.vertical, 4)
+    }
+}
+
+/// Compact summary-mode tile that previews a single ayah (Arabic / transliteration / English),
+/// each limited to two lines — like a normal AyahRow but trimmed to fit a tile.
+struct SummaryAyahTile: View {
+    @EnvironmentObject var settings: Settings
+
+    let title: String
+    let icon: String
+    let surah: Surah
+    let ayah: Ayah
+    let onTap: () -> Void
+
+    /// e.g. "Al-Fatiha 1:5"
+    private var detail: String { "\(surah.nameTransliteration) \(surah.id):\(ayah.id)" }
+
+    private func arabicDisplayText() -> String {
+        let text = ayah.displayArabicText(surahId: surah.id, clean: settings.cleanArabicText)
+        return settings.beginnerMode ? text.map { String($0) }.joined(separator: " ") : text
+    }
+
+    private var shouldShowTajweedColors: Bool {
+        settings.showTajweedColors && settings.showArabicText && settings.isHafsDisplay
+    }
+
+    private func arabicTajweedText() -> AttributedString? {
+        guard shouldShowTajweedColors else { return nil }
+        let text = ayah.displayArabicText(surahId: surah.id, clean: false)
+        let displayText = settings.cleanArabicText ? ayah.displayArabicText(surahId: surah.id, clean: true) : text
+        let renderedDisplayText = settings.beginnerMode ? displayText.map { String($0) }.joined(separator: " ") : displayText
+        return TajweedStore.shared.attributedText(
+            surah: surah.id,
+            ayah: ayah.id,
+            text: text,
+            displayText: renderedDisplayText,
+            cleanDisplayText: settings.cleanArabicText,
+            beginnerSpacing: settings.beginnerMode
+        )
+    }
+
+    var body: some View {
+        Button {
+            settings.hapticFeedback()
+            onTap()
+        } label: {
+            VStack(alignment: .leading, spacing: 6) {
+                if !title.isEmpty {
+                    HStack(spacing: 6) {
+                        Image(systemName: icon)
+                            .font(.caption)
+                            .foregroundColor(settings.accentColor.color)
+                        Text(title)
+                            .font(.caption2.weight(.semibold))
+                            .foregroundColor(.secondary)
+                            .lineLimit(1)
+                    }
+                }
+
+                Text(detail)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundColor(settings.accentColor.color)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+
+                ayahPreview
+
+                Spacer(minLength: 0)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+            .padding(12)
+            .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.primary.opacity(0.06)))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private var ayahPreview: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if settings.showArabicText {
+                HighlightedSnippet(
+                    source: arabicDisplayText(),
+                    term: "",
+                    font: .custom(settings.fontArabic, size: UIFont.preferredFont(forTextStyle: .subheadline).pointSize * 1.1),
+                    accent: settings.accentColor.color,
+                    fg: .primary,
+                    preStyledSource: arabicTajweedText(),
+                    beginnerMode: settings.beginnerMode,
+                    lineLimit: 1
+                )
+                .multilineTextAlignment(.trailing)
+                .frame(maxWidth: .infinity, alignment: .trailing)
+            }
+
+            if settings.showTransliteration, settings.isHafsDisplay {
+                Text(ayah.textTransliteration)
+                    .font(.footnote)
+                    .foregroundColor(.primary)
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            if settings.showEnglishSaheeh, settings.isHafsDisplay {
+                Text(ayah.textEnglishSaheeh)
+                    .font(.footnote)
+                    .foregroundColor(.primary)
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            } else if settings.showEnglishMustafa, settings.isHafsDisplay {
+                Text(ayah.textEnglishMustafa)
+                    .font(.footnote)
+                    .foregroundColor(.primary)
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+    }
+}
+
+/// Compact summary-mode tile for the last-listened surah. There is no ayah, so it shows the reciter,
+/// duration, a play button, and a tiny progress bar instead — sized to match the ayah tile beside it.
+struct SummarySurahTile: View {
+    @EnvironmentObject var settings: Settings
+    @EnvironmentObject var quranPlayer: QuranPlayer
+
+    let title: String
+    let icon: String
+    let surah: Surah
+    let lastListenedSurah: LastListenedSurah
+    let onTap: () -> Void
+
+    /// e.g. "1 - Al-Fatiha"
+    private var detail: String { "\(surah.id) - \(surah.nameTransliteration)" }
+
+    var body: some View {
+        Button {
+            settings.hapticFeedback()
+            onTap()
+        } label: {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 6) {
+                    Image(systemName: icon)
+                        .font(.caption)
+                        .foregroundColor(settings.accentColor.color)
+                    Text(title)
+                        .font(.caption2.weight(.semibold))
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                }
+
+                Text(detail)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundColor(settings.accentColor.color)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+
+                Text(lastListenedSurah.reciter.displayNameWithEnglishQiraah)
+                    .font(.caption2)
+                    .foregroundColor(.primary)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.6)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                HStack(spacing: 6) {
+                    Text("\(formatMMSS(lastListenedSurah.currentDuration)) / \(formatMMSS(lastListenedSurah.fullDuration))")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
+
+                    Spacer()
+
+                    Menu {
+                        Text("Last Listened")
+                            .foregroundStyle(.secondary)
+
+                        Button {
+                            settings.hapticFeedback()
+                            quranPlayer.playSurah(
+                                surahNumber: lastListenedSurah.surahNumber,
+                                surahName: lastListenedSurah.surahName,
+                                certainReciter: true
+                            )
+                        } label: {
+                            Label("Play Last Listened", systemImage: "play.fill")
+                        }
+
+                        Button {
+                            settings.hapticFeedback()
+                            quranPlayer.playSurah(
+                                surahNumber: lastListenedSurah.surahNumber,
+                                surahName: surah.nameTransliteration
+                            )
+                        } label: {
+                            Label("Play from Beginning", systemImage: "memories")
+                        }
+                    } label: {
+                        Image(systemName: "play.fill")
+                            .font(.subheadline)
+                            .foregroundColor(settings.accentColor.color)
+                            .opacity(!quranPlayer.isPlaying && !quranPlayer.isPaused ? 1 : 0.35)
+                            .contentShape(Rectangle())
+                    }
+                    .disabled(quranPlayer.isPlaying || quranPlayer.isPaused)
+                }
+
+                TinyProgressBar(
+                    fraction: lastListenedSurah.fullDuration > 0 ? lastListenedSurah.currentDuration / lastListenedSurah.fullDuration : 0,
+                    color: settings.accentColor.color
+                )
+                .padding(.top, 1)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+            .padding(12)
+            .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.primary.opacity(0.06)))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 }
 #endif
@@ -734,6 +1179,22 @@ struct LastReadAyahRow: View {
         return (t?.isEmpty == false) ? t : nil
     }
 
+    /// The ayah row plus its progress bar as a single tappable unit, so swipe/context actions cover both
+    /// and there is no stray standalone row (which left a large gap when the ayah had no note).
+    private var lastReadRowContent: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            SurahAyahRow(surah: surah, ayah: ayah, note: noteToShow)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            TinyProgressBar(
+                fraction: surah.numberOfAyahs > 0 ? Double(ayah.id) / Double(surah.numberOfAyahs) : 0,
+                color: settings.accentColor.color
+            )
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+    }
+
     var body: some View {
         Section(header:
             HStack {
@@ -762,17 +1223,13 @@ struct LastReadAyahRow: View {
                         settings.hapticFeedback()
                         onSelectAyah(surah.id, ayah.id)
                     } label: {
-                        SurahAyahRow(surah: surah, ayah: ayah, note: noteToShow)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .contentShape(Rectangle())
+                        lastReadRowContent
                     }
                     .buttonStyle(.plain)
                     .contentShape(Rectangle())
                 } else {
                     NavigationLink(destination: SurahView(surah: surah, ayah: ayah.id)) {
-                        SurahAyahRow(surah: surah, ayah: ayah, note: noteToShow)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .contentShape(Rectangle())
+                        lastReadRowContent
                     }
                     .tag(surah.id)
                     .contentShape(Rectangle())
@@ -868,6 +1325,355 @@ struct LastReadAyahRow: View {
     }
 }
 
+#if os(iOS)
+/// The last individual ayah the user listened to (single ayah or custom range). Mirrors LastReadAyahRow.
+struct LastListenedAyahRow: View {
+    @EnvironmentObject private var settings: Settings
+    @EnvironmentObject private var quranPlayer: QuranPlayer
+    @EnvironmentObject private var quranData: QuranData
+
+    let surah: Surah
+    let ayah: Ayah
+    let favoriteSurahs: Set<Int>
+    let bookmarkedAyahs: Set<String>
+
+    @Binding var searchText: String
+    @Binding var scrollToSurahID: Int
+    @Binding var showAyahListeningHistory: Bool
+    var onSelectAyah: ((Int, Int) -> Void)? = nil
+
+    @State private var confirmDeleteForever = false
+
+    private var rowContent: some View {
+        SurahAyahRow(surah: surah, ayah: ayah)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+    }
+
+    @ViewBuilder
+    private func historyRow(_ item: AyahListeningHistoryItem) -> some View {
+        if let histSurah = quranData.surah(item.surahNumber),
+           let histAyah = histSurah.ayahs.first(where: { $0.id == item.ayahNumber }) {
+            Group {
+                if let onSelectAyah {
+                    Button {
+                        settings.hapticFeedback()
+                        onSelectAyah(histSurah.id, histAyah.id)
+                    } label: {
+                        SurahAyahRow(surah: histSurah, ayah: histAyah)
+                            .opacity(0.6)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .contentShape(Rectangle())
+                } else {
+                    NavigationLink(destination: SurahView(surah: histSurah, ayah: histAyah.id)) {
+                        SurahAyahRow(surah: histSurah, ayah: histAyah)
+                            .opacity(0.6)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .contentShape(Rectangle())
+                    }
+                    .tag(histSurah.id)
+                    .contentShape(Rectangle())
+                }
+            }
+            .rightSwipeActions(
+                surahID: histSurah.id,
+                surahName: histSurah.nameTransliteration,
+                ayahID: histAyah.id,
+                searchText: $searchText,
+                scrollToSurahID: $scrollToSurahID
+            )
+            .leftSwipeActions(
+                surah: histSurah.id,
+                favoriteSurahs: favoriteSurahs,
+                bookmarkedAyahs: bookmarkedAyahs,
+                bookmarkedSurah: histSurah.id,
+                bookmarkedAyah: histAyah.id
+            )
+        }
+    }
+
+    var body: some View {
+        Section(header:
+            HStack {
+                Text("LAST LISTENED AYAH")
+
+                Spacer()
+
+                if !quranPlayer.ayahListeningHistory.isEmpty {
+                    Image(systemName: showAyahListeningHistory ? "minus.circle" : "plus.circle")
+                        .foregroundColor(settings.accentColor.color)
+                        .padding(4)
+                        .conditionalGlassEffect()
+                        .onTapGesture {
+                            settings.hapticFeedback()
+                            withAnimation {
+                                showAyahListeningHistory.toggle()
+                            }
+                        }
+                }
+            }
+        ) {
+            Group {
+                if let onSelectAyah {
+                    Button {
+                        settings.hapticFeedback()
+                        onSelectAyah(surah.id, ayah.id)
+                    } label: {
+                        rowContent
+                    }
+                    .buttonStyle(.plain)
+                    .contentShape(Rectangle())
+                } else {
+                    NavigationLink(destination: SurahView(surah: surah, ayah: ayah.id)) {
+                        rowContent
+                    }
+                    .tag(surah.id)
+                    .contentShape(Rectangle())
+                }
+            }
+            .rightSwipeActions(
+                surahID: surah.id,
+                surahName: surah.nameTransliteration,
+                ayahID: ayah.id,
+                searchText: $searchText,
+                scrollToSurahID: $scrollToSurahID
+            )
+            .leftSwipeActions(
+                surah: surah.id,
+                favoriteSurahs: favoriteSurahs,
+                bookmarkedAyahs: bookmarkedAyahs,
+                bookmarkedSurah: surah.id,
+                bookmarkedAyah: ayah.id
+            )
+            .contextMenu {
+                Text("Last Listened Ayah")
+                    .foregroundStyle(.secondary)
+
+                Button(role: .destructive) {
+                    settings.hapticFeedback()
+                    withAnimation {
+                        settings.lastListenedAyah = nil
+                    }
+                } label: {
+                    Label("Remove", systemImage: "minus.circle")
+                }
+
+                Button(role: .destructive) {
+                    settings.hapticFeedback()
+                    confirmDeleteForever = true
+                } label: {
+                    Label("Delete Forever", systemImage: "trash")
+                }
+
+                Divider()
+
+                Button {
+                    settings.hapticFeedback()
+                    quranPlayer.playAyah(surahNumber: surah.id, ayahNumber: ayah.id)
+                } label: {
+                    Label("Play This Ayah", systemImage: "play.circle")
+                }
+
+                Button {
+                    settings.hapticFeedback()
+                    quranPlayer.playAyah(surahNumber: surah.id, ayahNumber: ayah.id, continueRecitation: true)
+                } label: {
+                    Label("Play From Ayah", systemImage: "play.circle.fill")
+                }
+            }
+            .confirmationDialog("Are you sure?", isPresented: $confirmDeleteForever, titleVisibility: .visible) {
+                Button("Remove Permanently", role: .destructive) {
+                    settings.hapticFeedback()
+                    withAnimation {
+                        settings.lastListenedAyah = nil
+                        settings.saveLastListenedAyah = false
+                    }
+                }
+                Button("Cancel") {}
+            } message: {
+                Text("You can re-enable Last Listened Ayah later in Quran Settings.")
+            }
+
+            if showAyahListeningHistory && !quranPlayer.ayahListeningHistory.isEmpty {
+                ForEach(quranPlayer.ayahListeningHistory) { item in
+                    historyRow(item)
+                }
+            }
+        }
+    }
+}
+
+/// The deterministic daily "Ayah of the Day" card shown at the top of the Quran tab.
+struct AyahOfTheDayRow: View {
+    @EnvironmentObject private var settings: Settings
+    @EnvironmentObject private var quranPlayer: QuranPlayer
+
+    let surah: Surah
+    let ayah: Ayah
+    let favoriteSurahs: Set<Int>
+    let bookmarkedAyahs: Set<String>
+
+    @Binding var searchText: String
+    @Binding var scrollToSurahID: Int
+    var onSelectAyah: ((Int, Int) -> Void)? = nil
+
+    /// A featured card (accent-tinted glass, larger centered Arabic + translation) so the daily ayah looks
+    /// distinct from the compact Last Read / Last Listened rows.
+    private var rowContent: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if settings.showArabicText {
+                Text(ayah.displayArabicText(surahId: surah.id, clean: settings.cleanArabicText, qiraahOverride: settings.displayQiraahForArabic))
+                    .font(.custom(settings.fontArabic, size: UIFont.preferredFont(forTextStyle: .title2).pointSize))
+                    .multilineTextAlignment(.trailing)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+                    .lineSpacing(6)
+            }
+
+            Text("Surah \(surah.id):\(ayah.id) · \(surah.nameTransliteration)")
+                .font(.caption.weight(.semibold))
+                .foregroundColor(settings.accentColor.color)
+
+            Text(ayah.textEnglishSaheeh.isEmpty ? ayah.textEnglishMustafa : ayah.textEnglishSaheeh)
+                .font(.subheadline)
+                .foregroundColor(.primary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .conditionalGlassEffect(rectangle: true, useColor: 0.18)
+        .contentShape(Rectangle())
+    }
+
+    var body: some View {
+        Section(header:
+            HStack(spacing: 6) {
+                Image(systemName: "sparkles")
+                Text("AYAH OF THE DAY")
+            }
+            .foregroundColor(settings.accentColor.color)
+        ) {
+            Group {
+                if let onSelectAyah {
+                    Button {
+                        settings.hapticFeedback()
+                        onSelectAyah(surah.id, ayah.id)
+                    } label: {
+                        rowContent
+                    }
+                    .buttonStyle(.plain)
+                    .contentShape(Rectangle())
+                } else {
+                    NavigationLink(destination: SurahView(surah: surah, ayah: ayah.id)) {
+                        rowContent
+                    }
+                    .tag(surah.id)
+                    .contentShape(Rectangle())
+                }
+            }
+            .rightSwipeActions(
+                surahID: surah.id,
+                surahName: surah.nameTransliteration,
+                ayahID: ayah.id,
+                searchText: $searchText,
+                scrollToSurahID: $scrollToSurahID
+            )
+            .leftSwipeActions(
+                surah: surah.id,
+                favoriteSurahs: favoriteSurahs,
+                bookmarkedAyahs: bookmarkedAyahs,
+                bookmarkedSurah: surah.id,
+                bookmarkedAyah: ayah.id
+            )
+            .ayahContextMenuModifier(
+                surah: surah.id,
+                ayah: ayah.id,
+                favoriteSurahs: favoriteSurahs,
+                bookmarkedAyahs: bookmarkedAyahs,
+                searchText: $searchText,
+                scrollToSurahID: $scrollToSurahID,
+                ayahOfTheDay: true
+            )
+        }
+    }
+}
+#endif
+
+/// Compact, Arabic-only ayah row: the ayah reference (and an optional leading label like "Page 3")
+/// plus the Arabic text with tajweed + all reading settings applied, sized down to read nicely in
+/// page/juz search results and the Pages browse list.
+struct CompactAyahArabicRow: View {
+    @EnvironmentObject var settings: Settings
+
+    let surah: Surah
+    let ayah: Ayah
+    var leadingLabel: String? = nil
+
+    private var shouldShowTajweedColors: Bool {
+        settings.showTajweedColors && settings.showArabicText && settings.isHafsDisplay
+    }
+
+    private func arabicDisplayText() -> String {
+        let text = ayah.displayArabicText(surahId: surah.id, clean: settings.cleanArabicText)
+        return settings.beginnerMode ? text.map { String($0) }.joined(separator: " ") : text
+    }
+
+    private func arabicTajweedText() -> AttributedString? {
+        guard shouldShowTajweedColors else { return nil }
+        let text = ayah.displayArabicText(surahId: surah.id, clean: false)
+        let displayText = settings.cleanArabicText ? ayah.displayArabicText(surahId: surah.id, clean: true) : text
+        let renderedDisplayText = settings.beginnerMode ? displayText.map { String($0) }.joined(separator: " ") : displayText
+        return TajweedStore.shared.attributedText(
+            surah: surah.id,
+            ayah: ayah.id,
+            text: text,
+            displayText: renderedDisplayText,
+            cleanDisplayText: settings.cleanArabicText,
+            beginnerSpacing: settings.beginnerMode
+        )
+    }
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                if let leadingLabel {
+                    Text(leadingLabel)
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
+                }
+                Text("\(surah.id):\(ayah.id)")
+                    .font(.caption.monospacedDigit().weight(.semibold))
+                    .foregroundColor(settings.accentColor.color)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+            }
+            .frame(width: 64, alignment: .leading)
+
+            if settings.showArabicText {
+                HighlightedSnippet(
+                    source: arabicDisplayText(),
+                    term: "",
+                    font: .custom(settings.fontArabic, size: settings.fontArabicSize * 0.8),
+                    accent: settings.accentColor.color,
+                    fg: .primary,
+                    preStyledSource: arabicTajweedText(),
+                    beginnerMode: settings.beginnerMode,
+                    lineLimit: nil
+                )
+                .multilineTextAlignment(.trailing)
+                .frame(maxWidth: .infinity, alignment: .trailing)
+            } else {
+                Spacer(minLength: 0)
+            }
+        }
+        .padding(.vertical, 2)
+    }
+}
+
 struct AyahSearchResultRow: View {
     @EnvironmentObject private var settings: Settings
 
@@ -880,6 +1686,8 @@ struct AyahSearchResultRow: View {
     @Binding var searchText: String
     @Binding var scrollToSurahID: Int
     var disableTajweedColors: Bool = false
+    /// When true, the Arabic line is rendered smaller (used by the page/juz starting-ayah lists).
+    var compactArabic: Bool = false
     var onSelectAyah: ((Int, Int) -> Void)? = nil
 
     private var isBookmarked: Bool {
@@ -901,7 +1709,7 @@ struct AyahSearchResultRow: View {
 
     var body: some View {
         let row = VStack(alignment: .leading, spacing: 4) {
-            SurahAyahRow(surah: surah, ayah: ayah, disableTajweedColors: disableTajweedColors)
+            SurahAyahRow(surah: surah, ayah: ayah, disableTajweedColors: disableTajweedColors, arabicScale: compactArabic ? 0.8 : 1.1)
 
             if settings.showFullSurahRow, let pageJuzLine {
                 Label(pageJuzLine, systemImage: "map")
@@ -1235,7 +2043,9 @@ struct AyahSearchRow: View, Equatable {
         .confirmationDialog(Settings.bookmarkNoteRemovalDialogTitle, isPresented: $confirmRemoveNote, titleVisibility: .visible) {
             Button("Remove", role: .destructive) {
                 settings.hapticFeedback()
-                settings.toggleBookmark(surah: surah, ayah: ayah)
+                withAnimation(.easeInOut) {
+                    settings.toggleBookmark(surah: surah, ayah: ayah)
+                }
             }
             Button("Cancel") {}
         } message: {

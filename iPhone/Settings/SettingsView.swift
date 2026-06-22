@@ -30,8 +30,14 @@ struct SettingsView: View {
                                 }
                             }
                     } detail: {
-                        settingsSplitDetail
-                            .animation(.easeInOut(duration: 0.25), value: selectedDestination)
+                        // Detail gets its own NavigationStack so the sub-screen NavigationLinks
+                        // (e.g. Quran settings → Recitation) push within the detail column instead of
+                        // replacing the whole split. `.id` rebuilds it when the sidebar selection changes.
+                        NavigationStack {
+                            settingsSplitDetail
+                        }
+                        .id(selectedDestination ?? .quranSettings)
+                        .animation(.easeInOut(duration: 0.25), value: selectedDestination)
                     }
                 } else {
                     NavigationStack {
@@ -55,34 +61,42 @@ struct SettingsView: View {
 
     private var settingsList: some View {
         List {
-            quranSection
-            appearanceSection
-            creditsSection
-            
-            AlIslamAppsSection()
+            Group {
+                quranSection
+                appearanceSection
+                creditsSection
+
+                AlIslamAppsSection()
+            }
+            .themedListRowBackground()
         }
         .navigationTitle("Settings")
-        .applyConditionalListStyle(defaultView: true)
+        .applyConditionalListStyle(defaultView: settings.defaultView)
     }
 
     #if os(iOS)
     @available(iOS 16.0, *)
     private var settingsSplitList: some View {
         List(selection: $selectedDestination) {
-            quranSectionSplit
-            appearanceSection
-            creditsSection
-            AlIslamAppsSection()
+            Group {
+                quranSectionSplit
+                appearanceSection
+                creditsSection
+                AlIslamAppsSection()
+            }
+            .themedListRowBackground()
         }
         .navigationTitle("Settings")
-        .applyConditionalListStyle(defaultView: true)
+        .applyConditionalListStyle(defaultView: settings.defaultView)
     }
 
     @ViewBuilder
     private var settingsSplitDetail: some View {
-        switch selectedDestination ?? .quranSettings {
-        case .quranSettings:
-            SettingsQuranView(showEdits: true)
+        Group {
+            switch selectedDestination ?? .quranSettings {
+            case .quranSettings:
+                SettingsQuranView(showEdits: true)
+            }
         }
     }
     #endif
@@ -193,6 +207,9 @@ struct SettingsView: View {
                 .foregroundColor(settings.accentColor.color)
         }
         .contextMenu {
+            Text("Review")
+                .foregroundStyle(.secondary)
+
             Button {
                 settings.hapticFeedback()
                 UIPasteboard.general.string = "itms-apps://itunes.apple.com/app/id6449729655?action=write-review"
@@ -237,6 +254,9 @@ struct SettingsView: View {
         }
         #if os(iOS)
         .contextMenu {
+            Text("Website")
+                .foregroundStyle(.secondary)
+
             Button {
                 settings.hapticFeedback()
                 UIPasteboard.general.string = "abubakrelmallah.com"
@@ -265,6 +285,9 @@ struct SettingsView: View {
         }
         #if os(iOS)
         .contextMenu {
+            Text("Email")
+                .foregroundStyle(.secondary)
+
             Button {
                 settings.hapticFeedback()
                 UIPasteboard.general.string = "ammelmallah@icloud.com"
@@ -320,16 +343,49 @@ struct SettingsView: View {
 
 struct SettingsAppearanceView: View {
     @EnvironmentObject var settings: Settings
-    
+
+    /// Reads/writes the stored custom hex; picking a color also switches the active accent to `.custom`.
+    private var customAccentColorBinding: Binding<Color> {
+        Binding(
+            get: { Color(hex: settings.customAccentColorHex) ?? .green },
+            set: { newColor in
+                settings.customAccentColorHex = newColor.hexString
+                withAnimation { settings.accentColor = .custom }
+            }
+        )
+    }
+
+    /// On = custom accent is active (color picker enabled). Off = revert to the app's default accent.
+    private var customColorEnabledBinding: Binding<Bool> {
+        Binding(
+            get: { settings.accentColor == .custom },
+            set: { isOn in
+                withAnimation {
+                    settings.accentColor = isOn ? .custom : AppIdentifiers.mainColor
+                }
+            }
+        )
+    }
+
     var body: some View {
         #if os(iOS)
-        Picker("Color Theme", selection: $settings.colorSchemeString.animation(.easeInOut)) {
-            Text("System").tag("system")
-            Text("Light").tag("light")
-            Text("Dark").tag("dark")
+        VStack(alignment: .leading) {
+            Picker("Color Theme", selection: $settings.colorSchemeString.animation(.easeInOut)) {
+                Text("System").tag("system")
+                Text("Light").tag("light")
+                Text("Dark").tag("dark")
+                Text("Gray").tag("gray")
+                Text("Sepia").tag("sepia")
+            }
+            .font(.subheadline)
+            .pickerStyle(SegmentedPickerStyle())
+            .onChange(of: settings.colorSchemeString) { _ in settings.hapticFeedback() }
+            
+            Text("System follows your device — Light theme in Light Mode, Dark theme in Dark Mode. Gray and Sepia are fixed and ignore your device setting.")
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .padding(.vertical, 2)
         }
-        .font(.subheadline)
-        .pickerStyle(SegmentedPickerStyle())
         #endif
         
         VStack(alignment: .leading) {
@@ -349,7 +405,7 @@ struct SettingsAppearanceView: View {
                         )
                         .onTapGesture {
                             settings.hapticFeedback()
-                            
+
                             withAnimation {
                                 settings.accentColor = accentColor
                             }
@@ -357,6 +413,24 @@ struct SettingsAppearanceView: View {
                 }
             }
             .padding(.vertical)
+
+            #if os(iOS)
+            // One line: color well, label, then a toggle tinted with the custom color itself (not the accent).
+            HStack(spacing: 12) {
+                ColorPicker("", selection: customAccentColorBinding, supportsOpacity: false)
+                    .labelsHidden()
+
+                Text("Custom Color")
+                    .font(.subheadline)
+
+                Spacer()
+
+                Toggle("", isOn: customColorEnabledBinding.animation(.easeInOut))
+                    .labelsHidden()
+                    .tint(Color(hex: settings.customAccentColorHex) ?? .green)
+            }
+            .onChange(of: settings.accentColor) { _ in settings.hapticFeedback() }
+            #endif
             
             #if os(iOS)
             Text("Anas ibn Malik (may Allah be pleased with him) said, “The most beloved of colors to the Messenger of Allah (peace be upon him) was green.”")
@@ -370,8 +444,9 @@ struct SettingsAppearanceView: View {
         VStack(alignment: .leading) {
             Toggle("Default List View", isOn: $settings.defaultView.animation(.easeInOut))
                 .font(.subheadline)
-            
-            Text("The default list view is the standard interface found in many of Apple's first party apps, including Notes. This setting applies everywhere in the app except here in Settings.")
+                .onChange(of: settings.defaultView) { _ in settings.hapticFeedback() }
+
+            Text("The default list view is the standard interface found in many of Apple's first party apps, including Notes.")
                 .font(.caption)
                 .foregroundColor(.secondary)
                 .padding(.vertical, 2)
@@ -381,6 +456,7 @@ struct SettingsAppearanceView: View {
         VStack(alignment: .leading) {
             Toggle("Haptic Feedback", isOn: $settings.hapticOn.animation(.easeInOut))
                 .font(.subheadline)
+                .onChange(of: settings.hapticOn) { _ in settings.hapticFeedback() }
         }
     }
 }

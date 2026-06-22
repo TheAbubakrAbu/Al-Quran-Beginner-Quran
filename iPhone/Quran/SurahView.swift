@@ -14,6 +14,7 @@ struct SurahView: View {
     @State private var cachedAyahsForQiraah: [Ayah] = []
     @State private var cachedAyahByID: [Int: Ayah] = [:]
     @State private var cachedSearchBlobByAyahID: [Int: String] = [:]
+    @State private var searchBlobPrewarmKey: String? = nil
     @State private var overlayDividerByAyahID: [Int: BoundaryDividerModel] = [:]
     @State private var cacheQiraahKey: String = ""
     @State private var qiraahCacheSurahID: Int? = nil
@@ -24,6 +25,7 @@ struct SurahView: View {
     @State private var showFloatingHeader = false
     @State private var showAlert = false
     @State private var showCustomRangeSheet = false
+    @State private var showSurahInfoSheet = false
     @State private var showReciterPickerSheet = false
     @State private var showSurahPickerSheet = false
     @State private var confirmConvertQiraahToHafs = false
@@ -233,7 +235,7 @@ struct SurahView: View {
             message += "\n\nExceptions: \(exceptions)"
         }
 
-        return SurahInfoDialog(title: "Surah Info", message: message)
+        return SurahInfoDialog(title: "Revelation Info", message: message)
     }
 
     /// Ayah row id to scroll to after clearing search (first ayah following this boundary).
@@ -484,25 +486,7 @@ struct SurahView: View {
             return cached
         }
 
-        let displayQiraah = settings.displayQiraahForArabic
-        var searchBlobMap: [Int: String] = [:]
-        searchBlobMap.reserveCapacity(ayahs.count)
-
-        for ayah in ayahs {
-            let searchBlob = [
-                ayah.textArabic(for: displayQiraah),
-                ayah.textCleanArabic(for: displayQiraah),
-                ayah.textTransliteration,
-                ayah.textEnglishSaheeh,
-                ayah.textEnglishMustafa,
-                String(ayah.id),
-                ayah.idArabic
-            ]
-            .map { settings.cleanSearch($0) }
-            .joined(separator: " ")
-            searchBlobMap[ayah.id] = searchBlob
-        }
-
+        let searchBlobMap = buildSearchBlobMap(ayahs: ayahs, displayQiraah: settings.displayQiraahForArabic)
         let prepared = PreparedSurahSearchCache(searchBlobByAyahID: searchBlobMap)
         preparedSurahSearchCache.setObject(prepared, forKey: cacheKey)
         return prepared
@@ -534,6 +518,7 @@ struct SurahView: View {
         cachedAyahByID = prepared.ayahByID
         overlayDividerByAyahID = prepared.overlayDividerByAyahID
         cachedSearchBlobByAyahID = [:]
+        searchBlobPrewarmKey = nil
         cacheQiraahKey = key
         qiraahCacheSurahID = surah.id
 
@@ -545,6 +530,59 @@ struct SurahView: View {
         } else {
             self.firstVisibleAyahID = fallbackID
         }
+
+        prewarmSearchBlobs()
+    }
+
+    /// Builds the per-ayah search blobs for the active surah/qiraah on a background queue and
+    /// publishes them to `cachedSearchBlobByAyahID`. This moves the expensive normalization work
+    /// (thousands of `cleanSearch` calls) off the main thread so the first ayah-search keystroke
+    /// never has to build the blob map synchronously while the user is typing.
+    private func prewarmSearchBlobs() {
+        let qiraahKey = settings.displayQiraahForArabic ?? ""
+        let key = "\(surah.id)|\(qiraahKey)"
+        if searchBlobPrewarmKey == key, !cachedSearchBlobByAyahID.isEmpty { return }
+
+        let surah = self.surah
+        let settings = self.settings
+        let displayQiraah = settings.displayQiraahForArabic
+        let ayahs = cachedAyahsForQiraah.isEmpty
+            ? Self.preparedCache(for: surah, settings: settings).ayahs
+            : cachedAyahsForQiraah
+
+        Task.detached(priority: .utility) {
+            let blobMap = Self.buildSearchBlobMap(ayahs: ayahs, displayQiraah: displayQiraah)
+            await MainActor.run {
+                // Discard if the user moved to another surah/qiraah while we were building.
+                guard "\(self.surah.id)|\(self.settings.displayQiraahForArabic ?? "")" == key else { return }
+                self.cachedSearchBlobByAyahID = blobMap
+                self.searchBlobPrewarmKey = key
+            }
+        }
+    }
+
+    /// Pure, actor-agnostic builder for the per-ayah search-blob map. Marked `nonisolated` so it can run
+    /// on a background task without hopping back to the main actor (SurahView, being a `View`, is otherwise
+    /// `@MainActor`-isolated). It only touches `Settings.shared` config and immutable ayah text.
+    nonisolated private static func buildSearchBlobMap(ayahs: [Ayah], displayQiraah: String?) -> [Int: String] {
+        let settings = Settings.shared
+        var searchBlobMap: [Int: String] = [:]
+        searchBlobMap.reserveCapacity(ayahs.count)
+        for ayah in ayahs {
+            let searchBlob = [
+                ayah.textArabic(for: displayQiraah),
+                ayah.textCleanArabic(for: displayQiraah),
+                ayah.textTransliteration,
+                ayah.textEnglishSaheeh,
+                ayah.textEnglishMustafa,
+                String(ayah.id),
+                ayah.idArabic
+            ]
+            .map { settings.cleanSearch($0) }
+            .joined(separator: " ")
+            searchBlobMap[ayah.id] = searchBlob
+        }
+        return searchBlobMap
     }
 
     private var visibleAyahMemoryRouteKey: String {
@@ -552,27 +590,33 @@ struct SurahView: View {
     }
 
     @MainActor
-    private func rememberedVisibleAyahID() -> Int? {
-        guard let remembered = Self.visibleAyahMemoryByRoute[visibleAyahMemoryRouteKey],
-              cachedAyahByID[remembered] != nil else {
-            return nil
-        }
-        return remembered
-    }
-
-    @MainActor
     private func rememberVisibleAyahID(_ ayahID: Int) {
         Self.visibleAyahMemoryByRoute[visibleAyahMemoryRouteKey] = ayahID
     }
 
+    /// Clamps a requested ayah to the nearest verse that actually exists in the active qiraah. Bookmarks /
+    /// deep links are stored in Hafs numbering, but qiraat merge/omit some ayahs (e.g. Baqarah ends at 285
+    /// in Warsh, 286 in Hafs), so a target may not exist — land on the closest one instead of the top.
+    private func nearestExistingAyahID(_ requested: Int, in ids: [Int]) -> Int? {
+        ids.min(by: { abs($0 - requested) < abs($1 - requested) })
+    }
+
     private func scrollToAyah(_ ayahID: Int, proxy: ScrollViewProxy, animated: Bool = false) {
-        DispatchQueue.main.async {
+        // Lazy list cells for the target may not exist on the first pass (especially right after the view
+        // appears or is reconfigured), so a single scrollTo can silently miss and leave the old position.
+        // Retry across a few runloop ticks so the target reliably lands.
+        func attempt(_ remaining: Int) {
             if animated {
                 withAnimation { proxy.scrollTo(ayahID, anchor: .top) }
             } else {
                 proxy.scrollTo(ayahID, anchor: .top)
             }
+            guard remaining > 0 else { return }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                attempt(remaining - 1)
+            }
         }
+        DispatchQueue.main.async { attempt(2) }
     }
 
     private func boundaryDivider(model: BoundaryDividerModel, isOverlay: Bool = false, nextAyahID: Int? = nil) -> some View {
@@ -662,14 +706,20 @@ struct SurahView: View {
             #endif
         }
         .padding(.vertical, isOverlay ? 4 : 6)
-        .padding(.horizontal, isOverlay ? 10 : 0)
+        .padding(.horizontal, 0)
         .frame(maxWidth: isOverlay ? .infinity : nil)
         .contentShape(Rectangle())
         
         #if os(iOS)
         if !searchText.isEmpty, let ayahID = nextAyahID {
-            return AnyView(
+            let labeledContent = VStack(spacing: 2) {
                 dividerContent
+                Text("Ayah \(ayahID)")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundColor(.secondary)
+            }
+            return AnyView(
+                labeledContent
                     .contentShape(Rectangle())
                     .onTapGesture {
                         settings.hapticFeedback()
@@ -698,36 +748,45 @@ struct SurahView: View {
         )
     }
     
-    var body: some View {
+    // Extracted from `body` so the large modifier chain stays under the Swift type-checker limit.
+    private var surahCoreBody: some View {
         ScrollViewReader { proxy in
             ayahListScreen(proxy: proxy)
         }
         .environmentObject(quranPlayer)
         .onDisappear(perform: saveLastRead)
         .onChange(of: scenePhase) { phase in
-            guard phase != .active else { return }
-            saveLastRead()
-        }
-        #if os(iOS)
-        .toolbar {
-            ToolbarItem(placement: .principal) {
-                surahTitlePickerButton
-                    .onLongPressGesture(minimumDuration: 0.45) {
-                        settings.hapticFeedback()
-                        surahInfoDialog = surahInfoDialog(for: surah)
-                    }
+            switch phase {
+            case .inactive:
+                // Pulling Control Center / Notification Center down briefly flips the scene to `.inactive`.
+                // Only remember the current spot in memory here — writing `settings.lastRead*` (@AppStorage)
+                // republishes the view tree and can reconstruct this screen mid-scroll, jumping the user
+                // away from where they were. The in-memory anchor is enough to restore on re-appear.
+                rememberCurrentVisibleAyah()
+            case .background:
+                saveLastRead()
+            default:
+                break
             }
+        }
+    }
 
-            ToolbarItem(placement: .navigationBarTrailing) {
-                navBarTitle
-            }
-        }
+    var body: some View {
+        #if os(iOS)
+        // The centered title is now a Menu (Surah List / Surah Info / Revelation Info), so the toolbar
+        // only carries the principal title and the trailing settings gear.
+        applySurahToolbar(to: surahCoreBody)
         .onAppear {
             quranPlayer.recordReadingHistory(surahNumber: surah.id, surahName: surah.nameTransliteration, ayahNumber: ayah ?? 1)
         }
         .sheet(isPresented: $showingSettingsSheet) {
             settingsSheet
                 .smallMediumSheetPresentation()
+        }
+        .sheet(isPresented: $showSurahInfoSheet) {
+            SurahInfoSheet(surahName: surah.nameTransliteration, surahNumber: surah.id)
+                .environmentObject(settings)
+                .environmentObject(quranData)
         }
         .sheet(isPresented: $showSurahPickerSheet) {
             SurahPickerSheet(currentSurahID: surah.id) { selectedSurah in
@@ -838,7 +897,8 @@ struct SurahView: View {
             .hidden()
         )
         #else
-        .navigationTitle("\(surah.id) - \(surah.nameTransliteration)")
+        surahCoreBody
+            .navigationTitle("\(surah.id) - \(surah.nameTransliteration)")
         #endif
     }
 
@@ -959,7 +1019,9 @@ struct SurahView: View {
         }()
         let previousSurah = searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? neighboringSurah(before: surah.id) : nil
         let nextSurah = searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? neighboringSurah(after: surah.id) : nil
-        let shouldShowFloatingPageJuzOverlay = showBoundaryDividers && settings.showPageJuzOverlay && searchText.isEmpty
+        // The floating page/juz overlay is always shown when boundary dividers exist; there is no
+        // separate opt-in setting for it anymore.
+        let shouldShowFloatingPageJuzOverlay = showBoundaryDividers && searchText.isEmpty
         let shouldUpdateFloatingPageJuzOverlay = shouldShowFloatingPageJuzOverlay && surah.pageOrJuzChangesWithinSurah
         let currentFloatingAyah = shouldUpdateFloatingPageJuzOverlay
             ? (firstVisibleAyahID
@@ -1022,6 +1084,7 @@ struct SurahView: View {
 
         return
             List {
+                Group {
                 khatmProgressSection()
                 qiraahNoticeSection()
 
@@ -1066,11 +1129,13 @@ struct SurahView: View {
                     .padding(.bottom, -12)
                 }
                 
+                #if !os(watchOS)
                 if let previousSurah {
                     Section {
                         surahNavigationButton(title: "Go to Previous Surah", surah: previousSurah, systemImage: "chevron.up")
                     }
                 }
+                #endif
                  
                 Section {
                     VStack {
@@ -1193,11 +1258,13 @@ struct SurahView: View {
                         }
                     }
 
+                    #if !os(watchOS)
                     if let nextSurah {
                         Section {
                             surahNavigationButton(title: "Go to Next Surah", surah: nextSurah, systemImage: "chevron.down")
                         }
                     }
+                    #endif
 
                     if let trailingSearchBoundaryDivider {
                         Section {
@@ -1208,6 +1275,8 @@ struct SurahView: View {
                         }
                     }
                 }
+                }
+                .themedListRowBackground()
             }
             .applyConditionalListStyle(defaultView: settings.defaultView)
             .compactListSectionSpacing()
@@ -1239,21 +1308,18 @@ struct SurahView: View {
             #endif
             .onAppear {
                 rebuildQiraahCaches()
-                let restoreTarget = rememberedVisibleAyahID()
-                if let restoreTarget {
-                    firstVisibleAyahID = restoreTarget
-                } else if let sel = ayah, ayahByID[sel] != nil {
-                    firstVisibleAyahID = sel
+                // Always open at the requested ayah (or the top for a whole-surah open). Navigating to a
+                // surah/ayah should refresh to that target rather than restoring wherever the user last
+                // scrolled on a previous visit.
+                let target = ayah.flatMap { nearestExistingAyahID($0, in: ayahsForQiraah.map { $0.id }) }
+                if let target {
+                    firstVisibleAyahID = target
+                    if !didScrollDown {
+                        didScrollDown = true
+                        scrollToAyah(target, proxy: proxy)
+                    }
                 } else if firstVisibleAyahID == nil {
                     firstVisibleAyahID = ayahsForQiraah.first?.id
-                }
-
-                if let restoreTarget, !didScrollDown {
-                    didScrollDown = true
-                    scrollToAyah(restoreTarget, proxy: proxy)
-                } else if let sel = ayah, !didScrollDown {
-                    didScrollDown = true
-                    scrollToAyah(sel, proxy: proxy)
                 }
             }
             .onChange(of: quranPlayer.currentAyahNumber) { newVal in
@@ -1274,16 +1340,17 @@ struct SurahView: View {
                 visibleBoundaryAyahIDs.removeAll()
                 didScrollDown = false
                 let prepared = Self.preparedCache(for: surah, settings: settings)
-                if let sel = ayah, prepared.ayahByID[sel] != nil {
-                    firstVisibleAyahID = sel
-                    scrollToAyah(sel, proxy: proxy)
+                if let sel = ayah, let target = nearestExistingAyahID(sel, in: prepared.ayahs.map { $0.id }) {
+                    firstVisibleAyahID = target
+                    scrollToAyah(target, proxy: proxy)
                 } else if let top = prepared.ayahs.first?.id {
                     firstVisibleAyahID = top
                     scrollToAyah(top, proxy: proxy)
                 }
             }
             .onChange(of: ayah) { newValue in
-                guard let target = newValue, cachedAyahByID[target] != nil else { return }
+                guard let newValue,
+                      let target = nearestExistingAyahID(newValue, in: cachedAyahsForQiraah.map { $0.id }) else { return }
                 firstVisibleAyahID = target
                 didScrollDown = true
                 scrollToAyah(target, proxy: proxy)
@@ -1455,32 +1522,28 @@ struct SurahView: View {
         floatingDividerModel: BoundaryDividerModel?,
         floatingDividerAnimationKey: String
     ) -> some View {
-        VStack(spacing: 6) {
+        VStack(spacing: 2) {
             SurahSectionHeader(surah: surah)
-                .padding(.horizontal)
-                .padding(.vertical, 8)
-                .shadow(color: .primary.opacity(0.25), radius: 2, x: 0, y: 0)
-                .conditionalGlassEffect()
 
             if let floatingDividerModel {
                 boundaryDivider(model: floatingDividerModel, isOverlay: true)
                     .id(boundaryDividerID(floatingDividerModel))
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .shadow(color: .primary.opacity(0.25), radius: 2, x: 0, y: 0)
-                    .conditionalGlassEffect()
                     .transition(.opacity.combined(with: .scale(scale: 0.98)))
                     .animation(.easeInOut(duration: 0.18), value: floatingDividerAnimationKey)
             }
         }
+        .padding(.horizontal)
+        .padding(.vertical, 4)
+        .shadow(color: .black.opacity(0.15), radius: 2, x: 0, y: 0)
+        // When both the surah header and the page/juz divider are stacked, use a rounded rectangle;
+        // a lone header reads better as a capsule.
+        .conditionalGlassEffect(rectangle: floatingDividerModel != nil)
         .padding(.top, 4)
         .padding(.horizontal, settings.defaultView ? 20 : 16)
         .background(Color.clear)
         .opacity(showFloatingHeader ? 1 : 0)
-        .padding(.horizontal, 50)
         .zIndex(1)
         .offset(y: showFloatingHeader ? 0 : -80)
-        .opacity(showFloatingHeader ? 1 : 0)
     }
 
     #if os(iOS)
@@ -1516,6 +1579,8 @@ struct SurahView: View {
         VStack(spacing: SafeAreaInsetVStackSpacing.standard) {
             HStack(spacing: 0) {
                 SearchBar(
+                    // Animate the filtered results only when the user types (binding-scoped), so the
+                    // list transition eases without the List-level animation that breaks scroll restoration.
                     text: $searchText.animation(.easeInOut),
                     onFocusChanged: { focused in
                         withAnimation {
@@ -1677,14 +1742,9 @@ struct SurahView: View {
         } else {
             Button {
                 settings.hapticFeedback()
-
-                if quranPlayer.isLoading {
-                    quranPlayer.isLoading = false
-                    quranPlayer.pause(saveInfo: false)
-
-                } else if quranPlayer.isPlaying || quranPlayer.isPaused {
-                    quranPlayer.stop()
-                }
+                // A tap while loading OR playing fully stops playback. Previously a loading tap only paused
+                // the in-flight load, which could resume once the item became ready (so it "did nothing").
+                quranPlayer.stop()
             } label: {
                 playbackMenuControlLabel {
                     playIcon()
@@ -1733,10 +1793,20 @@ struct SurahView: View {
     }
     
     private var surahTitlePickerButton: some View {
-        Button {
-            settings.hapticFeedback()
-            showSurahPickerSheet = true
-        } label: {
+        // Tap opens the Surah list; long-press shows Revelation Info (no longer a menu).
+        surahTitleLabel
+            .onTapGesture {
+                settings.hapticFeedback()
+                showSurahPickerSheet = true
+            }
+            .onLongPressGesture(minimumDuration: 0.45) {
+                settings.hapticFeedback()
+                surahInfoDialog = surahInfoDialog(for: surah)
+            }
+    }
+
+    private var surahTitleLabel: some View {
+        Group {
             VStack(spacing: 0) {
                 HStack {
                     HStack {
@@ -1755,20 +1825,20 @@ struct SurahView: View {
                             .font(.custom(settings.fontArabic, size: UIFont.preferredFont(forTextStyle: .headline).pointSize + 2))
                         
                         Text(surah.idArabic)
-                            .font(.custom(Settings.hafsUthmaniFontName, size: UIFont.preferredFont(forTextStyle: .headline).pointSize + 2))
+                            .font(.custom(Settings.hafsUthmaniFontName, size: UIFont.preferredFont(forTextStyle: .headline).pointSize + 4))
                             .foregroundColor(settings.accentColor.color)
                     }
                 }
                 
                 Text(surah.nameEnglish)
                     .font(.caption2)
-                    .padding(.top, -4)
+                    .padding(.top, -8)
             }
             .lineLimit(1)
             .foregroundColor(.primary)
             .contentShape(Rectangle())
             .padding(.horizontal)
-            .padding(.vertical, 8)
+            .padding(.bottom, 6)
             .conditionalGlassEffect()
         }
     }
@@ -1780,6 +1850,33 @@ struct SurahView: View {
         } label: {
             Image(systemName: "gear")
         }
+    }
+
+    @ViewBuilder
+    private func applySurahToolbar(to base: some View) -> some View {
+        base.toolbar {
+            ToolbarItem(placement: .principal) {
+                surahTitlePickerButton
+            }
+
+            ToolbarItem(placement: .navigationBarTrailing) {
+                surahInfoButton
+            }
+            
+            ToolbarItem(placement: .navigationBarTrailing) {
+                navBarTitle
+            }
+        }
+    }
+
+    private var surahInfoButton: some View {
+        Button {
+            settings.hapticFeedback()
+            showSurahInfoSheet = true
+        } label: {
+            Image(systemName: "info.circle")
+        }
+        .tint(settings.accentColor.color)
     }
 
     @ViewBuilder
@@ -1797,15 +1894,26 @@ struct SurahView: View {
     }
     #endif
     
-    private func saveLastRead() {
-        let topVisible = visibleAyahIDs.min()
-        let targetAyah = topVisible
+    /// The ayah currently anchored at the top of the screen (falling back through the last known anchor).
+    private func currentReadingAyahID() -> Int? {
+        visibleAyahIDs.min()
             ?? firstVisibleAyahID
             ?? ayah
             ?? cachedAyahsForQiraah.first?.id
+    }
 
-        guard let targetAyah else { return }
+    /// Cheap, in-memory only: records where the user is so a re-appear (e.g. after Control Center) can
+    /// restore the spot without the expensive `settings` write that `saveLastRead()` performs.
+    private func rememberCurrentVisibleAyah() {
+        guard let targetAyah = currentReadingAyahID() else { return }
         rememberVisibleAyahID(targetAyah)
+    }
+
+    private func saveLastRead() {
+        guard let targetAyah = currentReadingAyahID() else { return }
+        rememberVisibleAyahID(targetAyah)
+
+        guard settings.saveLastReadAyah else { return }
 
         if settings.lastReadSurah == surah.id, settings.lastReadAyah == targetAyah {
             return
@@ -1813,6 +1921,7 @@ struct SurahView: View {
 
         settings.lastReadSurah = surah.id
         settings.lastReadAyah = targetAyah
+        settings.refreshQuranWidgets()
     }
 
     private func neighboringSurah(before currentSurahID: Int) -> Surah? {
@@ -1958,33 +2067,36 @@ private struct SurahPickerSheet: View {
         NavigationView {
             ScrollViewReader { proxy in
                 List {
-                    ForEach(filteredSurahs, id: \.id) { surah in
-                        Section {
-                            ZStack {
-                                RoundedRectangle(cornerRadius: 24)
-                                    .fill(
-                                        surah.id == currentSurahID
-                                        ? settings.accentColor.color.opacity(0.15)
-                                        : .clear
-                                    )
-                                    .padding(.horizontal, -12)
-                                    .padding(.vertical, ayahHighlightBackgroundVerticalPadding)
-                                
-                                Button {
-                                    settings.hapticFeedback()
-                                    withAnimation {
-                                        select(surah)
+                    Group {
+                        ForEach(filteredSurahs, id: \.id) { surah in
+                            Section {
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: 24)
+                                        .fill(
+                                            surah.id == currentSurahID
+                                            ? settings.accentColor.color.opacity(0.15)
+                                            : .clear
+                                        )
+                                        .padding(.horizontal, -12)
+                                        .padding(.vertical, ayahHighlightBackgroundVerticalPadding)
+
+                                    Button {
+                                        settings.hapticFeedback()
+                                        withAnimation {
+                                            select(surah)
+                                        }
+                                    } label: {
+                                        SurahRow(surah: surah, hideInfo: settings.showSurahInformation)
+                                            .contentShape(Rectangle())
                                     }
-                                } label: {
-                                    SurahRow(surah: surah, hideInfo: settings.showSurahInformation)
-                                        .contentShape(Rectangle())
+                                    .id(surah.id)
                                 }
-                                .id(surah.id)
                             }
                         }
                     }
+                    .themedListRowBackground()
                 }
-                .applyConditionalListStyle(defaultView: true)
+                .applyConditionalListStyle(defaultView: settings.defaultView)
                 .compactListSectionSpacing()
                 .searchable(text: $searchText.animation(.easeInOut), prompt: "Search surah")
                 .navigationTitle("Choose Surah")
@@ -2035,7 +2147,7 @@ struct ArabicTextRiwayahPicker: View {
     var body: some View {
         #if os(iOS)
         if useSimpleIOSPicker {
-            Picker("Arabic Riwayah", selection: $selection) {
+            Picker("Arabic Riwayah", selection: $selection.animation(.easeInOut)) {
                 ForEach(Settings.Riwayah.groups) { group in
                     Section {
                         ForEach(group.options, id: \.tag) { option in
@@ -2047,6 +2159,7 @@ struct ArabicTextRiwayahPicker: View {
                     }
                 }
             }
+            .onChange(of: selection) { _ in settings.hapticFeedback() }
         } else {
             Menu {
                 Text("Arabic Riwayah")
@@ -2070,12 +2183,12 @@ struct ArabicTextRiwayahPicker: View {
                 }
                 .padding(.horizontal, 10)
                 .padding(.vertical, 8)
-                .shadow(color: .primary.opacity(0.25), radius: 2, x: 0, y: 0)
+                .shadow(color: .black.opacity(0.15), radius: 2, x: 0, y: 0)
                 .conditionalGlassEffect()
             }
         }
         #else
-        Picker("Arabic Riwayah", selection: $selection) {
+        Picker("Arabic Riwayah", selection: $selection.animation(.easeInOut)) {
             ForEach(Settings.Riwayah.groups) { group in
                 Section {
                     ForEach(group.options, id: \.tag) { option in
@@ -2087,12 +2200,14 @@ struct ArabicTextRiwayahPicker: View {
                 }
             }
         }
+        .onChange(of: selection) { _ in settings.hapticFeedback() }
         #endif
     }
 
     @ViewBuilder
     private func qiraahButton(_ option: Settings.Riwayah.Option) -> some View {
         Button {
+            settings.hapticFeedback()
             withAnimation {
                 selection = option.tag
             }

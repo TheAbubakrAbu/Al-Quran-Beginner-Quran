@@ -214,6 +214,67 @@ struct AyahRow: View, Equatable {
         )
     }
 
+    /// For surahs that open with the disconnected letters (muqatta'at, e.g. الٓمٓ), shows a small aid
+    /// above the ayah with the letters spaced out, their recited Arabic names, and a transliteration.
+    @ViewBuilder
+    private func muqattaatPronunciationBlock() -> some View {
+        if settings.showArabicText, let p = Muqattaat.pronunciation(surah: surah.id, ayah: ayah.id) {
+            let arabicFont = Font.custom(settings.fontArabic, size: settings.fontArabicSize * 0.62)
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text("ACTUAL PRONUNCIATION")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundColor(.secondary)
+
+                    Spacer()
+
+                    Image(systemName: settings.showMuqattaatHelper ? "chevron.down.circle" : "chevron.up.circle")
+                        .font(.caption)
+                        .foregroundColor(settings.accentColor.color)
+                        .onTapGesture {
+                            settings.hapticFeedback()
+                            withAnimation { settings.showMuqattaatHelper.toggle() }
+                        }
+                }
+
+                if settings.showMuqattaatHelper {
+                    Text(p.individualLetters)
+                        .font(arabicFont)
+                        .foregroundColor(.primary)
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+
+                    muqattaatNamesView(p, font: arabicFont)
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(10)
+            .background(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(settings.accentColor.color.opacity(0.06))
+            )
+        }
+    }
+
+    /// The recited letter names (e.g. أَلِف لَام مِيم), tajweed-coloured when tajweed colours are on.
+    /// Uses surah/ayah 0 so the cache and rule lookups don't collide with the real ayah's coloring.
+    @ViewBuilder
+    private func muqattaatNamesView(_ p: Muqattaat.Pronunciation, font: Font) -> some View {
+        if settings.showTajweedColors,
+           let styled = TajweedStore.shared.attributedText(
+               surah: 0,
+               ayah: 0,
+               text: p.spelledOutArabic,
+               displayText: p.spelledOutArabic
+           ) {
+            Text(styled).font(font)
+        } else {
+            Text(p.spelledOutArabic)
+                .font(font)
+                .foregroundColor(.primary)
+        }
+    }
+
     private var tajweedAnimationKey: String {
         let categorySignature = TajweedLegendCategory.allCases
             .map { settings.isTajweedCategoryVisible($0) ? "1" : "0" }
@@ -273,7 +334,7 @@ struct AyahRow: View, Equatable {
                     .padding(.vertical, ayahHighlightBackgroundVerticalPadding)
             }
             
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 4) {
                     ZStack(alignment: .topTrailing) {
                         Text("\(surah.id):\(ayah.id)")
@@ -308,7 +369,9 @@ struct AyahRow: View, Equatable {
                     if shouldShowManualKhatmButton {
                         Button {
                             settings.hapticFeedback()
-                            settings.markKhatmAyahComplete(surah: surah.id, ayah: ayah.id)
+                            withAnimation(.easeInOut) {
+                                settings.markKhatmAyahComplete(surah: surah.id, ayah: ayah.id)
+                            }
                         } label: {
                             Image(systemName: "checkmark.circle")
                                 .resizable()
@@ -590,6 +653,8 @@ struct AyahRow: View, Equatable {
                 .padding(.top, 4)
             }
 
+            muqattaatPronunciationBlock()
+
             if showArabic {
                 let beginner = settings.beginnerMode || ayahBeginnerMode
                 let arabicSource = arabicDisplayText()
@@ -864,7 +929,9 @@ struct AyahRow: View, Equatable {
             if !currentNote.isEmpty {
                 Button(role: .destructive) {
                     settings.hapticFeedback()
-                    removeNote()
+                    withAnimation(.easeInOut) {
+                        removeNote()
+                    }
                 } label: {
                     Label("Remove Note", systemImage: "minus.circle")
                 }
@@ -945,6 +1012,7 @@ private struct AyahRowPreviewContent: View {
 
 #Preview {
     AlIslamPreviewContainer(embedInNavigation: false) {
-        AyahRowPreviewContent()
+        QuranView()
+        //AyahRowPreviewContent()
     }
 }

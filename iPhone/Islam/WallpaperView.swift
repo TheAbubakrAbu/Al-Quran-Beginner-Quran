@@ -21,7 +21,10 @@ struct WallpaperView: View {
 
     var body: some View {
         List {
-            wallpaperSections
+            Group {
+                wallpaperSections
+            }
+            .themedListRowBackground()
         }
         .applyConditionalListStyle(defaultView: settings.defaultView)
         .navigationTitle("Wallpapers")
@@ -36,6 +39,8 @@ struct WallpaperView: View {
 }
 
 private struct WallpaperCell: View {
+    @EnvironmentObject private var settings: Settings
+
     let wallpaper: Wallpaper
 
     var body: some View {
@@ -55,6 +60,7 @@ private struct WallpaperCell: View {
                     .foregroundStyle(.secondary)
 
                 Button {
+                    settings.hapticFeedback()
                     if let uiImage = UIImage(named: wallpaper.imageName) {
                         UIPasteboard.general.image = uiImage
                     }
@@ -63,6 +69,7 @@ private struct WallpaperCell: View {
                 }
 
                 Button {
+                    settings.hapticFeedback()
                     guard let uiImage = UIImage(named: wallpaper.imageName) else { return }
 
                     PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in

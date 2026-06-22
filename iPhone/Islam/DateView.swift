@@ -40,8 +40,11 @@ struct DateView: View {
         VStack {
             #if os(iOS)
             List {
+                Group {
                 selectionSection
                 convertedDateSection
+                }
+                .themedListRowBackground()
             }
             #endif
         }
@@ -131,6 +134,7 @@ struct DateView: View {
         #if os(iOS)
         .pickerStyle(.segmented)
         #endif
+        .onChange(of: selectedTab) { _ in settings.hapticFeedback() }
     }
 
     private func formatted(_ date: Date, using calendar: Calendar) -> String {

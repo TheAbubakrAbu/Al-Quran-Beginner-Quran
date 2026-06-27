@@ -110,10 +110,13 @@ struct HighlightedSnippet: View {
     }
 
     private func normalizeForSearch(_ text: String, trimWhitespace: Bool) -> String {
-        if !text.containsArabicLetters {
-            return normalizeEnglishForHighlight(text, trimWhitespace: trimWhitespace)
+        // Strip search operators (`# ^ % $ …`) first so a query like `#الله` or `^Allah%` highlights the
+        // residual word instead of failing to match (the source text never contains these characters).
+        let base = text.removingAyahSearchOperators
+        if !base.containsArabicLetters {
+            return normalizeEnglishForHighlight(base, trimWhitespace: trimWhitespace)
         }
-        return settings.cleanSearch(text, whitespace: trimWhitespace)
+        return settings.cleanSearch(base, whitespace: trimWhitespace)
             .removingArabicDiacriticsAndSigns
     }
 
@@ -180,8 +183,12 @@ struct HighlightedSnippet: View {
                     normalizedTerm: normalizedTerm
                 )
             }
-            if ranges.isEmpty, source.containsArabicLetters {
-                ranges = arabicPhrasePrefixRanges(
+            // Phrase-prefix fallback for BOTH scripts: highlights consecutive words where the leading words
+            // match and the final word is a prefix (e.g. "those who believ" → "those who believe"). This is
+            // the same "close match" rule the verse search itself uses, so English close matches — which
+            // previously highlighted nothing — now get colored like the Arabic ones.
+            if ranges.isEmpty {
+                ranges = phrasePrefixRanges(
                     in: source,
                     normalizedSource: normEntry.normalizedSource,
                     normalizedTerm: normalizedTerm,
@@ -203,7 +210,7 @@ struct HighlightedSnippet: View {
         return attributed
     }
 
-    private func arabicPhrasePrefixRanges(
+    private func phrasePrefixRanges(
         in source: String,
         normalizedSource: String,
         normalizedTerm: String,

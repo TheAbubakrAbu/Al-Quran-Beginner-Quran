@@ -225,6 +225,7 @@ struct SurahRow: View, Equatable {
                     Text(context)
                         .font(.caption2)
                         .foregroundColor(.secondary)
+                        .lineLimit(1)
                 }
 
                 HighlightedSnippet(
@@ -234,6 +235,7 @@ struct SurahRow: View, Equatable {
                     accent: accentColor.color,
                     fg: .primary
                 )
+                .lineLimit(1)
 
                 HighlightedSnippet(
                     source: surah.nameEnglish,
@@ -243,6 +245,7 @@ struct SurahRow: View, Equatable {
                     fg: showInfo ? .primary : .secondary,
                     trailingSuffix: showInfo ? "" : " \(revelationEmoji)"
                 )
+                .lineLimit(1)
 
                 if showInfo {
                     Text(pageLine)
@@ -277,14 +280,18 @@ struct SurahRow: View, Equatable {
                     term: searchQuery,
                     font: .custom(fontArabic, size: UIFont.preferredFont(forTextStyle: .title3).pointSize),
                     accent: accentColor.color,
-                    fg: .primary
+                    fg: .primary,
+                    // HighlightedSnippet applies its own `.lineLimit` to the inner Text, which would otherwise
+                    // override the row's outer `.lineLimit(1)` (the closest modifier wins) and let long Arabic
+                    // names like آل عمران wrap to two lines.
+                    lineLimit: 1
                 )
 
                 Text(surah.idArabic)
                     .font(.custom(Settings.hafsUthmaniFontName, size: UIFont.preferredFont(forTextStyle: .title1).pointSize))
                     .foregroundColor(accentColor.color)
             }
-            .minimumScaleFactor(1)
+            .minimumScaleFactor(0.5)
             .padding(.leading, 8)
             .frame(maxWidth: .infinity, alignment: .trailing)
         }
@@ -296,7 +303,7 @@ struct SurahRow: View, Equatable {
     /// Custom grid tile: the same information as the list row, re-laid out vertically so it reads
     /// well in a narrow 2-column grid cell.
     private var gridBody: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: 6) {
                 Text("\(surah.id)")
                     .font(.subheadline.monospacedDigit().weight(.bold))
@@ -321,7 +328,8 @@ struct SurahRow: View, Equatable {
                     term: searchQuery,
                     font: .custom(fontArabic, size: UIFont.preferredFont(forTextStyle: .title3).pointSize),
                     accent: accentColor.color,
-                    fg: .primary
+                    fg: .primary,
+                    lineLimit: 1
                 )
             }
             .lineLimit(1)
@@ -388,7 +396,7 @@ struct SurahRow: View, Equatable {
             Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-        .padding(12)
+        .padding(8)
         .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.primary.opacity(0.06)))
         .contentShape(Rectangle())
     }
@@ -592,9 +600,11 @@ struct SurahAyahRow: View {
     private var gridBody: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
-                Text("\(surah.id):\(ayah.id)")
+                Text("\(surah.nameTransliteration) \(surah.id):\(ayah.id)")
                     .font(.subheadline.monospacedDigit().weight(.semibold))
                     .foregroundColor(settings.accentColor.color)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
                     .onTapGesture {
                         settings.hapticFeedback()
                         toggleBookmarkWithNoteGuard()
@@ -901,8 +911,8 @@ struct LastListenedSurahRow: View {
                     .minimumScaleFactor(0.75)
                     .transition(.opacity)
                     .opacity(!quranPlayer.isPlaying && !quranPlayer.isPaused ? 1 : 0.35)
-                    .animation(.easeInOut, value: quranPlayer.isPlaying)
-                    .animation(.easeInOut, value: quranPlayer.isPaused)
+                    // The opacity only depends on whether playback is active, so animate on that one value.
+                    .animation(.easeInOut, value: quranPlayer.isPlaying || quranPlayer.isPaused)
                     .contentShape(Rectangle())
             }
             .disabled(quranPlayer.isPlaying || quranPlayer.isPaused)
@@ -1674,6 +1684,60 @@ struct CompactAyahArabicRow: View {
     }
 }
 
+/// Just the Arabic text of an ayah, rendered through the same pipeline as the reading view — same font,
+/// tajweed colors, beginner-mode spacing, and Allah highlighting — sized by `scale`. Used for compact
+/// previews such as the page/juz dividers in SurahView.
+struct AyahArabicSnippet: View {
+    @EnvironmentObject var settings: Settings
+
+    let surah: Surah
+    let ayah: Ayah
+    var scale: CGFloat = 0.8
+    var lineLimit: Int? = 1
+
+    private var shouldShowTajweedColors: Bool {
+        settings.showTajweedColors && settings.showArabicText && settings.isHafsDisplay
+    }
+
+    private func arabicDisplayText() -> String {
+        let text = ayah.displayArabicText(surahId: surah.id, clean: settings.cleanArabicText)
+        return settings.beginnerMode ? text.map { String($0) }.joined(separator: " ") : text
+    }
+
+    private func arabicTajweedText() -> AttributedString? {
+        guard shouldShowTajweedColors else { return nil }
+        let text = ayah.displayArabicText(surahId: surah.id, clean: false)
+        let displayText = settings.cleanArabicText ? ayah.displayArabicText(surahId: surah.id, clean: true) : text
+        let renderedDisplayText = settings.beginnerMode ? displayText.map { String($0) }.joined(separator: " ") : displayText
+        return TajweedStore.shared.attributedText(
+            surah: surah.id,
+            ayah: ayah.id,
+            text: text,
+            displayText: renderedDisplayText,
+            cleanDisplayText: settings.cleanArabicText,
+            beginnerSpacing: settings.beginnerMode
+        )
+    }
+
+    var body: some View {
+        if settings.showArabicText {
+            HighlightedSnippet(
+                source: arabicDisplayText(),
+                term: "",
+                font: .custom(settings.fontArabic, size: settings.fontArabicSize * scale),
+                accent: settings.accentColor.color,
+                fg: .primary,
+                preStyledSource: arabicTajweedText(),
+                beginnerMode: settings.beginnerMode,
+                lineLimit: lineLimit,
+                highlightAllahNames: settings.highlightAllahNames
+            )
+            .multilineTextAlignment(.trailing)
+            .frame(maxWidth: .infinity, alignment: .trailing)
+        }
+    }
+}
+
 struct AyahSearchResultRow: View {
     @EnvironmentObject private var settings: Settings
 
@@ -1950,14 +2014,44 @@ struct AyahSearchRow: View, Equatable {
         return sources
     }
 
+    /// A source "matches" the query when it contains the whole phrase contiguously OR matches it loosely as
+    /// a phrase-prefix (consecutive words, last is a prefix) — the same close-match rule the verse search
+    /// uses. Gating highlights on the strict `contains` alone meant close matches showed the row but never
+    /// highlighted; this keeps the two in sync so the matched words always color.
+    private func sourceMatchesQuery(_ source: String, normalizedQuery: String) -> Bool {
+        guard !normalizedQuery.isEmpty else { return false }
+        if source.contains(normalizedQuery) { return true }
+
+        let queryTokens = normalizedQuery.split(separator: " ").map(String.init).filter { !$0.isEmpty }
+        guard queryTokens.count >= 1 else { return false }
+        let sourceTokens = source.split(separator: " ").map(String.init)
+        guard sourceTokens.count >= queryTokens.count else { return false }
+
+        for start in 0...(sourceTokens.count - queryTokens.count) {
+            var matched = true
+            for offset in queryTokens.indices {
+                let word = sourceTokens[start + offset]
+                let token = queryTokens[offset]
+                if offset == queryTokens.count - 1 {
+                    if !word.hasPrefix(token) { matched = false; break }
+                } else if word != token {
+                    matched = false
+                    break
+                }
+            }
+            if matched { return true }
+        }
+        return false
+    }
+
     private func searchVisibility() -> SearchVisibility {
-        let normalizedQuery = settings.cleanSearch(query, whitespace: true).removingArabicDiacriticsAndSigns
+        let normalizedQuery = settings.cleanSearch(query.removingAyahSearchOperators, whitespace: true).removingArabicDiacriticsAndSigns
         let sources = normalizedSources()
 
-        let mArabic = !normalizedQuery.isEmpty && sources.arabic.contains(normalizedQuery)
-        let mTr = !normalizedQuery.isEmpty && sources.transliteration.contains(normalizedQuery)
-        let mSaheeh = !normalizedQuery.isEmpty && sources.saheeh.contains(normalizedQuery)
-        let mMustafa = !normalizedQuery.isEmpty && sources.mustafa.contains(normalizedQuery)
+        let mArabic = sourceMatchesQuery(sources.arabic, normalizedQuery: normalizedQuery)
+        let mTr = sourceMatchesQuery(sources.transliteration, normalizedQuery: normalizedQuery)
+        let mSaheeh = sourceMatchesQuery(sources.saheeh, normalizedQuery: normalizedQuery)
+        let mMustafa = sourceMatchesQuery(sources.mustafa, normalizedQuery: normalizedQuery)
         let showArabicLine = settings.showArabicText || mArabic
         let showTrLine = settings.isHafsDisplay && (settings.showTransliteration || mTr)
 
@@ -2001,10 +2095,14 @@ struct AyahSearchRow: View, Equatable {
                         accent: settings.accentColor.color,
                         fg: .primary,
                         preStyledSource: arabicTajweedText(),
-                        beginnerMode: settings.beginnerMode
+                        beginnerMode: settings.beginnerMode,
+                        lineLimit: nil
                     )
                     .frame(maxWidth: .infinity, alignment: .trailing)
                     .multilineTextAlignment(.trailing)
+                    // Inside this badge+Arabic HStack SwiftUI otherwise truncates a long ayah to one line;
+                    // fixedSize lets it wrap to as many lines as needed.
+                    .fixedSize(horizontal: false, vertical: true)
                 }
             }
 
@@ -2075,10 +2173,12 @@ struct AyahSearchRow: View, Equatable {
                     accent: settings.accentColor.color,
                     fg: .primary,
                     preStyledSource: arabicTajweedText(),
-                    beginnerMode: settings.beginnerMode
+                    beginnerMode: settings.beginnerMode,
+                    lineLimit: nil
                 )
                 .frame(maxWidth: .infinity, alignment: .trailing)
                 .multilineTextAlignment(.trailing)
+                .fixedSize(horizontal: false, vertical: true)
             }
 
             if visibility.showTrLine {
@@ -2114,7 +2214,7 @@ struct AyahSearchRow: View, Equatable {
             pageJuzMetadata
         }
     }
-    
+
     var body: some View {
         Group {
             if compact {
@@ -2175,5 +2275,6 @@ struct AyahSearchRow: View, Equatable {
                 ayah: AlIslamPreviewData.ayah
             )
         }
+        .applyConditionalListStyle(disableNowPlayingInset: true)
     }
 }

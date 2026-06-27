@@ -12,6 +12,9 @@ struct NowPlayingView: View {
 
     @State private var confirmRemoveNote = false
     @State private var confirmClearQueue = false
+    /// Last real playback context, kept so the bar can stay mounted (hidden) after playback stops — tearing
+    /// it down inside the stop action was cancelling "Stop Playing".
+    @State private var retainedContext: PlaybackContext?
 
     /// Small (default) vs. big player. Stored on `settings` (not @AppStorage) so `withAnimation` animates it.
     private var isExpanded: Bool { settings.nowPlayingExpanded }
@@ -29,11 +32,16 @@ struct NowPlayingView: View {
     }
 
     var body: some View {
-        guard let playbackContext else {
+        #if os(iOS)
+        // The parent inset inserts/removes this view with `if isPlaying||isPaused` + `.animation`, which
+        // animates BOTH the fade and the height collapse (a `.frame(height:)` between natural and 0 can't
+        // animate — it snaps). `retainedContext` keeps the last context so the bar still has content to render
+        // while it fades OUT (otherwise `playbackContext` goes nil on stop and there's nothing to fade). The
+        // "Stop Playing" action defers `stop()` so this view isn't torn down mid-action (which cancelled it).
+        guard let ctx = playbackContext ?? retainedContext else {
             return AnyView(EmptyView())
         }
 
-        #if os(iOS)
         return
             AnyView(
                 VStack(spacing: 8) {
@@ -41,14 +49,14 @@ struct NowPlayingView: View {
                         if let onOpenPlayback {
                             Button {
                                 settings.hapticFeedback()
-                                onOpenPlayback(playbackContext)
+                                onOpenPlayback(ctx)
                             } label: {
                                 playerRow(isPlaying: quranPlayer.isPlaying)
                             }
                             .buttonStyle(.plain)
                         } else {
                             NavigationLink {
-                                destinationView(for: playbackContext)
+                                destinationView(for: ctx)
                             } label: {
                                 playerRow(isPlaying: quranPlayer.isPlaying)
                             }
@@ -57,16 +65,18 @@ struct NowPlayingView: View {
                         playerRow(isPlaying: quranPlayer.isPlaying)
                     }
                 }
+                // Pin a stable full width so the small and big players are the same size and only the
+                // height animates — keeps the card from resizing sideways when expanding/collapsing.
                 .overlay(alignment: .topTrailing) {
                     expandToggleButton
                 }
                 .contextMenu {
-                    contextMenu(for: playbackContext)
+                    contextMenu(for: ctx)
                 }
                 .confirmationDialog("Clear the queue?", isPresented: $confirmClearQueue, titleVisibility: .visible) {
                     Button("Clear Queue", role: .destructive) {
                         settings.hapticFeedback()
-                        withAnimation(.easeInOut) { quranPlayer.clearSurahQueue() }
+                        quranPlayer.clearSurahQueue()
                     }
                     Button("Cancel") {}
                 } message: {
@@ -74,12 +84,26 @@ struct NowPlayingView: View {
                 }
                 .cornerRadius(24)
                 .padding(.horizontal, 8)
+                // Always use the rounded-rectangle glass so the shape never morphs between a capsule and a
+                // rectangle when expanding/collapsing. Animating the glass shape change crashed the glass
+                // renderer (and caused the temporary Quran-layout shift), so we keep one stable shape.
+                .conditionalGlassEffect(rectangle: true)
+                // Fades in/out as the parent inserts/removes the bar (gated on isPlaying||isPaused).
                 .transition(.opacity)
-                // Big player uses the rounded-rectangle glass; small player is a capsule (rectangle: false)
-                // unless it's a custom range, which needs the taller rectangle to fit its detail lines.
-                .conditionalGlassEffect(rectangle: isExpanded || quranPlayer.isPlayingCustomRange)
+                // Capture the context on appear AND on change. `onChange` alone misses the very first value
+                // (continuous surah playback never changes the key), leaving `retainedContext` nil — so on
+                // stop the bar fell back to EmptyView and vanished without fading. Capturing on appear fixes it.
+                .onAppear {
+                    if let pc = playbackContext { retainedContext = pc }
+                }
+                .onChange(of: playbackContextKey) { _ in
+                    if let pc = playbackContext { retainedContext = pc }
+                }
             )
         #else
+        guard let playbackContext else {
+            return AnyView(EmptyView())
+        }
         return
             AnyView(
                 Section(header: Text("NOW PLAYING")) {
@@ -90,6 +114,12 @@ struct NowPlayingView: View {
                 }
             )
         #endif
+    }
+
+    /// Identity of the current playback context (nil when stopped). Used to refresh `retainedContext`.
+    private var playbackContextKey: String? {
+        guard let pc = playbackContext else { return nil }
+        return "\(pc.surah.id):\(pc.ayahNumber):\(pc.isPlaying)"
     }
 
     private var playbackContext: PlaybackContext? {
@@ -165,9 +195,10 @@ struct NowPlayingView: View {
             .contentShape(Rectangle())
             .onTapGesture {
                 settings.hapticFeedback()
-                withAnimation {
-                    isPlaying ? quranPlayer.pause() : quranPlayer.resume()
-                }
+                // No withAnimation: wrapping play/pause in an animation transaction made the glass card
+                // briefly flash a black backing behind the (expanded) player. The icon swap alone needs
+                // no animation, and isPlaying||isPaused stays true across pause/resume so nothing else moves.
+                isPlaying ? quranPlayer.pause() : quranPlayer.resume()
             }
 
         #if os(iOS)
@@ -201,7 +232,7 @@ struct NowPlayingView: View {
             let total = (rawTotal.isFinite && rawTotal > 0) ? rawTotal : 0
             let safeElapsed = elapsed.isFinite ? max(0, elapsed) : 0
 
-            VStack(spacing: 4) {
+            VStack(spacing: 6) {
                 if total > 0 {
                     TinyProgressBar(fraction: safeElapsed / total, color: settings.accentColor.color)
                 }
@@ -226,6 +257,10 @@ struct NowPlayingView: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
             }
+            // The progress bar / times tick every 0.5s and on play/resume. Opt this subtree out of any
+            // implicit animation inherited from the player card so the bar jumps to its position instead of
+            // easing — otherwise resuming (and each tick) shows a weird sliding/lurching animation.
+            .transaction { $0.animation = nil }
         }
     }
 
@@ -271,9 +306,11 @@ struct NowPlayingView: View {
     private var expandToggleButton: some View {
         Button {
             settings.hapticFeedback()
-            withAnimation(.easeInOut) {
-                settings.nowPlayingExpanded.toggle()
-            }
+            // Toggle WITHOUT a global withAnimation. A global transaction animated the whole enclosing
+            // List, which squished the ayah/surah rows and scrolled the Quran list back to the top. The
+            // compact<->expanded size change is animated locally by `.animation(value: isExpanded)` on
+            // playerRow, so only this card animates.
+            settings.nowPlayingExpanded.toggle()
         } label: {
             Image(systemName: isExpanded
                   ? "arrow.down.right.and.arrow.up.left"
@@ -297,7 +334,12 @@ struct NowPlayingView: View {
             }
         }
         .transition(.opacity)
-        .animation(.easeInOut, value: quranPlayer.isPlaying || quranPlayer.isPaused)
+        // No `.animation(value: isPlaying || isPaused)` here: the appearance/disappearance of the player on
+        // start/stop is already animated by the enclosing inset (`nowPlayingInset`), and a second animation
+        // at this level fought with it — producing the weird morph when resuming and when playback ended.
+        // Animate only the compact<->expanded size change locally, from this single source. The expand button
+        // no longer wraps the toggle in a global `withAnimation` (that animated the whole List — squishing
+        // rows and resetting the Quran scroll), so there's no longer a second animation to fight with.
         .animation(.easeInOut, value: isExpanded)
         .confirmationDialog(Settings.bookmarkNoteRemovalDialogTitle, isPresented: $confirmRemoveNote, titleVisibility: .visible) {
             Button("Remove", role: .destructive) {
@@ -319,7 +361,6 @@ struct NowPlayingView: View {
                 transportButtons(isPlaying: isPlaying)
             }
             .font(.headline)
-            .frame(maxWidth: .infinity)
             .padding(.top, 2)
         }
         .padding(4)
@@ -351,7 +392,6 @@ struct NowPlayingView: View {
                 HStack(spacing: 22) {
                     transportButtons(isPlaying: isPlaying)
                 }
-                .frame(maxWidth: .infinity)
             }
         }
         .padding(.vertical, 6)
@@ -369,11 +409,12 @@ struct NowPlayingView: View {
             HStack(spacing: 10) {
                 compactTransportButtons(isPlaying: isPlaying)
             }
+            // Clearance for the top-right expand button lives on the controls (not the row) so the row keeps
+            // the SAME horizontal padding as the expanded player.
+            .padding(.trailing, 30)
         }
         .padding(.vertical, 8)
-        .padding(.leading, 12)
-        // Extra trailing room so the controls clear the top-right expand button.
-        .padding(.trailing, 30)
+        .padding(.horizontal, 12)
     }
 
     @ViewBuilder
@@ -393,9 +434,10 @@ struct NowPlayingView: View {
             .contentShape(Rectangle())
             .onTapGesture {
                 settings.hapticFeedback()
-                withAnimation {
-                    isPlaying ? quranPlayer.pause() : quranPlayer.resume()
-                }
+                // No withAnimation: wrapping play/pause in an animation transaction made the glass card
+                // briefly flash a black backing behind the (expanded) player. The icon swap alone needs
+                // no animation, and isPlaying||isPaused stays true across pause/resume so nothing else moves.
+                isPlaying ? quranPlayer.pause() : quranPlayer.resume()
             }
 
         Image(systemName: "forward.fill")
@@ -459,9 +501,8 @@ struct NowPlayingView: View {
     private var stopButton: some View {
         Button {
             settings.hapticFeedback()
-            withAnimation {
-                quranPlayer.stop()
-            }
+            // No withAnimation: the player's disappearance is animated by the view's own `.animation(value:)`.
+            quranPlayer.stop()
         } label: {
             Image(systemName: "xmark.circle.fill")
                 .imageScale(.large)
@@ -485,9 +526,9 @@ struct NowPlayingView: View {
 
         Button(role: .destructive) {
             settings.hapticFeedback()
-            withAnimation {
-                quranPlayer.stop()
-            }
+            // Defer stop so the menu action fully completes before this bar (the menu's host) is removed —
+            // removing it synchronously inside the action cancelled the stop.
+            DispatchQueue.main.async { quranPlayer.stop() }
         } label: {
             Label("Stop Playing", systemImage: "xmark.circle.fill")
         }
@@ -521,9 +562,7 @@ struct NowPlayingView: View {
 
         Button(role: isFavorite ? .destructive : nil) {
             settings.hapticFeedback()
-            withAnimation(.easeInOut) {
-                settings.toggleSurahFavorite(surah: context.surah.id)
-            }
+            settings.toggleSurahFavorite(surah: context.surah.id)
         } label: {
             Label(
                 isFavorite ? "Unfavorite Surah" : "Favorite Surah",
@@ -546,11 +585,9 @@ struct NowPlayingView: View {
         if quranView {
             Button {
                 settings.hapticFeedback()
-                withAnimation {
-                    searchText = ""
-                    scrollDown = context.surah.id
-                    self.endEditing()
-                }
+                searchText = ""
+                scrollDown = context.surah.id
+                self.endEditing()
             } label: {
                 Label("Scroll To Surah", systemImage: "arrow.down.circle")
             }

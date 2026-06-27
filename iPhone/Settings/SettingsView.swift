@@ -71,7 +71,7 @@ struct SettingsView: View {
             .themedListRowBackground()
         }
         .navigationTitle("Settings")
-        .applyConditionalListStyle(defaultView: settings.defaultView)
+        .applyConditionalListStyle()
     }
 
     #if os(iOS)
@@ -87,7 +87,7 @@ struct SettingsView: View {
             .themedListRowBackground()
         }
         .navigationTitle("Settings")
-        .applyConditionalListStyle(defaultView: settings.defaultView)
+        .applyConditionalListStyle()
     }
 
     @ViewBuilder

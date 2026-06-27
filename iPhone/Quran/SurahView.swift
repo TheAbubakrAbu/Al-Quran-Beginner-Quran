@@ -21,8 +21,10 @@ struct SurahView: View {
     @State private var scrollDown: Int? = nil
     @State private var pendingScrollAfterSearchClear: Int? = nil
     @State private var didScrollDown = false
+    /// True while the surah's first page/juz divider is on screen. The pinned floating header then drops
+    /// its page/juz line (redundant with the visible divider) and shows it only once that divider scrolls off.
+    @State private var firstBoundaryDividerOnScreen = false
     @State private var showingSettingsSheet = false
-    @State private var showFloatingHeader = false
     @State private var showAlert = false
     @State private var showCustomRangeSheet = false
     @State private var showSurahInfoSheet = false
@@ -164,12 +166,12 @@ struct SurahView: View {
     }
 
     @ViewBuilder
-    private func listBoundaryDivider(model: BoundaryDividerModel, nextAyahID: Int? = nil) -> some View {
+    private func listBoundaryDivider(model: BoundaryDividerModel, nextAyahID: Int? = nil, showAyahPreview: Bool = false, showAyahLabel: Bool = true) -> some View {
         if settings.defaultView {
-            boundaryDivider(model: model, nextAyahID: nextAyahID)
+            boundaryDivider(model: model, nextAyahID: nextAyahID, showAyahPreview: showAyahPreview, showAyahLabel: showAyahLabel)
         } else {
             VStack {
-                boundaryDivider(model: model, nextAyahID: nextAyahID)
+                boundaryDivider(model: model, nextAyahID: nextAyahID, showAyahPreview: showAyahPreview, showAyahLabel: showAyahLabel)
                 
                 Divider()
                     .padding(.top, 7)
@@ -263,10 +265,10 @@ struct SurahView: View {
 
     private func boundaryText(for ayah: Ayah) -> String? {
         if let page = ayah.page, let juz = ayah.juz {
-            return "Page \(page) • Juz \(juz)"
+            return "\(mushafPageLabel(forAbsolutePage: page, in: surah)) • Juz \(juz)"
         }
         if let page = ayah.page {
-            return "Page \(page)"
+            return mushafPageLabel(forAbsolutePage: page, in: surah)
         }
         if let juz = ayah.juz {
             return "Juz \(juz)"
@@ -318,7 +320,7 @@ struct SurahView: View {
             .replacingOccurrences(of: "&&", with: "&")
             .replacingOccurrences(of: "||", with: "|")
 
-        guard normalized.contains("&") || normalized.contains("|") || normalized.contains("!") || normalized.contains("#") else {
+        guard normalized.contains("&") || normalized.contains("|") || normalized.contains("!") || normalized.contains("#") || normalized.contains("^") || normalized.contains("%") || normalized.contains("$") else {
             return nil
         }
 
@@ -334,8 +336,16 @@ struct SurahView: View {
     }
 
     private struct BooleanAyahTerm {
+        enum MatchMode {
+            case contains
+            case startsWith
+            case endsWith
+            case exact
+        }
+
         let value: String
         let isNegated: Bool
+        let matchMode: MatchMode
         let requiresTashkeelMatch: Bool
         let tashkeelPattern: String
         let requiresExactEnglishMatch: Bool
@@ -381,13 +391,39 @@ struct SurahView: View {
             term = term.trimmingCharacters(in: .whitespacesAndNewlines)
         }
 
+        var startsWithMatch = false
+        if term.hasPrefix("^") {
+            startsWithMatch = true
+            term.removeFirst()
+            term = term.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+
+        var endsWithMatch = false
+        if term.hasSuffix("%") || term.hasSuffix("$") {
+            endsWithMatch = true
+            term.removeLast()
+            term = term.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+
         guard !term.isEmpty else { return nil }
         let cleaned = settings.cleanSearch(term, whitespace: true)
         guard !cleaned.isEmpty else { return nil }
 
+        let matchMode: BooleanAyahTerm.MatchMode
+        if startsWithMatch && endsWithMatch {
+            matchMode = .exact
+        } else if startsWithMatch {
+            matchMode = .startsWith
+        } else if endsWithMatch {
+            matchMode = .endsWith
+        } else {
+            matchMode = .contains
+        }
+
         return BooleanAyahTerm(
             value: cleaned,
             isNegated: isNegated,
+            matchMode: matchMode,
             requiresTashkeelMatch: requiresTashkeelMatch && term.containsArabicLetters,
             tashkeelPattern: arabicTashkeelBlob(term),
             requiresExactEnglishMatch: requiresTashkeelMatch && !term.containsArabicLetters,
@@ -395,12 +431,30 @@ struct SurahView: View {
         )
     }
 
+    private func searchTokens(from cleanedText: String) -> [String] {
+        cleanedText.split(separator: " ").map(String.init).filter { !$0.isEmpty }
+    }
+
+    private func ayahTermMatch(haystack: String, tokens: [String], term: String, mode: BooleanAyahTerm.MatchMode) -> Bool {
+        switch mode {
+        case .contains:
+            return haystack.contains(term)
+        case .startsWith:
+            return haystack.hasPrefix(term) || tokens.contains(where: { $0.hasPrefix(term) })
+        case .endsWith:
+            return haystack.hasSuffix(term) || tokens.contains(where: { $0.hasSuffix(term) })
+        case .exact:
+            return haystack == term || tokens.contains(term)
+        }
+    }
+
     private func matchesBooleanAyahSearch(ayah: Ayah, haystack: String, groups: [[BooleanAyahTerm]]) -> Bool {
-        groups.contains { andTerms in
+        let haystackTokens = searchTokens(from: haystack)
+        return groups.contains { andTerms in
             andTerms.allSatisfy { term in
                 let containsTerm: Bool
                 if term.requiresTashkeelMatch {
-                    let lettersMatch = haystack.contains(term.value)
+                    let lettersMatch = ayahTermMatch(haystack: haystack, tokens: haystackTokens, term: term.value, mode: term.matchMode)
                     let tashkeelHaystack = arabicTashkeelBlob(ayah.textArabic(for: settings.displayQiraahForArabic))
                     let tashkeelMatch = term.tashkeelPattern.isEmpty || tashkeelHaystack.contains(term.tashkeelPattern)
                     containsTerm = lettersMatch && tashkeelMatch
@@ -410,9 +464,14 @@ struct SurahView: View {
                         ayah.textEnglishSaheeh,
                         ayah.textEnglishMustafa
                     ].joined(separator: " "))
-                    containsTerm = !term.exactEnglishPhrase.isEmpty && englishExactHaystack.contains(term.exactEnglishPhrase)
+                    containsTerm = !term.exactEnglishPhrase.isEmpty && ayahTermMatch(
+                        haystack: englishExactHaystack,
+                        tokens: searchTokens(from: englishExactHaystack),
+                        term: term.exactEnglishPhrase,
+                        mode: term.matchMode
+                    )
                 } else {
-                    containsTerm = haystack.contains(term.value)
+                    containsTerm = ayahTermMatch(haystack: haystack, tokens: haystackTokens, term: term.value, mode: term.matchMode)
                 }
                 return term.isNegated ? !containsTerm : containsTerm
             }
@@ -449,7 +508,7 @@ struct SurahView: View {
             if shouldBuildFullOverlayMap || index == 0 {
                 let pageSegment: String
                 if let page = ayah.page {
-                    pageSegment = "Page \(page)"
+                    pageSegment = mushafPageLabel(forAbsolutePage: page, in: surah)
                 } else if let juz = ayah.juz {
                     pageSegment = "Juz \(juz)"
                 } else {
@@ -458,7 +517,7 @@ struct SurahView: View {
 
                 let juzSegment = (ayah.page != nil) ? ayah.juz.map { "Juz \($0)" } : nil
                 overlayMap[ayah.id] = BoundaryDividerModel(
-                    text: boundaryText(for: ayah) ?? pageSegment,
+                    text: boundaryText(for: ayah, in: surah) ?? pageSegment,
                     pageSegment: pageSegment,
                     juzSegment: juzSegment,
                     style: .allAccent
@@ -481,23 +540,24 @@ struct SurahView: View {
         ayahs: [Ayah]
     ) -> PreparedSurahSearchCache {
         let qiraahKey = settings.displayQiraahForArabic ?? ""
-        let cacheKey = "\(surah.id)|\(qiraahKey)" as NSString
+        let ignoreSilent = settings.ignoreSilentLettersInQuranSearch
+        let cacheKey = "\(surah.id)|\(qiraahKey)|s\(ignoreSilent ? 1 : 0)" as NSString
         if let cached = preparedSurahSearchCache.object(forKey: cacheKey) {
             return cached
         }
 
-        let searchBlobMap = buildSearchBlobMap(ayahs: ayahs, displayQiraah: settings.displayQiraahForArabic)
+        let searchBlobMap = buildSearchBlobMap(ayahs: ayahs, displayQiraah: settings.displayQiraahForArabic, ignoreSilent: ignoreSilent)
         let prepared = PreparedSurahSearchCache(searchBlobByAyahID: searchBlobMap)
         preparedSurahSearchCache.setObject(prepared, forKey: cacheKey)
         return prepared
     }
 
-    private static func boundaryText(for ayah: Ayah) -> String? {
+    private static func boundaryText(for ayah: Ayah, in surah: Surah) -> String? {
         if let page = ayah.page, let juz = ayah.juz {
-            return "Page \(page) • Juz \(juz)"
+            return "\(mushafPageLabel(forAbsolutePage: page, in: surah)) • Juz \(juz)"
         }
         if let page = ayah.page {
-            return "Page \(page)"
+            return mushafPageLabel(forAbsolutePage: page, in: surah)
         }
         if let juz = ayah.juz {
             return "Juz \(juz)"
@@ -540,7 +600,8 @@ struct SurahView: View {
     /// never has to build the blob map synchronously while the user is typing.
     private func prewarmSearchBlobs() {
         let qiraahKey = settings.displayQiraahForArabic ?? ""
-        let key = "\(surah.id)|\(qiraahKey)"
+        let ignoreSilent = settings.ignoreSilentLettersInQuranSearch
+        let key = "\(surah.id)|\(qiraahKey)|s\(ignoreSilent ? 1 : 0)"
         if searchBlobPrewarmKey == key, !cachedSearchBlobByAyahID.isEmpty { return }
 
         let surah = self.surah
@@ -551,10 +612,11 @@ struct SurahView: View {
             : cachedAyahsForQiraah
 
         Task.detached(priority: .utility) {
-            let blobMap = Self.buildSearchBlobMap(ayahs: ayahs, displayQiraah: displayQiraah)
+            let blobMap = Self.buildSearchBlobMap(ayahs: ayahs, displayQiraah: displayQiraah, ignoreSilent: ignoreSilent)
             await MainActor.run {
-                // Discard if the user moved to another surah/qiraah while we were building.
-                guard "\(self.surah.id)|\(self.settings.displayQiraahForArabic ?? "")" == key else { return }
+                // Discard if the user moved to another surah/qiraah, or toggled silent search, mid-build.
+                let currentKey = "\(self.surah.id)|\(self.settings.displayQiraahForArabic ?? "")|s\(self.settings.ignoreSilentLettersInQuranSearch ? 1 : 0)"
+                guard currentKey == key else { return }
                 self.cachedSearchBlobByAyahID = blobMap
                 self.searchBlobPrewarmKey = key
             }
@@ -564,12 +626,12 @@ struct SurahView: View {
     /// Pure, actor-agnostic builder for the per-ayah search-blob map. Marked `nonisolated` so it can run
     /// on a background task without hopping back to the main actor (SurahView, being a `View`, is otherwise
     /// `@MainActor`-isolated). It only touches `Settings.shared` config and immutable ayah text.
-    nonisolated private static func buildSearchBlobMap(ayahs: [Ayah], displayQiraah: String?) -> [Int: String] {
+    nonisolated private static func buildSearchBlobMap(ayahs: [Ayah], displayQiraah: String?, ignoreSilent: Bool) -> [Int: String] {
         let settings = Settings.shared
         var searchBlobMap: [Int: String] = [:]
         searchBlobMap.reserveCapacity(ayahs.count)
         for ayah in ayahs {
-            let searchBlob = [
+            var parts = [
                 ayah.textArabic(for: displayQiraah),
                 ayah.textCleanArabic(for: displayQiraah),
                 ayah.textTransliteration,
@@ -579,8 +641,16 @@ struct SurahView: View {
                 ayah.idArabic
             ]
             .map { settings.cleanSearch($0) }
-            .joined(separator: " ")
-            searchBlobMap[ayah.id] = searchBlob
+
+            if ignoreSilent {
+                // Mirror QuranView's silent-letter search: also index the silent-letter-stripped Arabic so a
+                // query that omits silent letters still matches. Gated by the setting (and the cache key) so
+                // it doesn't loosen matching when the user has the option off.
+                parts.append(settings.cleanSearchIgnoringSilentArabicLetters(ayah.textArabic(for: displayQiraah)))
+                parts.append(settings.cleanSearchIgnoringSilentArabicLetters(ayah.textCleanArabic(for: displayQiraah)))
+            }
+
+            searchBlobMap[ayah.id] = parts.joined(separator: " ")
         }
         return searchBlobMap
     }
@@ -619,7 +689,7 @@ struct SurahView: View {
         DispatchQueue.main.async { attempt(2) }
     }
 
-    private func boundaryDivider(model: BoundaryDividerModel, isOverlay: Bool = false, nextAyahID: Int? = nil) -> some View {
+    private func boundaryDivider(model: BoundaryDividerModel, isOverlay: Bool = false, nextAyahID: Int? = nil, showAyahPreview: Bool = false, showAyahLabel: Bool = true) -> some View {
         let accent = settings.accentColor.color
         
         let dividerColor: Color = {
@@ -683,6 +753,7 @@ struct SurahView: View {
                 } ?? Text(""))
             )
             .font((isOverlay ? Font.caption : Font.caption).weight(.semibold))
+            .monospacedDigit()
             .lineLimit(1)
             .minimumScaleFactor(isOverlay ? 0.5 : 0.6)
             .allowsTightening(!isOverlay)
@@ -714,9 +785,20 @@ struct SurahView: View {
         if !searchText.isEmpty, let ayahID = nextAyahID {
             let labeledContent = VStack(spacing: 2) {
                 dividerContent
-                Text("Ayah \(ayahID)")
-                    .font(.caption2.weight(.semibold))
-                    .foregroundColor(.secondary)
+                if showAyahLabel {
+                    Text("Ayah \(ayahID)")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundColor(.secondary)
+                }
+
+                // For a bare "page"/"juz" keyword search we only list dividers (no ayah rows), so show a
+                // small Arabic preview of the start of the divider's first ayah. Rendered with the same
+                // pipeline as a real ayah row (font, tajweed, beginner mode, Allah highlight), just smaller
+                // and single-line so only the beginning of the ayah shows.
+                if showAyahPreview, settings.showArabicText,
+                   let previewAyah = surah.ayahs.first(where: { $0.id == ayahID }) {
+                    AyahArabicSnippet(surah: surah, ayah: previewAyah, scale: 0.7, lineLimit: 1)
+                }
             }
             return AnyView(
                 labeledContent
@@ -904,6 +986,11 @@ struct SurahView: View {
 
     private func ayahListScreen(proxy: ScrollViewProxy) -> some View {
         let cleanQuery = settings.cleanSearch(searchText, whitespace: true)
+        // Mirror QuranView: when the option is on and the query is Arabic, also match the silent-letter
+        // stripped form (the matching silent forms are folded into the search blob above).
+        let silentQuery: String? = (settings.ignoreSilentLettersInQuranSearch && searchText.containsArabicLetters)
+            ? settings.cleanSearchIgnoringSilentArabicLetters(searchText, whitespace: true)
+            : nil
         let booleanGroups = booleanAyahSearchGroups(from: searchText)
         let pageJuzQuery = parsePageJuzQuery(from: searchText)
         let ayahNumberQuery = parseAyahNumberQuery(from: searchText)
@@ -915,7 +1002,10 @@ struct SurahView: View {
         }()
         let isDividerKeywordSearch = dividerKeywordMode != nil
         let isPageOrJuzSearch = pageJuzQuery.page != nil || pageJuzQuery.juz != nil
-        let showBoundaryDividers = settings.showPageJuzDividers && (searchText.isEmpty || isPageOrJuzSearch || isDividerKeywordSearch)
+        // During a page/juz search the divider IS the context (it tells you which page/juz you're looking
+        // at), so always show it then — regardless of the user's normal show-page/juz-dividers preference,
+        // which only governs reading (searchText empty).
+        let showBoundaryDividers = isPageOrJuzSearch || isDividerKeywordSearch || (settings.showPageJuzDividers && searchText.isEmpty)
         let prepared = cachedAyahsForQiraah.isEmpty ? Self.preparedCache(for: surah, settings: settings) : nil
         let ayahsForQiraah = cachedAyahsForQiraah.isEmpty
             ? (prepared?.ayahs ?? [])
@@ -952,10 +1042,11 @@ struct SurahView: View {
                         if booleanGroups.isEmpty { return false }
                         return matchesBooleanAyahSearch(ayah: a, haystack: blob, groups: booleanGroups)
                     }
-                    return blob.contains(cleanQuery)
+                    if blob.contains(cleanQuery) { return true }
+                    return silentQuery.map { !$0.isEmpty && blob.contains($0) } ?? false
                 }
 
-                let fallbackBlob = [
+                var fallbackParts = [
                     settings.cleanSearch(a.textArabic),
                     settings.cleanSearch(a.textCleanArabic),
                     settings.cleanSearch(a.textTransliteration),
@@ -964,14 +1055,19 @@ struct SurahView: View {
                     settings.cleanSearch(String(a.id)),
                     settings.cleanSearch(a.idArabic)
                 ]
-                .joined(separator: " ")
+                if silentQuery != nil {
+                    fallbackParts.append(settings.cleanSearchIgnoringSilentArabicLetters(a.textArabic))
+                    fallbackParts.append(settings.cleanSearchIgnoringSilentArabicLetters(a.textCleanArabic))
+                }
+                let fallbackBlob = fallbackParts.joined(separator: " ")
 
                 if let booleanGroups {
                     if booleanGroups.isEmpty { return false }
                     return matchesBooleanAyahSearch(ayah: a, haystack: fallbackBlob, groups: booleanGroups)
                 }
 
-                return fallbackBlob.contains(cleanQuery)
+                if fallbackBlob.contains(cleanQuery) { return true }
+                return silentQuery.map { !$0.isEmpty && fallbackBlob.contains($0) } ?? false
             }
         }()
         let boundaryModel = showBoundaryDividers ? quranData.boundaryModel(forSurah: surah.id) : nil
@@ -1010,8 +1106,17 @@ struct SurahView: View {
             return nil
         }()
         let startOfSurahDivider: BoundaryDividerModel? = {
-            guard showBoundaryDividers, searchText.isEmpty else { return nil }
-            return boundaryModel?.startDivider
+            guard showBoundaryDividers else { return nil }
+            if searchText.isEmpty { return boundaryModel?.startDivider }
+            // Page/juz search: the surah's first ayah has no `dividerBeforeAyah` entry, so when the searched
+            // page/juz is the one the surah begins on (first ayah is in the results), surface the start
+            // divider too — otherwise the "Page X • Juz Y" header is missing for that first page.
+            if isPageOrJuzSearch,
+               let firstID = ayahsForQiraah.first?.id,
+               filteredAyahs.contains(where: { $0.id == firstID }) {
+                return boundaryModel?.startDivider
+            }
+            return nil
         }()
         let endOfSurahDivider: BoundaryDividerModel? = {
             guard showBoundaryDividers, searchText.isEmpty else { return nil }
@@ -1096,23 +1201,11 @@ struct SurahView: View {
                             surahInfoDialog = surahInfoDialog(for: surah)
                         }*/
                 } header: {
-                    ZStack {
-                        if searchText.isEmpty {
-                            SurahSectionHeader(surah: surah)
-                                .onAppear {
-                                    withAnimation {
-                                        showFloatingHeader = false
-                                    }
-                                }
-                                .onDisappear {
-                                    withAnimation {
-                                        showFloatingHeader = true
-                                    }
-                                }
-                        }
-                        
+                    // The surah header now lives in the always-pinned top safeAreaInset, so this section
+                    // header only carries the search results-count pill (trailing, visible while searching).
+                    if !searchText.isEmpty {
                         HStack {
-                            if !searchText.isEmpty { Spacer() }
+                            Spacer()
                             
                             Text(String(searchCount))
                                 .font(.caption.weight(.semibold))
@@ -1120,13 +1213,11 @@ struct SurahView: View {
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 6)
                                 .conditionalGlassEffect()
-                                .padding(.vertical, -16)
-                                .opacity(searchText.isEmpty ? 0 : 1)
                         }
+                        .animation(.easeInOut, value: searchText)
+                        .transition(.opacity)
+                        .padding(.vertical, -12)
                     }
-                    .animation(.easeInOut, value: searchText)
-                    .transition(.opacity)
-                    .padding(.bottom, -12)
                 }
                 
                 #if !os(watchOS)
@@ -1167,7 +1258,8 @@ struct SurahView: View {
                                         forDivider: dividerModel,
                                         boundaryModel: bm,
                                         ayahsForQiraah: ayahsForQiraah
-                                    )
+                                    ),
+                                    showAyahPreview: true
                                 )
                             } else {
                                 listBoundaryDivider(model: dividerModel, nextAyahID: nil)
@@ -1177,15 +1269,17 @@ struct SurahView: View {
                 } else {
                     if let startOfSurahDivider {
                         Section {
-                            listBoundaryDivider(model: startOfSurahDivider, nextAyahID: ayahsForQiraah.first?.id)
+                            listBoundaryDivider(model: startOfSurahDivider, nextAyahID: ayahsForQiraah.first?.id, showAyahLabel: false)
                         }
                         .onAppear {
+                            firstBoundaryDividerOnScreen = true
                             if shouldUpdateFloatingPageJuzOverlay, let nextID = filteredAyahs.first?.id {
                                 visibleBoundaryAyahIDs.insert(nextID)
                                 syncVisibleAyahAnchor()
                             }
                         }
                         .onDisappear {
+                            firstBoundaryDividerOnScreen = false
                             if shouldUpdateFloatingPageJuzOverlay, let nextID = filteredAyahs.first?.id {
                                 visibleBoundaryAyahIDs.remove(nextID)
                                 syncVisibleAyahAnchor()
@@ -1198,7 +1292,7 @@ struct SurahView: View {
 
                         if let dividerBefore {
                             Section {
-                                listBoundaryDivider(model: dividerBefore, nextAyahID: ayah.id)
+                                listBoundaryDivider(model: dividerBefore, nextAyahID: ayah.id, showAyahLabel: false)
                             }
                             .onAppear {
                                 if shouldUpdateFloatingPageJuzOverlay {
@@ -1270,7 +1364,8 @@ struct SurahView: View {
                         Section {
                             listBoundaryDivider(
                                 model: trailingSearchBoundaryDivider,
-                                nextAyahID: trailingSearchBoundaryScrollTarget
+                                nextAyahID: trailingSearchBoundaryScrollTarget,
+                                showAyahLabel: false
                             )
                         }
                     }
@@ -1278,7 +1373,7 @@ struct SurahView: View {
                 }
                 .themedListRowBackground()
             }
-            .applyConditionalListStyle(defaultView: settings.defaultView)
+            .applyConditionalListStyle(disableNowPlayingInset: true, topContentMargin: 11)
             .compactListSectionSpacing()
             #if os(iOS)
             .onChange(of: scrollDown) { value in
@@ -1356,25 +1451,34 @@ struct SurahView: View {
                 scrollToAyah(target, proxy: proxy)
             }
             #if os(iOS)
-            .overlay(alignment: .top) {
-                VStack(spacing: 8) {
-                    floatingHeaderOverlay(
-                        floatingDividerModel: floatingDividerModel,
-                        floatingDividerAnimationKey: floatingDividerAnimationKey
-                    )
-                }
+            // Always-pinned header (safeAreaInset, not overlay): it reserves space so list content — and
+            // the search results-count pill — sits below it rather than being hidden behind it.
+            .safeAreaInset(edge: .top, spacing: 0) {
+                // Drop the page/juz line from the pinned header while the surah's first divider is on screen
+                // (it would just duplicate what's visible); it returns once that divider scrolls away.
+                floatingHeaderOverlay(
+                    floatingDividerModel: firstBoundaryDividerOnScreen ? nil : floatingDividerModel,
+                    floatingDividerAnimationKey: firstBoundaryDividerOnScreen ? "none" : floatingDividerAnimationKey
+                )
             }
             .safeAreaInset(edge: .bottom) {
-                VStack(spacing: SafeAreaInsetVStackSpacing.standard) {
+                let active = quranPlayer.isPlaying || quranPlayer.isPaused
+                // Insert/remove the bar on isPlaying||isPaused with `.animation` so SwiftUI animates BOTH the
+                // fade (the bar's `.transition`) and the height collapse natively. The bar keeps its content
+                // while fading out via `retainedContext`, and "Stop Playing" defers `stop()`, so closing works.
+                VStack(spacing: 0) {
                     qiraatAndTajweedControls
-                    
-                    if quranPlayer.isPlaying || quranPlayer.isPaused {
-                        nowPlayingInset(proxy: proxy).padding(.horizontal, 24)
-                            .animation(.easeInOut, value: quranPlayer.isPlaying || quranPlayer.isPaused)
+
+                    if active {
+                        nowPlayingInset(proxy: proxy)
+                            .padding(.horizontal, 24)
+                            .padding(.top, SafeAreaInsetVStackSpacing.standard)
+                            .transition(.opacity)
                     }
                 }
                 .padding(.bottom, 7)
                 .background(Color.white.opacity(0.00001))
+                .animation(.easeInOut, value: active)
             }
             .adaptiveSafeArea(edge: .bottom) {
                 bottomInsetContent(proxy: proxy)
@@ -1532,18 +1636,18 @@ struct SurahView: View {
                     .animation(.easeInOut(duration: 0.18), value: floatingDividerAnimationKey)
             }
         }
+        // Animate the page/juz line appearing/disappearing (it shows once the first divider scrolls off,
+        // and updates as you move between pages) using the transition above.
+        .animation(.easeInOut(duration: 0.2), value: floatingDividerModel != nil)
         .padding(.horizontal)
         .padding(.vertical, 4)
         .shadow(color: .black.opacity(0.15), radius: 2, x: 0, y: 0)
         // When both the surah header and the page/juz divider are stacked, use a rounded rectangle;
         // a lone header reads better as a capsule.
-        .conditionalGlassEffect(rectangle: floatingDividerModel != nil)
+        .conditionalGlassEffect(rectangle: true)
         .padding(.top, 4)
         .padding(.horizontal, settings.defaultView ? 20 : 16)
-        .background(Color.clear)
-        .opacity(showFloatingHeader ? 1 : 0)
         .zIndex(1)
-        .offset(y: showFloatingHeader ? 0 : -80)
     }
 
     #if os(iOS)
@@ -1825,7 +1929,7 @@ struct SurahView: View {
                             .font(.custom(settings.fontArabic, size: UIFont.preferredFont(forTextStyle: .headline).pointSize + 2))
                         
                         Text(surah.idArabic)
-                            .font(.custom(Settings.hafsUthmaniFontName, size: UIFont.preferredFont(forTextStyle: .headline).pointSize + 4))
+                            .font(.custom(Settings.hafsUthmaniFontName, size: UIFont.preferredFont(forTextStyle: .headline).pointSize + 3))
                             .foregroundColor(settings.accentColor.color)
                     }
                 }
@@ -2096,7 +2200,7 @@ private struct SurahPickerSheet: View {
                     }
                     .themedListRowBackground()
                 }
-                .applyConditionalListStyle(defaultView: settings.defaultView)
+                .applyConditionalListStyle()
                 .compactListSectionSpacing()
                 .searchable(text: $searchText.animation(.easeInOut), prompt: "Search surah")
                 .navigationTitle("Choose Surah")

@@ -22,11 +22,9 @@ struct CreditsView: View {
             creditsLinksSection
             appsSection
             botsSection
+            intentSection
         }
-        .listStyle(.plain)
-        .navigationBarTitleDisplayMode(.inline)
-        .accentColor(settings.accentColor.color)
-        .tint(settings.accentColor.color)
+        .applyConditionalListStyle()
         .navigationTitle("Credits")
     }
 
@@ -46,6 +44,9 @@ struct CreditsView: View {
                     .padding(.vertical, 4)
                     .padding(.bottom, 8)
                     .contextMenu {
+                        Text("Copy")
+                            .foregroundStyle(.secondary)
+
                         Button {
                             settings.hapticFeedback()
                             UIPasteboard.general.string = "https://abubakrelmallah.com/"
@@ -58,9 +59,7 @@ struct CreditsView: View {
                     }
             }
 
-            Divider()
-                .background(settings.accentColor.color)
-                .padding(.trailing, -100)
+            Divider().background(settings.accentColor.color)
         }
         .listRowSeparator(.hidden)
     }
@@ -75,9 +74,10 @@ struct CreditsView: View {
                 .font(.body)
                 .multilineTextAlignment(.leading)
 
-            if let url = URL(string: "https://github.com/TheAbubakrAbu/Al-Quran-Beginner-Quran") {
+            let urlText = "https://github.com/TheAbubakrAbu/Al-Quran-iOS"
+            if let url = URL(string: urlText) {
                 Link(
-                    "View the source code: github.com/TheAbubakrAbu/Al-Quran-Beginner-Quran",
+                    "View the source code: \(urlText)",
                     destination: url
                 )
                 .font(.body)
@@ -86,7 +86,7 @@ struct CreditsView: View {
                     Button {
                         settings.hapticFeedback()
                         UIPasteboard.general.string =
-                        "https://github.com/TheAbubakrAbu/Al-Quran-Beginner-Quran"
+                        urlText
                     } label: {
                         HStack {
                             Image(systemName: "doc.on.doc")
@@ -135,16 +135,22 @@ struct CreditsView: View {
                 
                 creditLink("Credit for all the Quranic Arabic text and all qiraat/riwayaat data goes to quran-data-kfgqpc (KFGQPC)", url: "https://github.com/thetruetruth/quran-data-kfgqpc")
                 
-                creditLink("Credit for the Uthmani Quran font goes to quran-data-kfgqpc (KFGQPC)", url: "https://github.com/thetruetruth/quran-data-kfgqpc/tree/main/qumbul/font")
+                // https://qul.tarteel.ai/resources/font/458 SURAH HEADER FULL LINE
                 
-                creditLink("Credit for the Indopak Quran font goes to Urdu Nigar", url: "https://urdunigaar.com/download/al-mushaf-arabic-font-ttf-font-download/")
+                creditLink("Credit for the Uthmani Quran font goes to King Fahad Complex (KFGQPC)", url: "https://qul.tarteel.ai/resources/font/245")
+                
+                creditLink("Credit for the Indopak Nastaleeq Quran font goes to Ayman Siddiqui and R. Siddiqua", url: "https://qul.tarteel.ai/resources/font/242")
                 
                 creditLink("Credit for the Surah Quran Recitations goes to MP3 Quran", url: "https://mp3quran.net/eng")
                 
                 creditLink("Credit for the Ayah Quran Recitations goes to Al Quran", url: "https://alquran.cloud/cdn")
 
+                creditLink("Credit for the English Quran translation comparison API goes to Al Quran Cloud", url: "https://alquran.cloud/api")
+
                 creditLink("Credit for the Tafsir API goes to Quran API Pages", url: "https://quranapi.pages.dev/")
-                
+
+                creditLink("Credit for the Surah Info goes to Quran.com (Quran Foundation)", url: "https://api-docs.quran.foundation/docs/content_apis_versioned/4.0.0/get-chapter-info/#get-chapter-info")
+
                 creditLink("Credit for the 99 Names of Allah goes to MyIslam", url: "https://myislam.org/99-names-of-allah/")
             }
             .foregroundColor(settings.accentColor.color)
@@ -168,14 +174,25 @@ struct CreditsView: View {
         }
     }
 
+    private var intentSection: some View {
+        Section(header: Text("A NOTE ON INTENT")) {
+            Text("This app is offered as *sadaqah jariyah* — a contribution for the benefit of the Muslim community and anyone building tools to read, learn, and listen to the Quran. If it helps you, please keep the chain of attribution intact and consider contributing improvements back.")
+                .font(.body)
+                .multilineTextAlignment(.leading)
+        }
+    }
+
     @ViewBuilder
     private func creditLink(_ title: String, url: String) -> some View {
         if let destination = URL(string: url) {
             Link(title, destination: destination)
                 .contextMenu {
+                    Text("Copy")
+                        .foregroundStyle(.secondary)
+
                     Button {
                         settings.hapticFeedback()
-                        UIPasteboard.general.string = title
+                        UIPasteboard.general.string = url
                     } label: {
                         Label("Copy Link", systemImage: "doc.on.doc")
                     }
@@ -244,6 +261,9 @@ struct AppLinkRow: View {
             }
         }
         .contextMenu {
+            Text("Copy")
+                .foregroundStyle(.secondary)
+
             Button {
                 settings.hapticFeedback()
                 UIPasteboard.general.string = url

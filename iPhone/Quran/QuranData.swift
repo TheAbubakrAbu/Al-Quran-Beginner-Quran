@@ -377,8 +377,25 @@ final class TajweedStore {
     private static let smallHighUprightRectangularZero = UnicodeScalar(0x06E0)!
     private static let smallWaw = UnicodeScalar(0x06E5)!
     private static let smallYeh = UnicodeScalar(0x06E6)!
+    /// Small high yeh (ۧ), e.g. ٱلنَّبِيِّـۧنَ — another miniature natural-madd mark, treated like smallYeh.
+    private static let smallHighYeh = UnicodeScalar(0x06E7)!
     private static let smallHighMeem = UnicodeScalar(0x06E2)!
     private static let smallLowMeem = UnicodeScalar(0x06ED)!
+
+    /// Words from `madd_muttasil_analysis.json` `proper_words`. Each is written with a superscript madd
+    /// letter (dagger-alif ٰ / small-waw ۥ / small-yeh ۦ) carrying a maddah and immediately followed by a
+    /// hamzah inside the same written word — which normally reads as madd muttaṣil — but here that specific
+    /// sequence is recited as madd munfaṣil ḥukmī (a يا/ها particle joined to a following hamzah). Only that
+    /// superscript-carrier sequence is reclassified; any genuine madd muttaṣil elsewhere in the same word
+    /// (e.g. لَآءِ in هَٰٓؤُلَآءِ, a real alif) is left untouched. Stored NFC-normalized so the exact-word
+    /// match is independent of combining-mark order.
+    static let hukmiMunfasilProperWords: Set<String> = Set([
+        "يَٰٓأَيُّهَا", "هَٰٓؤُلَآءِ", "يَٰٓأَهۡلَ", "يَٰٓأَبَتِ", "يَٰٓأُوْلِي",
+        "يَٰٓـَٔادَمُ", "هَٰٓأَنتُمۡ", "أَهَٰٓؤُلَآءِ", "يَٰٓأَبَانَا", "هَٰٓؤُلَآءِۚ",
+        "يَٰٓإِبۡرَٰهِيمُ", "يَٰٓأَبَانَآ", "يَٰٓإِبۡلِيسُ", "وَيَٰٓـَٔادَمُ", "يَٰٓأَرۡضُ",
+        "يَٰٓأَسَفَىٰ", "وَهَٰٓؤُلَآءِ", "يَٰٓأُخۡتَ", "يَٰٓإِبۡرَٰهِيمُۖ", "يَٰٓأَيُّهَ",
+        "يَٰٓأَيَّتُهَا",
+    ].map { $0.precomposedStringWithCanonicalMapping })
 
     /// Higher value wins when painting overlapping UTF-16 units.
     private enum PaintPriority {
@@ -889,9 +906,23 @@ final class TajweedStore {
                 category: .maddNaturalMiniature,
                 into: &ops
             )
+
+            // Small high yeh (ۧ) sits on a tatweel (e.g. ـۧ in ٱلنَّبِيِّـۧنَ) and the font won't paint a
+            // foreground color onto the bare mark, so color the whole carrier cluster instead — the same
+            // "color the whole letter" approach used for the tiny iqlaab meem — so it's actually visible.
+            for cluster in clusters where clusterHasSmallHighYehMaddMark(cluster) {
+                for range in smallHighYehMaddPaintRanges(in: cluster) {
+                    appendPaintOpIfVisible(
+                        range: range,
+                        priority: PaintPriority.maddNatural2MiniatureScalars,
+                        category: .maddNaturalMiniature,
+                        into: &ops
+                    )
+                }
+            }
         }
 
-        appendExplicitMaddahPaintOps(text: text, clusters: clusters, finalAaridCarrier: finalAaridCarrier, ayahFinalNaturalIndex: ayahFinalMaddNaturalIndex, into: &ops)
+        appendExplicitMaddahPaintOps(text: text, clusters: clusters, words: words, finalAaridCarrier: finalAaridCarrier, ayahFinalNaturalIndex: ayahFinalMaddNaturalIndex, into: &ops)
 
         if settings.isTajweedCategoryVisible(.maddNecessary) {
             for index in clusters.indices where isLazimCombinedAlifCluster(clusters[index]) {
@@ -1022,6 +1053,10 @@ final class TajweedStore {
                 for i in lo..<hi {
                     if i == finalAaridCarrier { continue }
                     if isFinalFathataynSilentAlifMadd(clusters: clusters, index: i) {
+                        // Madd 'iwad: at the END of the ayah (waqf) the tanwin fath is dropped and the final
+                        // alif / alif-maqsura IS pronounced as a 2-count natural madd, so colour it (not
+                        // silent). Mid-ayah those alifs stay silent. Covers both fathatayn forms (ً 064B and
+                        // Uthmani ٗ 0657) via hasFathatayn, for alif and alif-maqsura.
                         if strongerMaddRuleCoversCluster(index: i, ops: ops, clusters: clusters) { continue }
                         appendLetterOnlyMaddPaintOps(
                             clusters: clusters,
@@ -1091,11 +1126,16 @@ final class TajweedStore {
         return false
     }
 
-    private func appendExplicitMaddahPaintOps(text: String, clusters: [CharacterClusterInfo], finalAaridCarrier: Int?, ayahFinalNaturalIndex: Int?, into ops: inout [PaintOp]) {
+    private func appendExplicitMaddahPaintOps(text: String, clusters: [CharacterClusterInfo], words: [Range<Int>], finalAaridCarrier: Int?, ayahFinalNaturalIndex: Int?, into ops: inout [PaintOp]) {
+        let hukmiOverrideIndices = hukmiMunfasilOverrideClusterIndices(clusters: clusters, words: words)
         for index in clusters.indices where hasMaddah(clusters[index]) {
             if index == finalAaridCarrier { continue }
             if hasMiniatureMaddMark(clusters[index]) { continue }
-            var classification = explicitMaddahCategory(clusters: clusters, index: index)
+            var classification = explicitMaddahCategory(
+                clusters: clusters,
+                index: index,
+                allowHukmiMunfasilOverride: hukmiOverrideIndices.contains(index)
+            )
             // Ayah-final lone madd letter: read as natural madd at waqf, not the highlighted madd lazim catch-all.
             if index == ayahFinalNaturalIndex, classification.category == .maddNecessary {
                 classification = (.maddNatural, PaintPriority.maddNatural2)
@@ -1111,13 +1151,29 @@ final class TajweedStore {
         }
     }
 
+    /// Cluster indices that belong to a `proper_words` (hukmī munfaṣil) exact-match word, so the superscript
+    /// madd carrier + same-word hamzah inside them is reclassified munfaṣil instead of muttaṣil.
+    private func hukmiMunfasilOverrideClusterIndices(clusters: [CharacterClusterInfo], words: [Range<Int>]) -> Set<Int> {
+        guard !Self.hukmiMunfasilProperWords.isEmpty else { return [] }
+        var result = Set<Int>()
+        for word in words {
+            let wordText = word.map { clusters[$0].text }.joined().precomposedStringWithCanonicalMapping
+            if Self.hukmiMunfasilProperWords.contains(wordText) {
+                result.formUnion(word)
+            }
+        }
+        return result
+    }
+
     private func explicitMaddahCategory(
         clusters: [CharacterClusterInfo],
-        index: Int
+        index: Int,
+        allowHukmiMunfasilOverride: Bool = false
     ) -> (category: TajweedLegendCategory, priority: Int) {
         let hasTashkeelMaddCarrier = scalarRange(in: clusters[index], scalar: Self.daggerAlif) != nil ||
             scalarRange(in: clusters[index], scalar: Self.smallWaw) != nil ||
-            scalarRange(in: clusters[index], scalar: Self.smallYeh) != nil
+            scalarRange(in: clusters[index], scalar: Self.smallYeh) != nil ||
+            scalarRange(in: clusters[index], scalar: Self.smallHighYeh) != nil
 
         if index + 1 < clusters.count,
            !isWhitespaceOnly(clusters[index + 1]),
@@ -1140,9 +1196,17 @@ final class TajweedStore {
             }
             // Check hamza before the Arabic-letter guard so tatweel+hamza (e.g. ـَٔ) is caught as muttasil.
             if isHamzaCarrier(cluster) {
-                return sawWordBreak
-                    ? (.maddSeparated, PaintPriority.explicitMaddSeparated)
-                    : (.maddConnected, PaintPriority.explicitMaddConnected)
+                if sawWordBreak {
+                    return (.maddSeparated, PaintPriority.explicitMaddSeparated)
+                }
+                // Exception: in the `proper_words` hukmī munfaṣil words, a superscript madd carrier
+                // (dagger-alif / small-waw / small-yeh) followed by a hamzah in the SAME written word is
+                // recited as madd munfaṣil, not muttaṣil. Only the superscript-carrier sequence is
+                // overridden — a real madd letter + hamzah in these words stays muttaṣil.
+                if allowHukmiMunfasilOverride, hasTashkeelMaddCarrier {
+                    return (.maddSeparated, PaintPriority.explicitMaddSeparated)
+                }
+                return (.maddConnected, PaintPriority.explicitMaddConnected)
             }
             guard cluster.primaryArabicLetter != nil else {
                 scanIndex += 1
@@ -1165,7 +1229,7 @@ final class TajweedStore {
     }
 
     private func hasMiniatureMaddScalar(_ cluster: CharacterClusterInfo) -> Bool {
-        cluster.contains(Self.daggerAlif) || cluster.contains(Self.smallWaw) || cluster.contains(Self.smallYeh)
+        cluster.contains(Self.daggerAlif) || cluster.contains(Self.smallWaw) || cluster.contains(Self.smallYeh) || cluster.contains(Self.smallHighYeh)
     }
 
     private func shouldIgnoreForExplicitMaddahScan(_ cluster: CharacterClusterInfo) -> Bool {
@@ -1249,7 +1313,7 @@ final class TajweedStore {
         into ops: inout [PaintOp]
     ) {
         let cluster = clusters[index]
-        let skipScalars: Set<UInt32> = [Self.daggerAlif.value, Self.smallWaw.value, Self.smallYeh.value]
+        let skipScalars: Set<UInt32> = [Self.daggerAlif.value, Self.smallWaw.value, Self.smallYeh.value, Self.smallHighYeh.value]
         var u = cluster.utf16Range.lowerBound
         for s in cluster.text.unicodeScalars {
             if !skipScalars.contains(s.value) {
@@ -2237,19 +2301,64 @@ final class TajweedStore {
     ) {
         let clusters = characterClusters(in: text)
         var paintedTanween = false
-        for cluster in clusters {
+        for (idx, cluster) in clusters.enumerated() {
             guard utf16RangesOverlap(cluster.utf16Range, range) else { continue }
             if category == .iqlaab, clusterHasTinyMeemIqlaabMark(cluster) {
                 paintedTanween = true
                 continue
             }
             guard let tanweenRange = tanweenScalarRange(in: cluster) else { continue }
+            // Waqf: a tanween at the end of the ayah — the last letter (e.g. نٌ), or with only a final
+            // silent alif/yaa after it (نًا / نًى) — isn't pronounced when stopping, so never color it.
+            // Mark it as "painted" so the whole-range fallback below doesn't end up coloring it instead.
+            if isTanweenClusterAtAyahEnd(clusters: clusters, index: idx) {
+                paintedTanween = true
+                continue
+            }
             ops.append(PaintOp(range: tanweenRange, priority: priority, category: category, color: category.color))
             paintedTanween = true
         }
 
         if !paintedTanween {
             ops.append(PaintOp(range: range, priority: priority, category: category, color: category.color))
+        }
+    }
+
+    /// True when the tanween-carrying cluster sits at a waqf (ayah-end) position: it is the final Arabic
+    /// letter, or the only thing after it is the ayah's final silent alif / alif-maqsura / yaa (نًا / نًى).
+    /// Tanween is not pronounced at waqf, so its mark must never be colored there. Applies to all six
+    /// tanween marks (tanweenScalarRange already matches every form).
+    private func isTanweenClusterAtAyahEnd(clusters: [CharacterClusterInfo], index: Int) -> Bool {
+        guard let finalIdx = indexOfFinalArabicLetterCluster(clusters: clusters) else { return false }
+        if index == finalIdx { return true }
+        guard let nextIdx = nextArabicLetterClusterIndex(clusters: clusters, after: index) else { return true }
+        guard nextIdx == finalIdx else { return false }
+        if let base = clusters[finalIdx].primaryArabicLetter, base == "ا" || base == "ى" { return true }
+        return isYaBase(clusters[finalIdx])
+    }
+
+    /// Ghunnah for a noon/meem with shadda colours the whole cluster — EXCEPT a trailing tanween at waqf
+    /// (ayah end), which is dropped when stopping and so must stay uncoloured (e.g. وَلَا جَآنّٞ: the نّ stays
+    /// green, the final tanween ٞ does not). Mid-ayah the tanween is pronounced, so the whole cluster colours.
+    private func appendShaddaGhunnahPaintOps(clusters: [CharacterClusterInfo], index: Int, into ops: inout [PaintOp]) {
+        let cluster = clusters[index]
+        let full = nsRange(for: cluster)
+
+        guard let tanweenRange = tanweenScalarRange(in: cluster),
+              isTanweenClusterAtAyahEnd(clusters: clusters, index: index) else {
+            appendPaintOpIfVisible(range: full, priority: PaintPriority.generalGhunnah, category: .generalGhunnah, into: &ops)
+            return
+        }
+
+        // Colour everything in the cluster except the tanween scalar.
+        let beforeLength = tanweenRange.location - full.location
+        if beforeLength > 0 {
+            appendPaintOpIfVisible(range: NSRange(location: full.location, length: beforeLength), priority: PaintPriority.generalGhunnah, category: .generalGhunnah, into: &ops)
+        }
+        let afterLocation = tanweenRange.location + tanweenRange.length
+        let afterLength = (full.location + full.length) - afterLocation
+        if afterLength > 0 {
+            appendPaintOpIfVisible(range: NSRange(location: afterLocation, length: afterLength), priority: PaintPriority.generalGhunnah, category: .generalGhunnah, into: &ops)
         }
     }
 
@@ -2344,6 +2453,17 @@ final class TajweedStore {
         // Color the whole carrier letter (e.g. the ة in ةُۢ before baa), not just the small meem mark,
         // so the iqlaab is actually visible on the letter.
         guard clusterHasTinyMeemIqlaabMark(cluster) else { return [] }
+        return [nsRange(for: cluster)]
+    }
+
+    private func clusterHasSmallHighYehMaddMark(_ cluster: CharacterClusterInfo) -> Bool {
+        cluster.contains(Self.smallHighYeh)
+    }
+
+    private func smallHighYehMaddPaintRanges(in cluster: CharacterClusterInfo) -> [NSRange] {
+        // Color the whole carrier cluster (e.g. the ـۧ in ٱلنَّبِيِّـۧنَ), not just the bare small high yeh
+        // mark, so this miniature natural madd actually shows — same reasoning as `tinyMeemPaintRanges`.
+        guard clusterHasSmallHighYehMaddMark(cluster) else { return [] }
         return [nsRange(for: cluster)]
     }
 
@@ -2456,7 +2576,7 @@ final class TajweedStore {
         var ranges: [NSRange] = []
         for scalar in cluster.text.unicodeScalars {
             let length = utf16Length(of: scalar)
-            if scalar == Self.daggerAlif || scalar == Self.maddah || scalar == Self.smallWaw || scalar == Self.smallYeh {
+            if scalar == Self.daggerAlif || scalar == Self.maddah || scalar == Self.smallWaw || scalar == Self.smallYeh || scalar == Self.smallHighYeh {
                 ranges.append(NSRange(location: offset, length: length))
             }
             offset += length
@@ -2467,7 +2587,8 @@ final class TajweedStore {
     private func explicitMaddahPaintRanges(in cluster: CharacterClusterInfo) -> [NSRange] {
         let hasTashkeelMaddCarrier = scalarRange(in: cluster, scalar: Self.daggerAlif) != nil ||
             scalarRange(in: cluster, scalar: Self.smallWaw) != nil ||
-            scalarRange(in: cluster, scalar: Self.smallYeh) != nil
+            scalarRange(in: cluster, scalar: Self.smallYeh) != nil ||
+            scalarRange(in: cluster, scalar: Self.smallHighYeh) != nil
         if hasTashkeelMaddCarrier {
             return specialMaddScalarRanges(in: cluster)
         }
@@ -2500,7 +2621,7 @@ final class TajweedStore {
             if let base,
                (base == "ن" || base == "م") && hasShadda(cluster) {
                 // Global ghunnah: any noon or meem with shaddah.
-                appendPaintOpIfVisible(range: nsRange(for: cluster), priority: PaintPriority.generalGhunnah, category: .generalGhunnah, into: &ops)
+                appendShaddaGhunnahPaintOps(clusters: clusters, index: idx, into: &ops)
                 continue
             }
 
@@ -2979,7 +3100,8 @@ final class QuranData: ObservableObject {
     }
 
     private struct QuranDynamicCache: Codable {
-        static let version = 2
+        // v3: cross-surah boundary dividers no longer carry a surah-relative "(N)" page annotation.
+        static let version = 3
 
         let version: Int
         let resourceSignature: String
@@ -4345,16 +4467,16 @@ final class QuranData: ObservableObject {
         cachedFirstAyahLookupQiraah = displayQiraah ?? ""
     }
 
-    private func boundaryText(from oldAyah: Ayah, to newAyah: Ayah) -> String? {
+    private func boundaryText(from oldAyah: Ayah, to newAyah: Ayah, in surah: Surah?) -> String? {
         let pageChanged = oldAyah.page != newAyah.page
         let juzChanged = oldAyah.juz != newAyah.juz
         guard pageChanged || juzChanged else { return nil }
 
         if let page = newAyah.page, let juz = newAyah.juz {
-            return "Page \(page) • Juz \(juz)"
+            return "\(mushafPageLabel(forAbsolutePage: page, in: surah)) • Juz \(juz)"
         }
         if let page = newAyah.page {
-            return "Page \(page)"
+            return mushafPageLabel(forAbsolutePage: page, in: surah)
         }
         if let juz = newAyah.juz {
             return "Juz \(juz)"
@@ -4362,12 +4484,12 @@ final class QuranData: ObservableObject {
         return nil
     }
 
-    private func boundaryText(for ayah: Ayah) -> String? {
+    private func boundaryText(for ayah: Ayah, in surah: Surah?) -> String? {
         if let page = ayah.page, let juz = ayah.juz {
-            return "Page \(page) • Juz \(juz)"
+            return "\(mushafPageLabel(forAbsolutePage: page, in: surah)) • Juz \(juz)"
         }
         if let page = ayah.page {
-            return "Page \(page)"
+            return mushafPageLabel(forAbsolutePage: page, in: surah)
         }
         if let juz = ayah.juz {
             return "Juz \(juz)"
@@ -4432,7 +4554,7 @@ final class QuranData: ObservableObject {
                 continue
             }
 
-            let startDividerText = ayahsForQiraah.first.flatMap { boundaryText(for: $0) }
+            let startDividerText = ayahsForQiraah.first.flatMap { boundaryText(for: $0, in: surah) }
             let startDividerHighlighted: Bool = {
                 guard index > 0,
                       let firstAyah = ayahsForQiraah.first else { return false }
@@ -4459,7 +4581,7 @@ final class QuranData: ObservableObject {
                 for i in 1..<ayahsForQiraah.count {
                     let prev = ayahsForQiraah[i - 1]
                     let current = ayahsForQiraah[i]
-                    if let text = boundaryText(from: prev, to: current) {
+                    if let text = boundaryText(from: prev, to: current, in: surah) {
                         dividerBeforeAyah[current.id] = dividerModel(
                             from: text,
                             style: boundaryStyle(pageChanged: prev.page != current.page, juzChanged: prev.juz != current.juz)
@@ -4479,7 +4601,9 @@ final class QuranData: ObservableObject {
                 if let lastAyah = ayahsForQiraah.last,
                    let nextAyah = nextSurah.ayahs.first(where: { $0.existsInQiraah(displayQiraah) }) {
                     nextFirstAyah = nextAyah
-                    endDividerText = boundaryText(from: lastAyah, to: nextAyah)
+                    // Cross-surah boundary: the page belongs to the next surah, so it is shown without a
+                    // surah-relative annotation — an "(N)" here would read as the next surah's page count.
+                    endDividerText = boundaryText(from: lastAyah, to: nextAyah, in: nil)
                     endBoundaryPageChanged = lastAyah.page != nextAyah.page
                     endBoundaryJuzChanged = lastAyah.juz != nextAyah.juz
                     endDividerHighlighted = lastAyah.page != nextAyah.page || lastAyah.juz != nextAyah.juz
@@ -4487,17 +4611,9 @@ final class QuranData: ObservableObject {
             }
 
             if let nextFirstAyah {
-                endOfSurahDividerText = boundaryText(for: nextFirstAyah)
+                endOfSurahDividerText = boundaryText(for: nextFirstAyah, in: nil)
             } else if let lastAyah = ayahsForQiraah.last {
-                if let page = lastAyah.page {
-                    if let juz = lastAyah.juz {
-                        endOfSurahDividerText = "Page \(page) • Juz \(juz)"
-                    } else {
-                        endOfSurahDividerText = "Page \(page)"
-                    }
-                } else if let juz = lastAyah.juz {
-                    endOfSurahDividerText = "Juz \(juz)"
-                }
+                endOfSurahDividerText = boundaryText(for: lastAyah, in: nil)
             }
             let endDividerStyle = boundaryStyle(pageChanged: endBoundaryPageChanged, juzChanged: endBoundaryJuzChanged)
             let endOfSurahDividerStyle: BoundaryDividerStyle = {

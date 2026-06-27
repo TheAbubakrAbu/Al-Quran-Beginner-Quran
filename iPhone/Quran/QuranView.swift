@@ -376,8 +376,7 @@ struct QuranView: View {
             if showAyahSearchLearnMore {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Boolean operators: & (AND), | (OR), ! (NOT)")
-                    Text("Use #Arabic for normalized letters + matching tashkeel")
-                    Text("Use #English for exact phrase (case-insensitive)")
+                    Text("Use #term for an exact match (Arabic: exact diacritics; English: exact phrase)")
                     Text("Use ^term for starts-with and term% for ends-with")
                     Text("Count filters: 'X ayahs/pages', '<X', '>X', '<=X', '>=X', '==X'")
                     Text("Juz names work too: Arabic or transliteration")
@@ -437,6 +436,13 @@ struct QuranView: View {
         // blocked by building surah caches. Priority routes (default/last-read/first bookmark/favorite) warm
         // first so the most likely next tap is ready, then the rest fill in slowly in the background.
         Task(priority: .utility) { @MainActor in
+            // This whole prewarm runs on the main actor (it reads `settings`/builds caches), so doing it the
+            // instant the tab appears stalls the FIRST render — the main cause of "opening Quran feels slow".
+            // Wait for the first render to settle before warming anything, so the list paints immediately and
+            // caches fill in afterward. (Cancelled automatically if the user leaves the tab.)
+            try? await Task.sleep(nanoseconds: 450_000_000)
+            if Task.isCancelled { return }
+
             var seen = Set<Int>()
             for route in priorityRoutes {
                 if case let .ayahs(surahID, _) = route,
@@ -638,7 +644,10 @@ struct QuranView: View {
                     primaryHistorySections(context: context)
                     bookmarkSection(context: context)
                     favoriteSection(context: context)
-                    if (context.pageJuzQuery.page != nil || context.pageJuzQuery.juz != nil) && context.isSearching {
+                    // Only hoist page/juz above the surah list for EXPLICIT "page X" / "juz Y" queries
+                    // (where surahContentSections is empty anyway). For a bare number, the surah match
+                    // comes first and the compact page/juz results follow below (in searchResultSections).
+                    if context.explicitPageOrJuzMode && context.isSearching {
                         pageSearchSection(context: context)
                         juzSearchSection(context: context)
                     }
@@ -647,11 +656,12 @@ struct QuranView: View {
                 }
                 .themedListRowBackground()
             }
-            .applyConditionalListStyle(defaultView: settings.defaultView)
+            .applyConditionalListStyle(disableNowPlayingInset: true)
             .compactListSectionSpacing()
             .listSectionIndexVisibilityWhenAvailable(visible: settings.quranSortMode == .juz && searchText.isEmpty)
-            .animation(.easeInOut(duration: 0.22), value: settings.quranSortMode)
-            .animation(.easeInOut(duration: 0.22), value: settings.quranSortDirection)
+            // No list-level `.animation(...)` here — it makes lazily-loaded rows stutter while scrolling
+            // (SurahView has none). The sort-change transition is already animated at the toggle sites via
+            // `withAnimation` in `sortModeButton` / the sort-direction picker.
             #if os(watchOS)
             .searchable(text: $searchText.animation(.easeInOut))
             #endif
@@ -669,17 +679,15 @@ struct QuranView: View {
             }
             .onChange(of: scrollToSurahID) { id in
                 guard id > 0 else { return }
-                // Grid mode uses a LazyVGrid, whose off-screen tiles aren't realized, so ScrollViewReader
-                // can't reach them. Force list mode (each surah is its own List row, which scrolls
-                // reliably to off-screen rows) before scrolling.
-                if settings.quranGridMode {
-                    settings.quranGridMode = false
+                // Grid mode (a LazyVGrid added after 4.4.4) can't scroll to off-screen tiles, so flip to list
+                // first. Otherwise this is exactly the Version 4.4.4 scroll, which felt right: one delayed,
+                // animated scrollTo — no retry loop, no settle attempts.
+                if settings.quranGridMode { settings.quranGridMode = false }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    withAnimation {
+                        scrollProxy.scrollTo("surah_\(id)", anchor: .top)
+                    }
                 }
-                // "Scroll To Surah" often clears an active search at the same time (and now may also flip
-                // grid→list), both of which rebuild the List. A single fixed-delay scroll races that
-                // rebuild and lands on an id that doesn't exist yet, so retry until the target row appears
-                // (its onAppear resets scrollToSurahID, which ends the retries).
-                scrollToSurah(id, proxy: scrollProxy, attemptsLeft: 12)
             }
             
         }
@@ -711,11 +719,16 @@ struct QuranView: View {
             }
 
             ToolbarItem(placement: .navigationBarTrailing) {
-                Button {
-                    settings.hapticFeedback()
-                    showingSettingsSheet = true
-                } label: {
-                    Image(systemName: "gear")
+                // On iPad/Mac the open-surah (detail) pane provides the settings gear; avoid a duplicate gear
+                // in the sidebar list when using side-by-side column navigation. (The condition lives inside
+                // the ToolbarItem so the toolbar content stays non-optional, keeping pre-iOS 16 support.)
+                if !usesColumnNavigation {
+                    Button {
+                        settings.hapticFeedback()
+                        showingSettingsSheet = true
+                    } label: {
+                        Image(systemName: "gear")
+                    }
                 }
             }
         }
@@ -766,21 +779,29 @@ struct QuranView: View {
     @ViewBuilder
     private var nowPlayingInset: some View {
         #if os(iOS)
-        VStack(spacing: SafeAreaInsetVStackSpacing.standard) {
-            if quranPlayer.isPlaying || quranPlayer.isPaused {
-                if #available(iOS 16.0, *) {
-                    NowPlayingView(quranView: true, scrollDown: $scrollToSurahID, searchText: $searchText) { context in
-                        push(surahID: context.surah.id, ayahID: quranPlayer.isPlayingSurah ? nil : context.ayahNumber)
+        // On iPad/Mac the open-surah (detail) pane shows its own Now Playing bar; don't duplicate it in
+        // the sidebar list when using side-by-side column navigation.
+        if !usesColumnNavigation {
+            let active = quranPlayer.isPlaying || quranPlayer.isPaused
+            // Insert/remove the bar on isPlaying||isPaused with `.animation` so SwiftUI animates BOTH the fade
+            // (the bar's `.transition`) and the height collapse natively. The bar keeps its content while
+            // fading out via `retainedContext`, and "Stop Playing" defers `stop()`, so closing still works.
+            VStack(spacing: SafeAreaInsetVStackSpacing.standard) {
+                if active {
+                    if #available(iOS 16.0, *) {
+                        NowPlayingView(quranView: true, scrollDown: $scrollToSurahID, searchText: $searchText) { context in
+                            push(surahID: context.surah.id, ayahID: quranPlayer.isPlayingSurah ? nil : context.ayahNumber)
+                        }
+                    } else {
+                        NowPlayingView(quranView: true, scrollDown: $scrollToSurahID, searchText: $searchText)
                     }
-                } else {
-                    NowPlayingView(quranView: true, scrollDown: $scrollToSurahID, searchText: $searchText)
                 }
             }
+            .padding(.horizontal, 24)
+            .padding(.bottom, active ? 8 : 0)
+            .background(Color.white.opacity(0.00001))
+            .animation(.easeInOut, value: active)
         }
-        .padding(.horizontal, 24)
-        .padding(.bottom, 8)
-        .background(Color.white.opacity(0.00001))
-        .animation(.easeInOut, value: quranPlayer.isPlaying || quranPlayer.isPaused)
         #endif
     }
 
@@ -1137,6 +1158,8 @@ struct QuranView: View {
                     scrollToSurahID: $scrollToSurahID,
                     onSelectAyah: columnAyahSelectionHandler
                 )
+                // One animation (combined surah+ayah key) rather than a stack of two.
+                .animation(.easeInOut, value: pair.surah.id * 1000 + pair.ayah.id)
             }
 
             if context.isSearching == false, settings.saveLastListenedSurah, let surah = settings.lastListenedSurah {
@@ -1150,6 +1173,7 @@ struct QuranView: View {
                         selectedRoute = .ayahs(surahID: surahID, ayah: nil)
                     } : nil
                 )
+                .animation(.easeInOut, value: surah.surahNumber)
             }
 
             if context.isSearching == false,
@@ -1165,6 +1189,7 @@ struct QuranView: View {
                     showAyahListeningHistory: $showAyahListeningHistory,
                     onSelectAyah: columnAyahSelectionHandler
                 )
+                .animation(.easeInOut, value: pair.surah.id * 1000 + pair.ayah.id)
             }
 
             if context.isSearching == false,
@@ -1181,8 +1206,7 @@ struct QuranView: View {
                     showReadingHistory: $showReadingHistory,
                     onSelectAyah: columnAyahSelectionHandler
                 )
-                .animation(.easeInOut, value: settings.lastReadAyah)
-                .animation(.easeInOut, value: settings.lastReadSurah)
+                .animation(.easeInOut, value: settings.lastReadSurah * 1000 + settings.lastReadAyah)
             }
         }
         #else
@@ -1229,16 +1253,19 @@ struct QuranView: View {
                     SummaryAyahTile(title: "Last Read Ayah", icon: "book", surah: lastReadSurah, ayah: lastReadAyah) {
                         push(surahID: lastReadSurah.id, ayahID: lastReadAyah.id)
                     }
+                    .animation(.easeInOut, value: settings.lastReadSurah * 1000 + settings.lastReadAyah)
                 }
                 if showAyah, let pair = ayahOfTheDayPair {
                     SummaryAyahTile(title: "Ayah of the Day", icon: "sparkles", surah: pair.surah, ayah: pair.ayah) {
                         push(surahID: pair.surah.id, ayahID: pair.ayah.id)
                     }
+                    .animation(.easeInOut, value: pair.surah.id * 1000 + pair.ayah.id)
                 }
                 if settings.saveLastListenedAyah, let pair = lastListenedAyahPair {
                     SummaryAyahTile(title: "Last Listened Ayah", icon: "headphones.circle", surah: pair.surah, ayah: pair.ayah) {
                         push(surahID: pair.surah.id, ayahID: pair.ayah.id)
                     }
+                    .animation(.easeInOut, value: pair.surah.id * 1000 + pair.ayah.id)
                 }
                 if settings.saveLastListenedSurah,
                    let last = settings.lastListenedSurah,
@@ -1246,6 +1273,7 @@ struct QuranView: View {
                     SummarySurahTile(title: "Last Listened Surah", icon: "headphones", surah: surah, lastListenedSurah: last) {
                         push(surahID: surah.id, ayahID: nil)
                     }
+                    .animation(.easeInOut, value: last.surahNumber)
                 }
             }
             .padding(.vertical, 4)
@@ -1998,10 +2026,10 @@ struct QuranView: View {
     private func surahBrowseSection(context: SearchDisplayContext, showsRevelationOrder: Bool) -> some View {
         let browsedSurahs = orderedQuranSurahs(showsRevelationOrder: showsRevelationOrder)
 
+        #if os(iOS)
         Section(header: surahBrowseHeader(showsRevelationOrder: showsRevelationOrder)) { }
             .padding(.bottom, -12)
 
-        #if os(iOS)
         if settings.quranGridMode {
             Section {
                 surahGrid(browsedSurahs, context: context)
@@ -2014,8 +2042,12 @@ struct QuranView: View {
             }
         }
         #else
-        ForEach(browsedSurahs, id: \.id) { surah in
-            surahRow(surah: surah, context: context, showsRevelationOrder: showsRevelationOrder)
+        // watchOS: keep the rows inside the header's own section. An empty `Section(header:) {}` followed
+        // by loose rows (the iOS pattern) leaves a large blank gap under the "SURAHS" title on watchOS.
+        Section(header: surahBrowseHeader(showsRevelationOrder: showsRevelationOrder)) {
+            ForEach(browsedSurahs, id: \.id) { surah in
+                surahRow(surah: surah, context: context, showsRevelationOrder: showsRevelationOrder)
+            }
         }
         #endif
     }
@@ -2052,7 +2084,7 @@ struct QuranView: View {
         .id("surah_\(surah.id)")
         .onAppear {
             if surah.id == scrollToSurahID {
-                withAnimation { scrollToSurahID = -1 }
+                scrollToSurahID = -1
             }
         }
     }
@@ -2083,9 +2115,7 @@ struct QuranView: View {
                     .id("surah_\(surah.id)")
                     .onAppear {
                         if surah.id == scrollToSurahID {
-                            withAnimation {
-                                scrollToSurahID = -1
-                            }
+                            scrollToSurahID = -1
                         }
                     }
                     .rightSwipeActions(
@@ -2411,10 +2441,11 @@ struct QuranView: View {
     @ViewBuilder
     private func searchResultSections(context: SearchDisplayContext) -> some View {
         if context.isSearching {
-            // Page/juz rows for explicit queries are inserted above surahContentSections.
+            // Page/juz rows for explicit queries are inserted above surahContentSections. For a bare number
+            // they go here, BELOW the surah match (juz before page). Each shows the range's Start/End ayah.
             if !context.explicitPageOrJuzMode {
-                pageSearchSection(context: context)
                 juzSearchSection(context: context)
+                pageSearchSection(context: context)
             }
 
             if !context.explicitPageOrJuzMode {
@@ -2427,11 +2458,9 @@ struct QuranView: View {
     private func pageSearchSection(context: SearchDisplayContext) -> some View {
         if let page = context.pageJuzQuery.page {
             let ayahs = quranData.ayahs(onPage: page)
-            if !ayahs.isEmpty {
+            if let first = ayahs.first {
                 Section(header: pageSearchHeader(title: "PAGE SEARCH RESULT", valueText: "Page \(page) • \(ayahs.count) Ayahs")) {
-                    ForEach(Array(ayahs.enumerated()), id: \.offset) { _, item in
-                        pageJuzAyahRow(item: item)
-                    }
+                    pageJuzRangeRows(first: first, last: ayahs.last, count: ayahs.count)
                 }
             }
         }
@@ -2441,20 +2470,40 @@ struct QuranView: View {
     private func juzSearchSection(context: SearchDisplayContext) -> some View {
         if let juz = context.pageJuzQuery.juz {
             let ayahs = quranData.ayahs(inJuz: juz)
-            if !ayahs.isEmpty {
+            if let first = ayahs.first {
                 Section(header: pageSearchHeader(title: "JUZ SEARCH RESULT", valueText: "Juz \(juz) • \(ayahs.count) Ayahs")) {
-                    ForEach(Array(ayahs.enumerated()), id: \.offset) { _, item in
-                        pageJuzAyahRow(item: item)
-                    }
+                    pageJuzRangeRows(first: first, last: ayahs.last, count: ayahs.count)
                 }
             }
         }
     }
 
+    /// A page/juz search result shows the range's FIRST and LAST ayah (labeled Start / End) rather than
+    /// every ayah — like Juz View marks where a section begins and ends. The header's count pill conveys
+    /// the total. A single-ayah range shows just the one row (unlabeled).
     @ViewBuilder
-    private func pageJuzAyahRow(item: (surah: Surah, ayah: Ayah)) -> some View {
+    private func pageJuzRangeRows(first: (surah: Surah, ayah: Ayah), last: (surah: Surah, ayah: Ayah)?, count: Int) -> some View {
+        if count > 1, let last {
+            pageJuzAyahRow(item: first, leadingLabel: "Start")
+            pageJuzAyahRow(item: last, leadingLabel: "End")
+        } else {
+            pageJuzAyahRow(item: first)
+        }
+    }
+
+    @ViewBuilder
+    private func pageJuzAyahRow(item: (surah: Surah, ayah: Ayah), leadingLabel: String? = nil) -> some View {
         quranNavigationLink(route: .ayahs(surahID: item.surah.id, ayah: item.ayah.id)) {
-            CompactAyahArabicRow(surah: item.surah, ayah: item.ayah)
+            VStack(alignment: .leading, spacing: 4) {
+                if let leadingLabel {
+                    Text(leadingLabel)
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
+                // Full ayah row (same font/tajweed/beginner mode/highlight as the reading view); already
+                // single-line internally.
+                SurahAyahRow(surah: item.surah, ayah: item.ayah)
+            }
         }
     }
 
@@ -2498,7 +2547,7 @@ struct QuranView: View {
             if !bestHits.isEmpty {
                 Section(header: bestAyahHeader(count: bestHits.count)) {
                     ForEach(bestHits) { hit in
-                        ayahHitRow(hit: hit, context: context)
+                        ayahHitRow(hit: hit, context: context, section: "best")
                     }
                 }
             }
@@ -2510,7 +2559,7 @@ struct QuranView: View {
             ForEach(verseHitsGroupedBySurah, id: \.surahId) { group in
                 Section {
                     ForEach(group.hits) { hit in
-                        ayahHitRow(hit: hit, context: context)
+                        ayahHitRow(hit: hit, context: context, section: "grouped")
                     }
                 } header: {
                     surahSearchSectionHeader(surahId: group.surahId)
@@ -2547,68 +2596,44 @@ struct QuranView: View {
         let normalizedQuery = normalizedBestMatchText(trimmed)
         guard !normalizedQuery.isEmpty else { return [] }
 
-        let queryTokens = normalizedQuery
-            .split(separator: " ")
-            .map(String.init)
-            .filter { !$0.isEmpty }
-
-        guard !queryTokens.isEmpty else { return [] }
-
-        typealias RankedHit = (hit: VerseIndexEntry, score: Int)
-        var ranked: [RankedHit] = []
-        ranked.reserveCapacity(verseHits.count)
-
-        for hit in verseHits {
-            let sources = [hit.arabicBlob, hit.englishBlob, hit.englishExactBlob]
-
-            var score = 0
-
-            if sources.contains(where: { $0 == normalizedQuery }) {
-                score += 260
-            }
-
-            if sources.contains(where: { $0.hasPrefix(normalizedQuery) }) {
-                score += 180
-            } else if sources.contains(where: { $0.contains(normalizedQuery) }) {
-                score += 120
-            }
-
-            let tokenHits = queryTokens.filter { token in
-                sources.contains(where: { $0.contains(token) })
-            }.count
-
-            score += tokenHits * 24
-
-            if tokenHits == queryTokens.count {
-                score += 60
-            }
-
-            if score > 0 {
-                ranked.append((hit: hit, score: score))
-            }
+        func sources(_ hit: VerseIndexEntry) -> [String] {
+            [hit.arabicBlob, hit.englishBlob, hit.englishExactBlob]
         }
 
-        guard !ranked.isEmpty else { return [] }
-
-        ranked.sort {
-            if $0.score != $1.score { return $0.score > $1.score }
-            if $0.hit.surah != $1.hit.surah { return $0.hit.surah < $1.hit.surah }
-            return $0.hit.ayah < $1.hit.ayah
+        // An "exact" hit contains the full query phrase contiguously, not just its tokens scattered around.
+        func isExactPhraseHit(_ hit: VerseIndexEntry) -> Bool {
+            sources(hit).contains { $0.contains(normalizedQuery) }
         }
 
-        let topScore = ranked[0].score
-        let secondScore = ranked.count > 1 ? ranked[1].score : 0
-        let isClearlyBetter = topScore >= 220 || (ranked.count > 1 && (topScore - secondScore) >= 40)
-        guard isClearlyBetter else { return [] }
+        let exactHits = verseHits.filter(isExactPhraseHit)
 
-        let minAcceptedScore = max(150, topScore - 55)
+        // Only worth a separate "Top Ayah Results" section when there's a real contrast: some loaded hits
+        // contain the exact phrase and others only matched loosely. If every hit (or no hit) is an exact
+        // phrase match, the section just duplicates the list below — so suppress it instead of showing a
+        // redundant "top" that's no better than the rest.
+        guard !exactHits.isEmpty, exactHits.count < verseHits.count else { return [] }
+
+        // Rank the exact hits so the strongest phrasing (whole-blob equality, then prefix) leads.
+        func rank(_ hit: VerseIndexEntry) -> Int {
+            let s = sources(hit)
+            if s.contains(where: { $0 == normalizedQuery }) { return 3 }
+            if s.contains(where: { $0.hasPrefix(normalizedQuery) }) { return 2 }
+            return 1
+        }
+
+        let ordered = exactHits.sorted {
+            let r0 = rank($0), r1 = rank($1)
+            if r0 != r1 { return r0 > r1 }
+            if $0.surah != $1.surah { return $0.surah < $1.surah }
+            return $0.ayah < $1.ayah
+        }
+
         var selected: [VerseIndexEntry] = []
         var seen = Set<String>()
-
-        for candidate in ranked where candidate.score >= minAcceptedScore {
-            let key = "\(candidate.hit.surah)-\(candidate.hit.ayah)"
+        for hit in ordered {
+            let key = "\(hit.surah)-\(hit.ayah)"
             if seen.insert(key).inserted {
-                selected.append(candidate.hit)
+                selected.append(hit)
             }
             if selected.count >= maxResults { break }
         }
@@ -2654,7 +2679,9 @@ struct QuranView: View {
                 bookmarkedAyahs: context.bookmarkedAyahs,
                 searchText: $searchText,
                 scrollToSurahID: $scrollToSurahID,
-                disableTajweedColors: true,
+                // Exact "S:A" match is a single row with no search-term highlight to conflict, so show
+                // tajweed colors here (text-search hits keep them off for the term highlight + perf).
+                disableTajweedColors: false,
                 onSelectAyah: columnAyahSelectionHandler
             )
         }
@@ -2678,7 +2705,7 @@ struct QuranView: View {
     }
 
     @ViewBuilder
-    private func ayahHitRow(hit: VerseIndexEntry, context: SearchDisplayContext) -> some View {
+    private func ayahHitRow(hit: VerseIndexEntry, context: SearchDisplayContext, section: String) -> some View {
         if let surah = quranData.surah(hit.surah),
            let ayah = quranData.ayah(surah: hit.surah, ayah: hit.ayah) {
             let row = AyahSearchRow(
@@ -2700,8 +2727,11 @@ struct QuranView: View {
                 compact: true,
                 disableTajweedColors: true
             )
-            .id("ayah-results-\(surah.id)-\(ayah.id)")
-            .animation(.easeInOut, value: verseHits.count)
+            // Section-scoped id: the same ayah can appear in both "best" and "grouped" sections, and
+            // duplicate List identities cause scroll jank. No per-row .animation here — that previously
+            // re-animated every visible row whenever verseHits.count changed (e.g. while loading more
+            // results during scroll), which is what made scrolling feel laggy versus SurahView.
+            .id("ayah-results-\(section)-\(surah.id)-\(ayah.id)")
 
             quranNavigationLink(route: .ayahs(surahID: surah.id, ayah: ayah.id)) {
                 row
@@ -2757,10 +2787,8 @@ struct QuranView: View {
                     guard !Task.isCancelled else { return }
                     await MainActor.run {
                         guard query == searchText.trimmingCharacters(in: .whitespacesAndNewlines) else { return }
-                        withAnimation {
-                            verseHits = allHits
-                            hasMoreHits = false
-                        }
+                        verseHits = allHits
+                        hasMoreHits = false
                     }
                 }
             } label: {
@@ -2784,20 +2812,6 @@ struct QuranView: View {
         handleAyahSearchChange(txt, debounce: true)
     }
 
-    /// Scrolls to a surah row, retrying until it appears. Needed because the action that requests the
-    /// scroll may also clear an active search, and the resulting List rebuild can outlast a single
-    /// fixed delay. The target row's `onAppear` resets `scrollToSurahID` to -1, which stops the loop.
-    private func scrollToSurah(_ id: Int, proxy: ScrollViewProxy, attemptsLeft: Int) {
-        guard attemptsLeft > 0, scrollToSurahID == id else { return }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
-            guard scrollToSurahID == id else { return }
-            withAnimation {
-                proxy.scrollTo("surah_\(id)", anchor: .top)
-            }
-            scrollToSurah(id, proxy: proxy, attemptsLeft: attemptsLeft - 1)
-        }
-    }
-
     private func loadMoreAyahMatches(_ amount: Int) {
         ayahSearchTask?.cancel()
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -2808,10 +2822,8 @@ struct QuranView: View {
             guard !Task.isCancelled else { return }
             await MainActor.run {
                 guard query == searchText.trimmingCharacters(in: .whitespacesAndNewlines) else { return }
-                withAnimation {
-                    verseHits.append(contentsOf: moreHits)
-                    hasMoreHits = moreAvail
-                }
+                verseHits.append(contentsOf: moreHits)
+                hasMoreHits = moreAvail
             }
         }
     }
@@ -2859,10 +2871,8 @@ struct QuranView: View {
             guard !Task.isCancelled else { return }
             await MainActor.run {
                 guard query == searchText.trimmingCharacters(in: .whitespacesAndNewlines) else { return }
-                withAnimation {
-                    verseHits = first
-                    hasMoreHits = more
-                }
+                verseHits = first
+                hasMoreHits = more
             }
         }
     }

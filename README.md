@@ -12,11 +12,13 @@ I was selected from thousands of high school and college students while still in
 [**Download Al-Quran on the App Store here**](https://apps.apple.com/us/app/al-quran-beginner-quran/id6474894373?platform=iphone)
 
 <a href="https://apps.apple.com/us/app/al-quran-beginner-quran/id6474894373?platform=iphone">
-  <img src="Resources/Logo.jpg" alt="Logo" width="120" style="border-radius:10px;"/>
+  <img src="Logo.jpg" alt="Logo" width="120" style="border-radius:10px;"/>
 </a>
 
 ### 📂 Related Projects on GitHub
 
+- [**Al-Islam | Islamic Pillars**](https://github.com/TheAbubakrAbu/Al-Islam-iOS)
+- [**Al-Adhan | Prayer Times**](https://github.com/TheAbubakrAbu/Al-Adhan-iOS)
 - [**Al-Quran Swift Student Challenge 2024 Submission**](https://github.com/TheAbubakrAbu/Al-Quran-Swift-Student-Challenge-2024)
 - [**Quran Swift Playground for Kids**](https://github.com/TheAbubakrAbu/Quran-Swift-Playground-for-Kids)
 
@@ -57,6 +59,10 @@ Al-Quran is a complete Quranic experience designed for new learners, reverts, an
 ## 100% Free, Ad-Free, and Privacy-Focused
 - No ads, fees, or subscriptions.
 - Your data never leaves your device, ensuring complete privacy and security.
+
+## A Note on Intent
+
+This project is offered as *sadaqah jariyah* — a contribution for the benefit of the Muslim community and anyone building tools to read, learn, and listen to the Quran. If it helps you, please keep the chain of attribution intact and consider contributing improvements back.
 
 ## License
 

@@ -2,7 +2,7 @@ import SwiftUI
 import WidgetKit
 
 @main
-struct AlQuranApp: App {
+struct AlIslamApp: App {
     @StateObject private var settings = Settings.shared
     @StateObject private var quranData = QuranData.shared
     @StateObject private var quranPlayer = QuranPlayer.shared
@@ -46,6 +46,7 @@ struct AlQuranApp: App {
                 .tint(settings.accentColor.color)
                 .preferredColorScheme(settings.colorScheme)
                 .appReviewPrompt()
+                //.statusBarHidden()
         }
         .onChange(of: settings.accentColor) { _ in
             WidgetCenter.shared.reloadAllTimelines()
@@ -54,8 +55,7 @@ struct AlQuranApp: App {
             quranPlayer.saveLastListenedSurah()
             quranPlayer.saveLastListenedAyah()
             settings.refreshQuranWidgets()
-            if phase == .active {
-            } else {
+            if phase != .active {
                 // Send any just-made setting change before the app is suspended, so it can't be lost (and
                 // can't be reverted by a stale synced value on the next launch).
                 WatchConnectivityManager.shared.flushPendingSync()
@@ -91,68 +91,36 @@ struct AlQuranApp: App {
 private struct MainTabView: View {
     @EnvironmentObject private var quranPlayer: QuranPlayer
 
-    private enum AppTab: Hashable { case adhan, quran, islam, settings }
-    @State private var selectedTab: AppTab = .adhan
+    private enum AppTab: Hashable { case quran, islam, settings }
+    @State private var selectedTab: AppTab = .quran
 
     var body: some View {
         tabs
-            // Single Now Playing bar for the whole app, applied once at the root so it persists across every
-            // screen — including pushed subviews — instead of each tab adding it. Suppressed on the Quran tab,
-            // which renders its own richer bar (scroll-to-surah, in-Quran navigation).
-            .safeAreaInset(edge: .bottom) {
-                if selectedTab != .quran,
-                   quranPlayer.isPlaying || quranPlayer.isPaused {
-                    VStack(spacing: SafeAreaInsetVStackSpacing.standard) {
-                        NowPlayingView()
-                    }
-                    .padding(.horizontal, 24)
-                    .padding(.bottom, 8)
-                    .background(Color.white.opacity(0.00001))
-                    .animation(.easeInOut, value: quranPlayer.isPlaying || quranPlayer.isPaused)
-                }
-            }
     }
 
     @ViewBuilder
     private var tabs: some View {
-        if #available(iOS 18.0, *) {
-            TabView(selection: $selectedTab) {
-                Tab("Quran", systemImage: "character.book.closed.ar", value: AppTab.quran) {
-                    QuranView()
+        TabView(selection: $selectedTab) {
+            QuranView()
+                .tabItem {
+                    Image(systemName: "character.book.closed.ar")
+                    Text("Quran")
                 }
+                .tag(AppTab.quran)
 
-                Tab("Islam", systemImage: "moon.stars", value: AppTab.islam) {
-                    IslamView()
+            IslamView()
+                .tabItem {
+                    Image(systemName: "moon.stars")
+                    Text("Islam")
                 }
+                .tag(AppTab.islam)
 
-                Tab("Settings", systemImage: "gearshape", value: AppTab.settings) {
-                    SettingsView()
+            SettingsView()
+                .tabItem {
+                    Image(systemName: "gearshape")
+                    Text("Settings")
                 }
-            }
-        } else {
-            TabView(selection: $selectedTab) {
-                QuranView()
-                    .tabItem {
-                        Image(systemName: "character.book.closed.ar")
-                        Text("Quran")
-                    }
-                    .tag(AppTab.quran)
-
-                IslamView()
-                    .tabItem {
-                        Image(systemName: "moon.stars")
-                        Text("Islam")
-                    }
-                    .tag(AppTab.islam)
-
-                SettingsView()
-                    .tabItem {
-                        Image(systemName: "gearshape")
-                        Text("Settings")
-                    }
-                    .tag(AppTab.settings)
-            }
+                .tag(AppTab.settings)
         }
     }
 }
-

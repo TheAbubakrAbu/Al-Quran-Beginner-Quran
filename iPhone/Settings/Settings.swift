@@ -5,6 +5,20 @@ import os
 
 let logger = Logger(subsystem: AppIdentifiers.bundleIdentifier, category: "Settings")
 
+/// The single source of truth for all user settings.
+///
+/// **Why everything lives in this one file:** `@AppStorage` / `@Published` are stored property wrappers, and
+/// Swift only allows stored properties in a type's primary declaration — never in an extension. So the
+/// settings themselves can't be physically moved into separate Quran/Adhan files; the *behavior* that uses
+/// them is what's split out, into `SettingsAdhan.swift` (prayer times, notifications, location) and
+/// `SettingsQuran.swift` (reciters, bookmarks, khatm, …).
+///
+/// The declarations below are grouped, in order, into the four buckets:
+///   1. **App Group** — `@Published`, mirrored into `appGroupUserDefaults` so widgets/extensions see them.
+///   2. **App Storage — Adhan/Prayer** — `@AppStorage` prayer state, notifications, travel, calculation.
+///   3. **App Storage — Quran** — `@AppStorage` reciter, favorites, sajdah/muqatta'at, bookmarks, khatm.
+///   4. **App Storage — Arabic/Names + appearance/misc** — fonts, themes, haptics, color scheme.
+/// Keep new settings in the matching section (and storage mechanism) so the split stays clean.
 final class Settings: ObservableObject {
     static let shared = Settings()
     private let appGroupUserDefaults = UserDefaults(suiteName: AppIdentifiers.appGroupSuiteName)
@@ -25,7 +39,6 @@ final class Settings: ObservableObject {
     private init() {
         self.accentColor = AccentColor(rawValue: appGroupUserDefaults?.string(forKey: "accentColor") ?? AppIdentifiers.mainColorString) ?? AppIdentifiers.mainColor
         self.customAccentColorHex = appGroupUserDefaults?.string(forKey: "customAccentColorHex") ?? "34C759"
-        self.nowPlayingExpanded = appGroupUserDefaults?.bool(forKey: "nowPlayingExpanded") ?? false
         
         loadKhatmProgressCacheFromStorage()
         runQuranStartupMigrations()
@@ -57,16 +70,11 @@ final class Settings: ObservableObject {
         }
     }
 
-    /// Big vs. small in-app Now Playing player. A @Published (not @AppStorage) so `withAnimation` animates it.
-    @Published var nowPlayingExpanded: Bool {
-        didSet {
-            guard Bundle.main.bundleIdentifier?.contains("Widget") != true else { return }
-            appGroupUserDefaults?.setValue(nowPlayingExpanded, forKey: "nowPlayingExpanded")
-        }
-    }
-
     // MARK: - Quran — @AppStorage
-    
+
+    /// Big vs. small in-app Now Playing player. An in-app UI preference, not shared with the widget/watch.
+    @AppStorage("nowPlayingExpanded") var nowPlayingExpanded: Bool = false
+
     @AppStorage("reciter") var reciter: String = "Muhammad Al-Minshawi (Murattal)"
 
     /// Disambiguates reciters that share the same display name (qiraah / surah base URL).

@@ -166,16 +166,6 @@ final class WatchConnectivityManager: NSObject, WCSessionDelegate {
                 self.sendSnapshotIfChanged()
             }
         }
-
-        #if os(watchOS)
-        // Now that we know whether the iPhone app is installed, (re)schedule prayer notifications
-        // on the watch if it needs to handle them itself.
-        if activationState == .activated {
-            Task { @MainActor in
-                Settings.shared.fetchPrayerTimes()
-            }
-        }
-        #endif
     }
 
     #if os(iOS)
@@ -251,10 +241,6 @@ extension Settings {
         if appGroup?.object(forKey: "accentColor") != nil { dict["accentColor"] = accentColor.rawValue }
         if appGroup?.object(forKey: "customAccentColorHex") != nil { dict["customAccentColorHex"] = customAccentColorHex }
         if appGroup?.object(forKey: "customBackgroundColorHex") != nil { dict["customBackgroundColorHex"] = customBackgroundColorHex }
-        if appGroup?.object(forKey: "prayerCalculation") != nil { dict["prayerCalculation"] = prayerCalculation }
-        if appGroup?.object(forKey: "hanafiMadhab") != nil { dict["hanafiMadhab"] = hanafiMadhab }
-        if appGroup?.object(forKey: "travelingMode") != nil { dict["travelingMode"] = travelingMode }
-        if appGroup?.object(forKey: "hijriOffset") != nil { dict["hijriOffset"] = hijriOffset }
 
         // @AppStorage settings — likewise only keys that have been explicitly written.
         let store = UserDefaults.standard
@@ -271,10 +257,6 @@ extension Settings {
         if let raw = dict["accentColor"] as? String, let c = AccentColor(rawValue: raw), c != accentColor { accentColor = c }
         if let v = dict["customAccentColorHex"] as? String, v != customAccentColorHex { customAccentColorHex = v }
         if let v = dict["customBackgroundColorHex"] as? String, v != customBackgroundColorHex { customBackgroundColorHex = v }
-        if let v = dict["prayerCalculation"] as? String, v != prayerCalculation { prayerCalculation = v }
-        if let v = dict["hanafiMadhab"] as? Bool, v != hanafiMadhab { hanafiMadhab = v }
-        if let v = dict["travelingMode"] as? Bool, v != travelingMode { travelingMode = v }
-        if let v = dict["hijriOffset"] as? Int, v != hijriOffset { hijriOffset = v }
 
         let store = UserDefaults.standard
         for key in Self.watchSyncedAppStorageKeys where dict[key] != nil {
@@ -282,8 +264,6 @@ extension Settings {
         }
 
         objectWillChange.send()
-        updateDates()
-        fetchPrayerTimes(force: true)
         #if os(iOS) || os(watchOS)
         WidgetCenter.shared.reloadAllTimelines()
         #endif

@@ -94,7 +94,7 @@ private struct MainTabView: View {
     @EnvironmentObject private var quranPlayer: QuranPlayer
 
     private enum AppTab: Hashable { case quran, islam, settings }
-    @State private var selectedTab: AppTab = .adhan
+    @State private var selectedTab: AppTab = .quran
 
     var body: some View {
         tabs

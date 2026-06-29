@@ -39,6 +39,7 @@ final class Settings: ObservableObject {
     private init() {
         self.accentColor = AccentColor(rawValue: appGroupUserDefaults?.string(forKey: "accentColor") ?? AppIdentifiers.mainColorString) ?? AppIdentifiers.mainColor
         self.customAccentColorHex = appGroupUserDefaults?.string(forKey: "customAccentColorHex") ?? "34C759"
+        self.customBackgroundColorHex = appGroupUserDefaults?.string(forKey: "customBackgroundColorHex") ?? "1C1C1E"
         
         loadKhatmProgressCacheFromStorage()
         runQuranStartupMigrations()
@@ -67,6 +68,15 @@ final class Settings: ObservableObject {
         didSet {
             guard Bundle.main.bundleIdentifier?.contains("Widget") != true else { return }
             appGroupUserDefaults?.setValue(customAccentColorHex, forKey: "customAccentColorHex")
+        }
+    }
+    
+    /// Hex ("RRGGBB") of the user-picked app background, used when the "custom" color theme is active. Kept
+    /// `@Published` (not `@AppStorage`) so dragging the color picker updates the background live everywhere.
+    @Published var customBackgroundColorHex: String {
+        didSet {
+            guard Bundle.main.bundleIdentifier?.contains("Widget") != true else { return }
+            appGroupUserDefaults?.setValue(customBackgroundColorHex, forKey: "customBackgroundColorHex")
         }
     }
 
@@ -209,7 +219,7 @@ final class Settings: ObservableObject {
 
     var groupBySurah: Bool { quranSortMode == .surah }
     @AppStorage("searchForSurahs") var searchForSurahs: Bool = true
-    @AppStorage("ignoreSilentLettersInQuranSearch") var ignoreSilentLettersInQuranSearch: Bool = false
+    @AppStorage("ignoreSilentLettersInQuranSearch") var ignoreSilentLettersInQuranSearch: Bool = true
 
     @AppStorage("lastReadSurah") var lastReadSurah: Int = 0
     @AppStorage("lastReadAyah") var lastReadAyah: Int = 0
@@ -411,11 +421,25 @@ final class Settings: ObservableObject {
     // MARK: Arabic search normalization
 
     func cleanSearch(_ text: String, whitespace: Bool = false) -> String {
-        let normalized = normalizedArabicForSearch(text)
-        var cleaned = String(normalized.unicodeScalars
-            .filter { !Self.unwantedCharSet.contains($0) }
-        ).lowercased()
-        cleaned = collapsingWhitespace(cleaned)
+        // Single scalar walk: fold each Arabic scalar through the canonical map (dagger alif → alif, hamza
+        // carriers → bare letters, teh marbuta → heh, …) and drop unwanted punctuation/marks in the SAME
+        // pass. Replaces the old 22 sequential `replacingOccurrences` scans (each a full-string pass +
+        // allocation) plus a separate filter pass — this runs on every keystroke query and ~7×/ayah during
+        // index build, so collapsing 23 passes into 1 is a real win. Behavior is identical: all map keys are
+        // single scalars, normalization still happens before the unwanted-char filter, lowercasing after.
+        var built = ""
+        built.unicodeScalars.reserveCapacity(text.unicodeScalars.count)
+        for scalar in text.unicodeScalars {
+            if let mapped = Self.canonicalArabicSearchScalarMap[scalar] {
+                guard let replacement = mapped else { continue }   // map → nil means "drop" (e.g. bare hamza)
+                if Self.unwantedCharSet.contains(replacement) { continue }
+                built.unicodeScalars.append(replacement)
+            } else {
+                if Self.unwantedCharSet.contains(scalar) { continue }
+                built.unicodeScalars.append(scalar)
+            }
+        }
+        var cleaned = collapsingWhitespace(built.lowercased())
 
         if whitespace {
             cleaned = cleaned.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -428,11 +452,23 @@ final class Settings: ObservableObject {
         cleanSearch(text.removingSilentArabicLettersForSearch, whitespace: whitespace)
     }
 
-    private func normalizedArabicForSearch(_ text: String) -> String {
-        Self.canonicalArabicSearchMap.reduce(text) { partial, pair in
-            partial.replacingOccurrences(of: pair.key, with: pair.value)
+    /// Scalar form of `canonicalArabicSearchMap`, built once: `key scalar → replacement scalar`, or `nil`
+    /// to drop the scalar entirely. Lets `cleanSearch` normalize in a single pass instead of 22 string scans.
+    /// (All `canonicalArabicSearchMap` keys are single scalars and values are one scalar or empty.)
+    private static let canonicalArabicSearchScalarMap: [UnicodeScalar: UnicodeScalar?] = {
+        var out: [UnicodeScalar: UnicodeScalar?] = [:]
+        for (key, value) in canonicalArabicSearchMap {
+            let keyScalars = Array(key.unicodeScalars)
+            guard keyScalars.count == 1 else { continue }
+            let valueScalars = Array(value.unicodeScalars)
+            if valueScalars.isEmpty {
+                out.updateValue(nil, forKey: keyScalars[0])              // store .none → drop
+            } else if valueScalars.count == 1 {
+                out.updateValue(valueScalars[0], forKey: keyScalars[0])  // store replacement scalar
+            }
         }
-    }
+        return out
+    }()
 
     private static let canonicalArabicSearchMap: [String: String] = [
         // Alif family
@@ -513,9 +549,33 @@ final class Settings: ObservableObject {
             return .light
         case "dark", "gray":
             return .dark
+        case "custom":
+            // Pick a light or dark base from the chosen background's brightness so text stays readable.
+            return (customBackgroundLuminance ?? 1) < 0.5 ? .dark : .light
         default:
             return nil
         }
+    }
+
+    /// RGB components (0…1) of a "RRGGBB" hex string, or nil if invalid.
+    private func rgbComponents(fromHex hex: String) -> (r: Double, g: Double, b: Double)? {
+        var s = hex.trimmingCharacters(in: .whitespacesAndNewlines)
+        if s.hasPrefix("#") { s.removeFirst() }
+        guard s.count == 6, let rgb = UInt64(s, radix: 16) else { return nil }
+        return (Double((rgb >> 16) & 0xFF) / 255, Double((rgb >> 8) & 0xFF) / 255, Double(rgb & 0xFF) / 255)
+    }
+
+    /// Perceived luminance (0…1) of the custom background, used to choose its light/dark base and derive shades.
+    private var customBackgroundLuminance: Double? {
+        guard let c = rgbComponents(fromHex: customBackgroundColorHex) else { return nil }
+        return 0.299 * c.r + 0.587 * c.g + 0.114 * c.b
+    }
+
+    /// The custom background nudged brighter/darker by `delta`, for deriving the row and glass-tint shades.
+    private func adjustedCustomBackground(by delta: Double) -> Color? {
+        guard let c = rgbComponents(fromHex: customBackgroundColorHex) else { return nil }
+        func clampAdj(_ v: Double) -> Double { max(0, min(1, v + delta)) }
+        return Color(red: clampAdj(c.r), green: clampAdj(c.g), blue: clampAdj(c.b))
     }
 
     // MARK: - Reading themes (Sepia / Gray)
@@ -525,14 +585,15 @@ final class Settings: ObservableObject {
 
     /// True when the active theme paints its own background/row colors instead of the system grouped colors.
     var hasCustomThemeColors: Bool {
-        colorSchemeString == "sepia" || colorSchemeString == "gray"
+        colorSchemeString == "sepia" || colorSchemeString == "gray" || colorSchemeString == "custom"
     }
 
-    /// Background shown behind list content for custom themes (warm cream / neutral charcoal).
+    /// Background shown behind list content for custom themes (warm cream / neutral charcoal / user-picked).
     var themeBackgroundColor: Color? {
         switch colorSchemeString {
         case "sepia": return Color(red: 0.90, green: 0.83, blue: 0.69)
         case "gray":  return Color(red: 0.13, green: 0.13, blue: 0.14)
+        case "custom": return Color(hex: customBackgroundColorHex)
         default:      return nil
         }
     }
@@ -542,6 +603,8 @@ final class Settings: ObservableObject {
         switch colorSchemeString {
         case "sepia": return Color(red: 0.93, green: 0.90, blue: 0.82)
         case "gray":  return Color(red: 0.19, green: 0.19, blue: 0.20)
+        // A shade offset from the picked background (lighter on dark, darker on light) so cards stand out.
+        case "custom": return adjustedCustomBackground(by: (customBackgroundLuminance ?? 1) < 0.5 ? 0.06 : -0.06)
         default:      return nil
         }
     }
@@ -552,6 +615,7 @@ final class Settings: ObservableObject {
         switch colorSchemeString {
         case "sepia": return Color(red: 0.85, green: 0.74, blue: 0.50).opacity(0.55)
         case "gray":  return Color(red: 0.33, green: 0.33, blue: 0.35).opacity(0.55)
+        case "custom": return adjustedCustomBackground(by: (customBackgroundLuminance ?? 1) < 0.5 ? 0.12 : -0.08)?.opacity(0.55)
         default:      return nil
         }
     }

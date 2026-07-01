@@ -1529,11 +1529,18 @@ final class TajweedStore {
     }
 
     private func isFinalFathataynSilentAlifMadd(clusters: [CharacterClusterInfo], index: Int) -> Bool {
-        guard clusters.indices.contains(index), isSilentFinalLetter(clusters: clusters, index: index) else { return false }
+        guard clusters.indices.contains(index) else { return false }
         guard let base = clusters[index].primaryArabicLetter, base == "ا" || base == "ى" else { return false }
         guard indexOfFinalArabicLetterCluster(clusters: clusters) == index else { return false }
         guard let previous = previousArabicLetterClusterIndex(clusters: clusters, before: index) else { return false }
-        return hasFathatayn(clusters[previous])
+        // Tanwin fath at the end of an ayah → madd 'iwad (the helper alif / alif-maqsura is a 2-count
+        // natural madd on waqf, not silent). It is written two ways and BOTH qualify:
+        //   • fathatayn (ـً 064B / Uthmani ٗ 0657), e.g. غَفُورًا — caught by isSilentFinalLetter + hasFathatayn.
+        //   • the Uthmani iqlaab form: a fatha + tiny high/low meem (the meem replaces the tanwin's noon),
+        //     e.g. رُوَيۡدَۢا / سَمِيعَۢا — caught by isSilentFinalLetterAfterTinyMeem. We don't pronounce the
+        //     tanwin at a stop, so the alif elongates here exactly like the fathatayn form.
+        if isSilentFinalLetter(clusters: clusters, index: index), hasFathatayn(clusters[previous]) { return true }
+        return isSilentFinalLetterAfterTinyMeem(clusters: clusters, index: index, previousIndex: previous)
     }
 
     private func wordClusterRanges(clusters: [CharacterClusterInfo]) -> [Range<Int>] {
@@ -1574,9 +1581,9 @@ final class TajweedStore {
         let rawFinalLetters = finalWord.filter { clusters.indices.contains($0) && clusters[$0].primaryArabicLetter != nil }
         if let rawLast = rawFinalLetters.last,
            let base = clusters[rawLast].primaryArabicLetter, base == "ا" || base == "ى",
-           isSilentFinalLetter(clusters: clusters, index: rawLast),
            let prev = previousArabicLetterClusterIndex(clusters: clusters, before: rawLast),
-           hasFathatayn(clusters[prev]) {
+           (isSilentFinalLetter(clusters: clusters, index: rawLast) && hasFathatayn(clusters[prev]))
+             || isSilentFinalLetterAfterTinyMeem(clusters: clusters, index: rawLast, previousIndex: prev) {
             return nil
         }
 
@@ -4876,6 +4883,43 @@ final class QuranData: ObservableObject {
         return (surahIDsByJuz[juzID] ?? []).compactMap { surah($0) }
     }
 
+    struct JuzStats: Equatable {
+        let surahCount: Int
+        let ayahCount: Int
+        let wordCount: Int
+        let letterCount: Int
+        let pageCount: Int
+    }
+
+    /// Aggregate counts for a single juz, computed from the ayahs actually assigned to it
+    /// (`ayah.juz == juz.id`) so surahs that straddle a juz boundary are split correctly.
+    func juzStats(for juz: Juz) -> JuzStats {
+        var surahIDs = Set<Int>()
+        var ayahCount = 0
+        var wordCount = 0
+        var letterCount = 0
+        var pages = Set<Int>()
+
+        for surahID in juz.startSurah...juz.endSurah {
+            guard let surah = surah(surahID) else { continue }
+            for ayah in surah.ayahs where ayah.juz == juz.id {
+                surahIDs.insert(surahID)
+                ayahCount += 1
+                wordCount += ayah.wordCount
+                letterCount += ayah.letterCount
+                if let page = ayah.page { pages.insert(page) }
+            }
+        }
+
+        return JuzStats(
+            surahCount: surahIDs.count,
+            ayahCount: ayahCount,
+            wordCount: wordCount,
+            letterCount: letterCount,
+            pageCount: pages.count
+        )
+    }
+
     func surahsMatchingCount(ayahFilter: CountFilter?, pageFilter: CountFilter?) -> [Surah] {
         func matchingIDs(from index: [Int: [Int]], filter: CountFilter?) -> Set<Int>? {
             guard let filter else { return nil }
@@ -5005,15 +5049,20 @@ final class QuranData: ObservableObject {
         let revelationSearchMode: RevelationSearchMode? = {
             guard !normalizedQuery.isEmpty else { return nil }
 
-            let makkanHit = Self.makkanAliases.contains { alias in
-                alias.hasPrefix(normalizedQuery) || normalizedQuery.hasPrefix(alias)
+            // Treat the query as a revelation-place filter only when it's a deliberate word, not an incidental
+            // prefix. Typing a single letter like "m" used to prefix-match "makkah" and silently swap the whole
+            // list for all 86 Meccan surahs (and "d" → every Madinan one). Require at least 4 characters before
+            // a *partial* alias counts; a fully-typed alias ("makki", "madina", …) still matches at any point.
+            let minRevelationPrefix = 4
+            func hits(_ aliases: Set<String>) -> Bool {
+                aliases.contains { alias in
+                    normalizedQuery.hasPrefix(alias)
+                        || (normalizedQuery.count >= minRevelationPrefix && alias.hasPrefix(normalizedQuery))
+                }
             }
-            if makkanHit { return .makkan }
 
-            let madinanHit = Self.madinanAliases.contains { alias in
-                alias.hasPrefix(normalizedQuery) || normalizedQuery.hasPrefix(alias)
-            }
-            if madinanHit { return .madinan }
+            if hits(Self.makkanAliases) { return .makkan }
+            if hits(Self.madinanAliases) { return .madinan }
 
             return nil
         }()

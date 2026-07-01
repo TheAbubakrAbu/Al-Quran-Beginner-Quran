@@ -57,10 +57,20 @@ struct SurahsHeader: View {
 
 struct JuzHeader: View {
     @EnvironmentObject var quranData: QuranData
+    #if os(iOS)
+    @EnvironmentObject var settings: Settings
+    #endif
 
     let juz: Juz
 
     @State private var randomSurah: Surah?
+    #if os(iOS)
+    @State private var showInfo = false
+    #endif
+
+    private var surahCount: Int {
+        quranData.surahs(inJuz: juz.id).count
+    }
 
     var body: some View {
         HStack {
@@ -75,7 +85,13 @@ struct JuzHeader: View {
             #if os(iOS)
             Spacer()
 
-            randomSurahLink
+            surahCountBadge
+            infoButton
+            // Khatm's Juz grouping is about tracking a full read-through, so the random "shuffle to a surah"
+            // jump doesn't belong there — hide it in khatm mode.
+            if settings.quranSortMode != .khatm {
+                randomSurahLink
+            }
             #endif
         }
         .onAppear {
@@ -83,6 +99,17 @@ struct JuzHeader: View {
                 randomSurah = randomSurahInJuz
             }
         }
+        #if os(iOS)
+        .confirmationDialog(
+            "Juz \(juz.id) — \(juz.nameTransliteration)",
+            isPresented: $showInfo,
+            titleVisibility: .visible
+        ) {
+            Button("OK") {}
+        } message: {
+            Text(infoMessage)
+        }
+        #endif
     }
 
     private var surahsInRange: [Surah] {
@@ -94,6 +121,45 @@ struct JuzHeader: View {
     }
 
     #if os(iOS)
+    private var infoMessage: String {
+        let stats = quranData.juzStats(for: juz)
+        return """
+        \(juz.nameArabic)
+
+        Ayahs: \(stats.ayahCount)
+        Pages: \(stats.pageCount)
+        Words: \(stats.wordCount)
+        Letters: \(stats.letterCount)
+
+        Starts: Surah \(juz.startSurah):\(juz.startAyah)
+        Ends: Surah \(juz.endSurah):\(juz.endAyah)
+        """
+    }
+
+    private var surahCountBadge: some View {
+        Text("\(surahCount)")
+            .font(.caption2.weight(.semibold))
+            .monospacedDigit()
+            .foregroundStyle(settings.accentColor.color)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .conditionalGlassEffect()
+            .accessibilityLabel("\(surahCount) surahs")
+    }
+
+    private var infoButton: some View {
+        Button {
+            settings.hapticFeedback()
+            showInfo = true
+        } label: {
+            Image(systemName: "info.circle")
+                .padding(4)
+                .conditionalGlassEffect()
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(settings.accentColor.color)
+    }
+
     private var randomSurahLink: some View {
         NavigationLink {
             Group {

@@ -276,7 +276,7 @@ struct ArabicView: View {
             Section("LIGHT LETTERS") {
                 ForEach((standardArabicLetters + otherArabicLetters).filter {
                     $0.weight == .light
-                        || $0.transliteration == "taa marbuuTa"
+                        || $0.transliteration == "taa marbuuTah"
                         || $0.transliteration.lowercased().contains("hamza")
                 }, id: \.id) {
                     letterRow(for: $0)
@@ -580,11 +580,11 @@ struct ArabicLetterView: View {
             case "yaa":
                 Text("In the Uthmani script of the Quran, when 'yaa' is written at the end of a word (or by itself), it is usually written without the two dots underneath.")
                     .font(.body)
-            case "taa marbuuTa":
+            case "taa marbuuTah":
                 Group {
-                    Text("\"Taa marbuuTa\" means \"tied taa\" and is used to indicate the feminine gender in Arabic.")
+                    Text("\"Taa marbuuTah\" means \"tied/knotted taa\" and is used to indicate the feminine gender in Arabic.")
                     Text("It is typically added to the end of a noun to show that the noun is feminine. For example, the Arabic word for teacher is \"معلم\" (mu'allim) for a male and \"معلمة\" (mu'allima) for a female.")
-                    Text("Taa marbuuTa is pronounced as a \"t\" sound in certain cases, such as when the word is in the construct state or has a suffix. Otherwise, it is often silent but affects the preceding vowel, usually creating a short \"ah\" sound, similar to 'ه' (as in \"mu'allimah\").")
+                    Text("Taa marbuuTah is pronounced as a \"t\" sound in certain cases, such as when the word is in the construct state or has a suffix. Otherwise, it is often silent but affects the preceding vowel, usually creating a short \"ah\" sound, similar to 'ه' (as in \"mu'allimah\").")
                 }
                 .font(.body)
             case "hamzatul waSl":
@@ -869,14 +869,21 @@ struct ArabicLetterRow: View, Equatable {
     }
 
     var body: some View {
-        NavigationLink(destination: ArabicLetterView(letterData: letterData)) {
+        // A letter can also match on its hidden `name` / weight keywords / rule, so only guarantee a
+        // highlight on a displayed field (transliteration or the letter glyph) when that field itself
+        // contains the query — otherwise leave it un-highlighted rather than force-color an unrelated field.
+        let query = searchQuery.lowercased()
+        let matchedTransliteration = !query.isEmpty && letterData.transliteration.lowercased().contains(query)
+        let matchedLetter = !query.isEmpty && letterData.letter.lowercased().contains(query)
+        return NavigationLink(destination: ArabicLetterView(letterData: letterData)) {
             HStack {
                 HighlightedSnippet(
                     source: letterData.transliteration,
                     term: searchQuery,
                     font: .subheadline,
                     accent: accentColor.color,
-                    fg: .primary
+                    fg: .primary,
+                    guaranteeMatch: matchedTransliteration
                 )
 
                 Spacer()
@@ -888,7 +895,8 @@ struct ArabicLetterRow: View, Equatable {
                         ? .custom(fontArabic, size: UIFont.preferredFont(forTextStyle: .title2).pointSize)
                         : .title2,
                     accent: accentColor.color,
-                    fg: accentColor.color
+                    fg: accentColor.color,
+                    guaranteeMatch: matchedLetter
                 )
             }
             .padding(.vertical, -2)

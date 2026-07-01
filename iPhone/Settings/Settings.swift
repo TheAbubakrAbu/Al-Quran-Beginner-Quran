@@ -53,6 +53,49 @@ final class Settings: ObservableObject {
             try? await Task.sleep(nanoseconds: 10_000_000)
         }
     }
+    
+    /// Restores every *preference* (appearance, prayer, and Quran options) to its default while keeping the
+    /// user's content. We wipe the app's standard-defaults domain — which clears all the `@AppStorage`
+    /// preferences in one shot — but first snapshot the content keys and write them back afterward, then
+    /// reset the app-group-backed `@Published` preferences (accent, calculation, madhab, traveling, Hijri
+    /// offset) to their defaults via their setters so the shared store + widgets update too. Location and
+    /// other app-group content are left untouched.
+    @MainActor
+    func resetAllSettings() {
+        // Bookmarks, favorites, khatm progress, saved reading/listening positions, and search history are
+        // content, not settings — preserve them across the domain wipe.
+        let contentKeys = [
+            "favoriteSurahsData", "bookmarkedAyahsData", "favoriteLetterData", "favoriteNameNumbersData",
+            "khatmCompletedAyahsData", "favoriteReciterIDsData", "favoriteQiraahTagsData",
+            "favoriteEnglishTranslationIDsData", "savedSajdahAyahIDsData", "savedBrokenLetterAyahIDsData",
+            "lastReadSurah", "lastReadAyah", "lastListenedAyahData", "lastListenedSurahData",
+            "quranSearchHistoryData",
+        ]
+
+        let standard = UserDefaults.standard
+        let preserved = contentKeys.reduce(into: [String: Any]()) { dict, key in
+            if let value = standard.object(forKey: key) { dict[key] = value }
+        }
+
+        if let bundleID = Bundle.main.bundleIdentifier {
+            standard.removePersistentDomain(forName: bundleID)
+        }
+
+        for (key, value) in preserved {
+            standard.set(value, forKey: key)
+        }
+
+        // App-group preferences are mirrored by these @Published properties; reassigning to the defaults
+        // re-persists them through each didSet. (Mirrors the init defaults.)
+        accentColor = AppIdentifiers.mainColor
+        customAccentColorHex = "34C759"
+        customBackgroundColorHex = "1C1C1E"
+
+        objectWillChange.send()
+        #if os(iOS) || os(watchOS)
+        WidgetCenter.shared.reloadAllTimelines()
+        #endif
+    }
 
     // MARK: - App group — shared with widgets / extensions
 
@@ -218,6 +261,10 @@ final class Settings: ObservableObject {
     }
 
     var groupBySurah: Bool { quranSortMode == .surah }
+    /// In Khatm mode, the Surah/Juz toggle (which replaces the Asc/Desc control). When on, surahs are grouped
+    /// under juz headers, each surah shown once in the juz it *starts* in — so juz that no surah opens (e.g.
+    /// juz 2, 5) appear empty.
+    @AppStorage("khatmGroupByJuz") var khatmGroupByJuz: Bool = false
     @AppStorage("searchForSurahs") var searchForSurahs: Bool = true
     @AppStorage("ignoreSilentLettersInQuranSearch") var ignoreSilentLettersInQuranSearch: Bool = true
 

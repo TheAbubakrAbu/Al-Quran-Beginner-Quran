@@ -7,6 +7,7 @@ struct SettingsView: View {
     @State private var showingCredits = false
     @State private var selectedDestination: SettingsDestination? = SettingsView.defaultDestination
     @State private var hasSetDefaultSelection = false
+    @State private var showResetConfirmation = false
 
     /// The destination shown when nothing is explicitly selected (single source of truth).
     private static let defaultDestination: SettingsDestination = .quranSettings
@@ -67,6 +68,7 @@ struct SettingsView: View {
             Group {
                 quranSection
                 appearanceSection
+                resetSection
                 creditsSection
 
                 AlIslamAppsSection()
@@ -84,6 +86,7 @@ struct SettingsView: View {
             Group {
                 quranSectionSplit
                 appearanceSection
+                resetSection
                 creditsSection
                 AlIslamAppsSection()
             }
@@ -98,7 +101,7 @@ struct SettingsView: View {
         Group {
             switch selectedDestination ?? Self.defaultDestination {
             case .quranSettings:
-                SettingsQuranView(showEdits: true)
+                SettingsQuranView()
             }
         }
     }
@@ -141,10 +144,41 @@ struct SettingsView: View {
         .tint(settings.accentColor.color)
     }
 
+    @ViewBuilder
+    private var resetSection: some View {
+        #if os(iOS)
+        Section(header: Text("RESET")) {
+            Button(role: .destructive) {
+                settings.hapticFeedback()
+                showResetConfirmation = true
+            } label: {
+                Label("Reset All Settings", systemImage: "arrow.counterclockwise")
+                    .font(.subheadline)
+                    .foregroundColor(.red)
+            }
+            .confirmationDialog(
+                "Reset All Settings?",
+                isPresented: $showResetConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button("Reset All Settings", role: .destructive) {
+                    settings.hapticFeedback()
+                    withAnimation {
+                        settings.resetAllSettings()
+                    }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This restores every setting (appearance, prayer, and Quran options) to its default. Your bookmarks, favorites, khatm progress, and saved location are kept.")
+            }
+        }
+        #endif
+    }
+
     private var quranSection: some View {
         Section(header: Text("AL-QURAN")) {
             resourceLink(title: "Quran Settings", systemImage: "character.book.closed.ar") {
-                SettingsQuranView(showEdits: true)
+                SettingsQuranView()
             }
         }
     }
